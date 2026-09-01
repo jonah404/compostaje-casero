@@ -1,0 +1,16 @@
+{
+  "name": "Compost Tracker",
+  "short_name": "Compost",
+  "description": "Seguimiento de compostaje, plantas y clima del jardín",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#161510",
+  "theme_color": "#2d6645",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
