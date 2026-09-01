@@ -394,6 +394,7 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
     <button class="sn"     onclick="go('sist')"><i class="ti ti-box-multiple"></i>Sistemas</button>
     <button class="sn"     onclick="go('rev')"> <i class="ti ti-history"></i>Revolcadas</button>
     <button class="sn"     onclick="go('cli')"> <i class="ti ti-cloud"></i>Clima</button>
+    <button class="sn"     onclick="go('pla')"> <i class="ti ti-leaf"></i>Plantas</button>
     <button class="sn"     onclick="go('reg')"> <i class="ti ti-circle-plus"></i>Registrar</button>
   </nav>
   <div class="sb-foot">
@@ -422,6 +423,7 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
       <button class="mt"    onclick="go('sist')"><i class="ti ti-box-multiple"></i>Sistemas</button>
       <button class="mt"    onclick="go('rev')"> <i class="ti ti-history"></i>Revolcadas</button>
       <button class="mt"    onclick="go('cli')"> <i class="ti ti-cloud"></i>Clima</button>
+      <button class="mt"    onclick="go('pla')"> <i class="ti ti-leaf"></i>Plantas</button>
       <button class="mt"    onclick="go('reg')"> <i class="ti ti-circle-plus"></i>Registrar</button>
     </div>
   </div>
@@ -451,6 +453,12 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
     <div class="pg" id="pg-cli">
       <div class="fetch-bar hide" id="fetch-bar"><i class="ti ti-cloud-download"></i> Actualizando clima desde Open-Meteo...</div>
       <div id="cli-c"></div>
+    </div>
+
+    <!-- PLANTAS -->
+    <div class="pg" id="pg-pla">
+      <div id="pla-c"></div>
+      <button class="add-btn" onclick="addPlanta()"><i class="ti ti-plus"></i> Agregar planta</button>
     </div>
 
     <!-- REGISTRAR -->
@@ -486,6 +494,51 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
           </div>
         </div>
       </div>
+
+      <div class="form-row" style="align-items:start;margin-top:20px">
+        <div>
+          <div class="fc">
+            <h3><i class="ti ti-leaf"></i>Nueva actividad de planta</h3>
+            <div class="f"><label>Planta</label><select id="pv"></select></div>
+            <div class="f"><label>Tipo de evento</label>
+              <select id="pt">
+                <option value="💧 Riego">💧 Riego</option>
+                <option value="🌿 Fertilización">🌿 Fertilización</option>
+                <option value="✂️ Poda">✂️ Poda</option>
+                <option value="🐛 Revisión plagas">🐛 Revisión plagas</option>
+                <option value="🍂 Cosecha">🍂 Cosecha</option>
+                <option value="📝 Observación">📝 Observación</option>
+              </select>
+            </div>
+            <div class="f"><label>Fecha</label><input type="date" id="pf"></div>
+            <div class="f"><label>Detalle</label><input type="text" id="pd" placeholder="ej: riego profundo, 15L"></div>
+            <div class="f"><label>Producto / Dosis (opcional)</label><input type="text" id="pp" placeholder="ej: 15-15-15, 100g"></div>
+            <div class="f"><label>Resultado / Observación</label><textarea id="pr" placeholder="Notas opcionales..."></textarea></div>
+            <button class="btn-g" onclick="saveEventoPlanta()">Guardar evento</button>
+          </div>
+        </div>
+        <div>
+          <div class="fc">
+            <h3><i class="ti ti-settings"></i>Editar planta</h3>
+            <div class="f"><label>Planta</label><select id="epv" onchange="loadPlanta()"></select></div>
+            <div class="f"><label>Nombre</label><input type="text" id="epn"></div>
+            <div class="form-row" style="margin-bottom:0">
+              <div class="f"><label>Variedad</label><input type="text" id="epva"></div>
+              <div class="f"><label>Especie</label><input type="text" id="epe"></div>
+            </div>
+            <div class="form-row" style="margin-bottom:0">
+              <div class="f"><label>Fecha plantación</label><input type="date" id="epf"></div>
+              <div class="f"><label>Ubicación</label><input type="text" id="epu"></div>
+            </div>
+            <div class="form-row" style="margin-bottom:0">
+              <div class="f"><label>Exposición solar</label><input type="text" id="epx" placeholder="Sol pleno"></div>
+              <div class="f"><label>Tipo suelo</label><input type="text" id="eps" placeholder="Tierra directa"></div>
+            </div>
+            <div class="f"><label>Notas</label><textarea id="epno"></textarea></div>
+            <button class="btn-g" onclick="savePlanta()">Guardar planta</button>
+          </div>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -511,13 +564,16 @@ import {
 
 // ════ FIREBASE CONFIG ════
 const firebaseConfig = {
-  apiKey: "TU_API_KEY",
-  authDomain: "TU_PROYECTO.firebaseapp.com",
-  projectId: "TU_PROYECTO_ID",
-  storageBucket: "TU_PROYECTO.appspot.com",
-  messagingSenderId: "TU_SENDER_ID",
-  appId: "TU_APP_ID"
+  apiKey: "AIzaSyCjlf3MS68H4lCSZbeWpdvCvv8tZjnm2cE",
+  authDomain: "compostaje-casero.firebaseapp.com",
+  projectId: "compostaje-casero",
+  storageBucket: "compostaje-casero.firebasestorage.app",
+  messagingSenderId: "570860670823",
+  appId: "1:570860670823:web:2d061232d05e50b248a9c2"
 };
+// URL del Apps Script desplegado como Web App (Extensions > Apps Script > Deploy > New deployment > Web app).
+// Completar después de desplegarlo — hasta entonces el guardado en Firebase funciona igual, solo no se replica en la Sheet.
+const SHEET_SYNC_URL = "";
 let db, useFirebase = false;
 try {
   const a = initializeApp(firebaseConfig);
@@ -571,12 +627,27 @@ const SEED_CLI = [
   {id:'c-2026-05-28',fecha:'2026-05-28',temp:13.0,tmax:17.1,tmin:10.1,hum:86,humMax:99,humMin:73,lluvia:'si',mm:0.2,hsLluvia:2.0,viento:13.2,rafaga:24.1,dir:'➡️E 94°',evapo:1.2,sol:7.1,notas:'☔ Día lluvioso'},
 ];
 
+const SEED_PLA = [
+  {id:1,nombre:'Mandarina Criolla',variedad:'Citrus reticulata',especie:'Cítrico',fechaP:'2026-08-04',ubicacion:'Huerta - posición 1',exposicion:'Sol pleno',suelo:'Tierra directa',notas:''},
+  {id:2,nombre:'Limonero 4 Estaciones',variedad:'Citrus limon',especie:'Cítrico',fechaP:'2026-08-04',ubicacion:'Huerta - posición 2',exposicion:'Sol pleno',suelo:'Tierra directa',notas:''},
+  {id:3,nombre:'Ciruela Reina Claudia',variedad:'Reina Claudia',especie:'Prunus doméstica',fechaP:'2026-08-30',ubicacion:'Huerta - posición 3',exposicion:'Sol pleno',suelo:'Tierra directa',notas:''},
+  {id:4,nombre:'Durazno amarillo',variedad:'Amarillo',especie:'Prunus pérsica',fechaP:'2026-08-30',ubicacion:'Huerta posición 4',exposicion:'Sol pleno',suelo:'Tierra directa',notas:''},
+];
+const SEED_REGPLA = [
+  {id:'p1',planta:1,fecha:'2026-08-04',tipo:'🌱 Plantación',detalle:'Plantación en tierra directa, sol pleno',producto:'Fertilizante 15-15-15, 250g en fondo de hoyo',resultado:'Planta instalada. Pan de tierra intacto. Relleno con tierra y regado.'},
+  {id:'p2',planta:2,fecha:'2026-08-04',tipo:'🌱 Plantación',detalle:'Plantación en tierra directa, sol pleno',producto:'Fertilizante 15-15-15, 250g en fondo de hoyo',resultado:'Planta instalada. Pan de tierra intacto. Relleno con tierra y regado.'},
+  {id:'p3',planta:3,fecha:'2026-08-30',tipo:'🌱 Plantación',detalle:'Plantación en tierra directa, sol pleno',producto:'Fertilizante 15-15-15, 50g en fondo de hoyo',resultado:'Planta instalada. Pan de tierra intacto. Relleno con tierra y regado.'},
+  {id:'p4',planta:4,fecha:'2026-08-30',tipo:'🌱 Plantación',detalle:'Plantación en tierra directa, sol pleno',producto:'Fertilizante 15-15-15, 50g en fondo de hoyo',resultado:'Planta instalada. Pan de tierra intacto. Relleno con tierra y regado.'},
+];
+
 // ════ ESTADO ════
 let S = JSON.parse(localStorage.getItem('compost_v7') || 'null');
 if (!S) {
-  S = { sistemas: SEED_SIS, revolcadas: SEED_REV, clima: SEED_CLI, climaLastFetch: null };
+  S = { sistemas: SEED_SIS, revolcadas: SEED_REV, clima: SEED_CLI, climaLastFetch: null, plantas: SEED_PLA, registroPlantas: SEED_REGPLA };
   localStorage.setItem('compost_v7', JSON.stringify(S));
 }
+if (!S.plantas) S.plantas = SEED_PLA;
+if (!S.registroPlantas) S.registroPlantas = SEED_REGPLA;
 const sv = () => localStorage.setItem('compost_v7', JSON.stringify(S));
 const upsertCli = arr => arr.forEach(c => {
   const i = S.clima.findIndex(x => x.fecha === c.fecha);
@@ -645,8 +716,24 @@ const fbLoad = async () => {
     if (rd.docs.length) S.revolcadas = rd.docs.map(d=>({id:d.id,...d.data()}));
     const cd = await getDocs(query(collection(db,'clima'),orderBy('fecha','desc')));
     if (cd.docs.length) upsertCli(cd.docs.map(d=>({id:d.id,...d.data()})));
+    const pd = await getDocs(collection(db,'plantas'));
+    pd.forEach(d => { const x=d.data(); const i=S.plantas.findIndex(p=>p.id===x.id); i>=0?(S.plantas[i]={...S.plantas[i],...x}):S.plantas.push(x); });
+    const prd = await getDocs(query(collection(db,'registroPlantas'),orderBy('fecha','desc')));
+    if (prd.docs.length) S.registroPlantas = prd.docs.map(d=>({id:d.id,...d.data()}));
     sv();
   } catch(e) {}
+};
+
+// ════ SYNC A GOOGLE SHEET (Apps Script Web App) ════
+// fetch en modo no-cors: no podemos leer la respuesta, pero evita el preflight CORS
+// que el Web App de Apps Script no maneja. Es "fire and forget".
+const sheetSync = (tipo, data) => {
+  if (!SHEET_SYNC_URL) return;
+  fetch(SHEET_SYNC_URL, {
+    method: 'POST', mode: 'no-cors',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ tipo, data })
+  }).catch(()=>{});
 };
 
 // ════ UTILS ════
@@ -676,6 +763,48 @@ const proxRev = s => {
   const p = new Date(base); p.setDate(p.getDate()+7); return p;
 };
 const sLbl = s => s.nombre ? `#${s.id} — ${s.nombre}` : `Sistema ${s.id}`;
+
+// ════ PLANTAS — cálculos ════
+const UMBRAL_LLUVIA_MM = 8;
+const CFG_PLA = { diasSinRiegoVerano:7, diasSinRiegoInvierno:14, diasFert:60, diasPlagas:30, diasPoda:365, mesesVerano:[11,12,1,2,3] };
+const regEventos = (pid, tipo) => S.registroPlantas.filter(r => r.planta===pid && (!tipo || r.tipo.includes(tipo))).sort((a,b)=>a.fecha>b.fecha?-1:1);
+const ultimoEvento = (pid, tipo) => regEventos(pid, tipo)[0] || null;
+const aguaEfectiva = p => {
+  const riego = ultimoEvento(p.id, 'Riego') || ultimoEvento(p.id, 'Plantación');
+  const fRiego = riego ? pISO(riego.fecha) : (p.fechaP ? pISO(p.fechaP) : null);
+  let lluvia = null, mmLluvia = 0;
+  [...S.clima].sort((a,b)=>a.fecha>b.fecha?-1:1).forEach(c => {
+    if (lluvia) return;
+    if (+c.mm >= UMBRAL_LLUVIA_MM) { lluvia = pISO(c.fecha); mmLluvia = +c.mm; }
+  });
+  if (lluvia && (!fRiego || lluvia > fRiego)) return { fecha: lluvia, tipo:'lluvia', mm: mmLluvia };
+  return fRiego ? { fecha: fRiego, tipo:'riego', mm:null } : null;
+};
+const estPlanta = p => {
+  const hoy = TODAY, mes = hoy.getMonth()+1;
+  const esVerano = CFG_PLA.mesesVerano.includes(mes);
+  const limite = esVerano ? CFG_PLA.diasSinRiegoVerano : CFG_PLA.diasSinRiegoInvierno;
+  const agua = aguaEfectiva(p);
+  const diasSinAgua = agua ? dd(agua.fecha, hoy) : null;
+  const fert = ultimoEvento(p.id,'Fertiliz');
+  const baseFert = fert ? pISO(fert.fecha) : (p.fechaP ? pISO(p.fechaP) : null);
+  const diasFert = baseFert ? dd(baseFert, hoy) : null;
+  const plagas = ultimoEvento(p.id,'plagas');
+  const basePlagas = plagas ? pISO(plagas.fecha) : (p.fechaP ? pISO(p.fechaP) : null);
+  const diasPlagas = basePlagas ? dd(basePlagas, hoy) : null;
+  const poda = ultimoEvento(p.id,'Poda');
+  const basePoda = poda ? pISO(poda.fecha) : (p.fechaP ? pISO(p.fechaP) : null);
+  const diasPoda = basePoda ? dd(basePoda, hoy) : null;
+  return {
+    diasSinAgua, limite, agua,
+    riegoUrg: diasSinAgua!=null && diasSinAgua>=limite,
+    riegoProx: diasSinAgua!=null && diasSinAgua>=limite*0.7 && diasSinAgua<limite,
+    diasFert, fertUrg: diasFert!=null && diasFert>=CFG_PLA.diasFert,
+    diasPlagas, plagasUrg: diasPlagas!=null && diasPlagas>=CFG_PLA.diasPlagas,
+    diasPoda, podaProx: diasPoda!=null && diasPoda>=CFG_PLA.diasPoda-30,
+  };
+};
+const pLbl = p => p.nombre || `Planta ${p.id}`;
 
 // ════ HEATMAP ════
 // Cada paleta: [{v,r,g,b}, …] igual que el AppScript original
@@ -791,6 +920,13 @@ const renderDash = () => {
   });
   S.sistemas.filter(s=>est(s).fase==='q').forEach(s=>als.push({c:'al-w',t:`${sLbl(s)} — casi listo`,b:`${est(s).d}d en estanque`}));
   S.sistemas.filter(s=>est(s).fase==='l').forEach(s=>als.push({c:'al-ok',t:`${sLbl(s)} — ¡listo!`,b:'Más de 180 días en estanque'}));
+  S.plantas.forEach(p=>{
+    const e = estPlanta(p);
+    if (e.riegoUrg) als.push({c:'al-r',t:`${pLbl(p)} — regar`,b:`${e.diasSinAgua} días sin agua (límite ${e.limite})`});
+    else if (e.riegoProx) als.push({c:'al-w',t:`${pLbl(p)} — riego pronto`,b:`${e.diasSinAgua} días sin agua`});
+    if (e.fertUrg) als.push({c:'al-w',t:`${pLbl(p)} — fertilizar`,b:`${e.diasFert} días desde la última`});
+    if (e.plagasUrg) als.push({c:'al-w',t:`${pLbl(p)} — revisar plagas`,b:`${e.diasPlagas} días desde la última revisión`});
+  });
   if(!als.length) als.push({c:'al-ok',t:'Todo en orden 👍',b:'Sin alertas pendientes'});
   const ch = cdDia(fISO(TODAY)) || [...S.clima].sort((a,b)=>a.fecha>b.fecha?-1:1)[0];
 
@@ -850,6 +986,29 @@ const renderDash = () => {
 // ════ RENDER SISTEMAS ════
 const renderSist = () => {
   document.getElementById('sist-c').innerHTML = S.sistemas.map(s=>sysHTML(s)).join('');
+};
+
+// ════ RENDER PLANTAS ════
+const plantHTML = p => {
+  const e = estPlanta(p);
+  const badges = [];
+  if (e.riegoUrg) badges.push(`<span class="badge" style="background:var(--rust-bg);color:var(--rust)">💧 Regar — ${e.diasSinAgua}d sin agua</span>`);
+  else if (e.riegoProx) badges.push(`<span class="badge" style="background:var(--umber-bg);color:var(--umber)">💧 Riego pronto</span>`);
+  else if (e.diasSinAgua!=null) badges.push(`<span class="badge bc">💧 ${e.diasSinAgua}d sin agua</span>`);
+  if (e.fertUrg) badges.push(`<span class="badge" style="background:var(--umber-bg);color:var(--umber)">🌿 Fertilizar</span>`);
+  if (e.plagasUrg) badges.push(`<span class="badge" style="background:var(--sky-bg);color:var(--sky)">🐛 Revisar plagas</span>`);
+  if (e.podaProx) badges.push(`<span class="badge bv">✂️ Poda cerca</span>`);
+  const meta = [p.variedad||p.especie, p.ubicacion].filter(Boolean).join(' · ');
+  return `<div class="sysc" onclick="openPla(${p.id})">
+    <div class="sysc-top">
+      <span class="sysc-name">${pLbl(p)}</span>
+    </div>
+    ${meta?`<div class="sysc-meta">${meta}</div>`:''}
+    <div class="pills" style="margin-top:8px">${badges.join('')||'<span class="badge bl">✅ Al día</span>'}</div>
+  </div>`;
+};
+const renderPla = () => {
+  document.getElementById('pla-c').innerHTML = S.plantas.map(p=>plantHTML(p)).join('') || '<div style="font-size:13px;color:var(--ink3)">Sin plantas registradas.</div>';
 };
 
 // ════ RENDER REVOLCADAS ════
@@ -986,6 +1145,37 @@ window.openSis = id => {
     <button class="btn-o" onclick="closeMod();go('reg');document.getElementById('es').value=${id};loadSis()">Editar sistema</button>`;
   document.getElementById('mwrap').classList.add('on');
 };
+window.openPla = id => {
+  const p = S.plantas.find(x=>x.id===id);
+  const e = estPlanta(p);
+  const eventos = regEventos(id);
+  document.getElementById('mtitle').textContent = pLbl(p);
+  document.getElementById('mbody').innerHTML = `
+    <table class="mt-tbl">
+      <tr><td>Variedad / Especie</td><td>${[p.variedad,p.especie].filter(Boolean).join(' / ')||'—'}</td></tr>
+      <tr><td>Fecha plantación</td><td>${fmt(p.fechaP)}</td></tr>
+      <tr><td>Ubicación</td><td>${p.ubicacion||'—'}</td></tr>
+      <tr><td>Días sin agua</td><td style="color:${e.riegoUrg?'var(--rust-mid)':e.riegoProx?'var(--umber-mid)':'var(--ink)'}">${e.diasSinAgua!=null?e.diasSinAgua+' días (límite '+e.limite+')':'—'}</td></tr>
+      <tr><td>Días desde última fertilización</td><td>${e.diasFert!=null?e.diasFert+' días':'—'}</td></tr>
+      <tr><td>Días desde última revisión de plagas</td><td>${e.diasPlagas!=null?e.diasPlagas+' días':'—'}</td></tr>
+    </table>
+    ${p.notas?`<div style="font-size:12px;color:var(--ink2);background:var(--paper2);padding:11px;border-radius:var(--r);margin:14px 0">${p.notas}</div>`:''}
+    <div style="font-family:var(--serif);font-size:17px;color:var(--ink);margin:18px 0 10px">Historial</div>
+    ${eventos.length?`<div style="overflow-x:auto"><table class="rtbl" style="width:100%">
+      <thead><tr><th>Fecha</th><th>Evento</th><th>Detalle</th><th>Resultado</th></tr></thead>
+      <tbody>${eventos.map(r=>`<tr>
+        <td><b>${fmt(r.fecha)}</b></td>
+        <td>${r.tipo}</td>
+        <td style="font-size:11px;color:var(--ink3)">${r.detalle||''}${r.producto?' — '+r.producto:''}</td>
+        <td style="font-size:11px;color:var(--ink3);font-style:italic">${r.resultado||''}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>`:`<div style="font-size:13px;color:var(--ink3)">Sin eventos registrados</div>`}
+    <div style="height:14px"></div>
+    <button class="btn-g" onclick="closeMod();go('reg');document.getElementById('pv').value=${id}">Registrar evento</button>
+    <div style="height:7px"></div>
+    <button class="btn-o" onclick="closeMod();go('reg');document.getElementById('epv').value=${id};loadPlanta()">Editar planta</button>`;
+  document.getElementById('mwrap').classList.add('on');
+};
 window.onMClick = e => { if(e.target===document.getElementById('mwrap')) closeMod(); };
 window.closeMod = () => document.getElementById('mwrap').classList.remove('on');
 
@@ -996,9 +1186,63 @@ window.saveRev = async () => {
   const r = {id:Date.now().toString(), sistema:si, fecha:f, obs:document.getElementById('ro').value};
   S.revolcadas.push(r); sv();
   const fbId = await fbAdd('revolcadas', r); if(fbId){r.id=fbId;sv();}
+  sheetSync('revolcada', r);
   document.getElementById('ro').value = '';
   toast(`✅ Revolcada guardada — Sistema ${si}`);
   if(cur==='dash') renderDash(); if(cur==='rev') renderRev();
+};
+
+window.loadPlanta = () => {
+  const id=+document.getElementById('epv').value, p=S.plantas.find(x=>x.id===id); if(!p)return;
+  document.getElementById('epn').value = p.nombre||'';
+  document.getElementById('epva').value = p.variedad||'';
+  document.getElementById('epe').value = p.especie||'';
+  document.getElementById('epf').value = p.fechaP||'';
+  document.getElementById('epu').value = p.ubicacion||'';
+  document.getElementById('epx').value = p.exposicion||'';
+  document.getElementById('eps').value = p.suelo||'';
+  document.getElementById('epno').value = p.notas||'';
+};
+window.savePlanta = async () => {
+  const id=+document.getElementById('epv').value, p=S.plantas.find(x=>x.id===id); if(!p)return;
+  p.nombre = document.getElementById('epn').value;
+  p.variedad = document.getElementById('epva').value;
+  p.especie = document.getElementById('epe').value;
+  p.fechaP = document.getElementById('epf').value;
+  p.ubicacion = document.getElementById('epu').value;
+  p.exposicion = document.getElementById('epx').value;
+  p.suelo = document.getElementById('eps').value;
+  p.notas = document.getElementById('epno').value;
+  sv(); await fbSave('plantas', id, p); sheetSync('planta', p); poblarSels();
+  toast(`✅ ${pLbl(p)} guardada`);
+  if(cur==='dash')renderDash(); if(cur==='pla')renderPla();
+};
+window.addPlanta = async () => {
+  const nid = S.plantas.length ? Math.max(...S.plantas.map(p=>p.id))+1 : 1;
+  const p = {id:nid, nombre:'', variedad:'', especie:'', fechaP:fISO(TODAY), ubicacion:'', exposicion:'', suelo:'', notas:''};
+  S.plantas.push(p); sv(); await fbSave('plantas', nid, p); sheetSync('planta', p);
+  poblarSels(); renderPla();
+  go('reg');
+  document.getElementById('epv').value = nid;
+  loadPlanta();
+  toast(`Planta ${nid} agregada — completá sus datos`);
+};
+window.saveEventoPlanta = async () => {
+  const pid=+document.getElementById('pv').value, f=document.getElementById('pf').value;
+  if(!f){ toast('Completá la fecha'); return; }
+  const r = {
+    id:'ev'+Date.now(), planta:pid, fecha:f,
+    tipo:document.getElementById('pt').value,
+    detalle:document.getElementById('pd').value,
+    producto:document.getElementById('pp').value,
+    resultado:document.getElementById('pr').value,
+  };
+  S.registroPlantas.push(r); sv();
+  const fbId = await fbAdd('registroPlantas', r); if(fbId){r.id=fbId;sv();}
+  sheetSync('plantaEvento', r);
+  ['pd','pp','pr'].forEach(x=>document.getElementById(x).value='');
+  toast(`✅ Evento guardado — ${pLbl(S.plantas.find(p=>p.id===pid))}`);
+  if(cur==='dash') renderDash(); if(cur==='pla') renderPla();
 };
 
 window.loadSis = () => {
@@ -1008,7 +1252,7 @@ window.loadSis = () => {
 window.saveSis = async () => {
   const id=+document.getElementById('es').value, s=S.sistemas.find(x=>x.id===id);
   [s.nombre,s.inicioC,s.finC,s.inicioE,s.notas] = ['en','ei','ef','ee','eno'].map(x=>document.getElementById(x).value);
-  sv(); await fbSave('sistemas',id,s); poblarSels();
+  sv(); await fbSave('sistemas',id,s); sheetSync('sistema', s); poblarSels();
   toast(`✅ Sistema ${id} guardado`);
   if(cur==='dash')renderDash(); if(cur==='sist')renderSist();
 };
@@ -1041,11 +1285,12 @@ window.delRev = async (id, e) => {
 
 // ════ NAVEGACIÓN ════
 let cur = 'dash';
-const TITLES = {dash:'Inicio',sist:'Sistemas',rev:'Revolcadas',cli:'Clima',reg:'Registrar'};
+const NAVT = ['dash','sist','rev','cli','pla','reg'];
+const TITLES = {dash:'Inicio',sist:'Sistemas',rev:'Revolcadas',cli:'Clima',pla:'Plantas',reg:'Registrar'};
 window.go = t => {
   cur = t;
-  document.querySelectorAll('.sn').forEach((b,i)=>b.classList.toggle('on',['dash','sist','rev','cli','reg'][i]===t));
-  document.querySelectorAll('.mt').forEach((b,i)=>b.classList.toggle('on',['dash','sist','rev','cli','reg'][i]===t));
+  document.querySelectorAll('.sn').forEach((b,i)=>b.classList.toggle('on',NAVT[i]===t));
+  document.querySelectorAll('.mt').forEach((b,i)=>b.classList.toggle('on',NAVT[i]===t));
   document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
   document.getElementById('pg-'+t).classList.add('on');
   const ttEl=document.getElementById('tb-title'); if(ttEl) ttEl.textContent=TITLES[t]||'';
@@ -1053,7 +1298,8 @@ window.go = t => {
   if(t==='sist') renderSist();
   if(t==='rev')  renderRev();
   if(t==='cli')  renderCli();
-  if(t==='reg')  { loadSis(); if(!document.getElementById('rf').value) document.getElementById('rf').value=fISO(TODAY); }
+  if(t==='pla')  renderPla();
+  if(t==='reg')  { loadSis(); if(!document.getElementById('rf').value) document.getElementById('rf').value=fISO(TODAY); if(!document.getElementById('pf').value) document.getElementById('pf').value=fISO(TODAY); }
 };
 
 // ════ SYNC ════
@@ -1086,6 +1332,8 @@ const poblarSels = () => {
   const opts = S.sistemas.map(s=>`<option value="${s.id}">${sLbl(s)}</option>`).join('');
   ['rs','es'].forEach(id=>{const el=document.getElementById(id);const c=el.value;el.innerHTML=opts;if(c)el.value=c;});
   document.getElementById('hf').innerHTML = '<option value="todos">Todos los sistemas</option>'+opts;
+  const poptsPla = S.plantas.map(p=>`<option value="${p.id}">${pLbl(p)}</option>`).join('');
+  ['pv','epv'].forEach(id=>{const el=document.getElementById(id);const c=el.value;el.innerHTML=poptsPla;if(c)el.value=c;});
 };
 
 const init = async () => {
