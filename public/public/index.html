@@ -572,8 +572,7 @@ const firebaseConfig = {
   appId: "1:570860670823:web:2d061232d05e50b248a9c2"
 };
 // URL del Apps Script desplegado como Web App (Extensions > Apps Script > Deploy > New deployment > Web app).
-// Completar después de desplegarlo — hasta entonces el guardado en Firebase funciona igual, solo no se replica en la Sheet.
-const SHEET_SYNC_URL = "";
+const SHEET_SYNC_URL = "https://script.google.com/macros/s/AKfycbzCWQBqlaII2vayl6q5Vl2WwP_y9GVHxkkUcXAQiy46h6DSoRB9z5RPb3QE8lFOiBtX/exec";
 let db, useFirebase = false;
 try {
   const a = initializeApp(firebaseConfig);
