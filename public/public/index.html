@@ -768,9 +768,18 @@ const UMBRAL_LLUVIA_MM = 8;
 const CFG_PLA = { diasSinRiegoVerano:7, diasSinRiegoInvierno:14, diasFert:60, diasPlagas:30, diasPoda:365, mesesVerano:[11,12,1,2,3] };
 const regEventos = (pid, tipo) => S.registroPlantas.filter(r => r.planta===pid && (!tipo || r.tipo.includes(tipo))).sort((a,b)=>a.fecha>b.fecha?-1:1);
 const ultimoEvento = (pid, tipo) => regEventos(pid, tipo)[0] || null;
+// aguaEfectiva/proxCalc combinan lo que ya calculó el trigger diario del Sheet
+// (p.ultimoRiego, p.proximaFert, etc. — llega vía Firestore por sincronizarPlantasAFirestore)
+// con los eventos cargados directo en la app, usando siempre la fecha más reciente
+// entre ambas fuentes. Así el "días sin agua" no queda desactualizado ni por
+// riegos anotados solo en la Sheet ni por riegos anotados solo en la app.
 const aguaEfectiva = p => {
   const riego = ultimoEvento(p.id, 'Riego') || ultimoEvento(p.id, 'Plantación');
-  const fRiego = riego ? pISO(riego.fecha) : (p.fechaP ? pISO(p.fechaP) : null);
+  let fRiego = riego ? pISO(riego.fecha) : (p.fechaP ? pISO(p.fechaP) : null);
+  if (p.ultimoRiego) {
+    const fSheet = pISO(p.ultimoRiego);
+    if (fSheet && (!fRiego || fSheet > fRiego)) fRiego = fSheet;
+  }
   let lluvia = null, mmLluvia = 0;
   [...S.clima].sort((a,b)=>a.fecha>b.fecha?-1:1).forEach(c => {
     if (lluvia) return;
@@ -779,28 +788,37 @@ const aguaEfectiva = p => {
   if (lluvia && (!fRiego || lluvia > fRiego)) return { fecha: lluvia, tipo:'lluvia', mm: mmLluvia };
   return fRiego ? { fecha: fRiego, tipo:'riego', mm:null } : null;
 };
+const proxCalc = (p, tipoEvento, ultimaKey, proximaKey, intervaloDias) => {
+  const ev = ultimoEvento(p.id, tipoEvento);
+  const baseLocal = ev ? pISO(ev.fecha) : null;
+  const baseSheet = p[ultimaKey] ? pISO(p[ultimaKey]) : null;
+  const localEsMasReciente = baseLocal && (!baseSheet || baseLocal > baseSheet);
+  let proxima;
+  if (localEsMasReciente) { proxima = new Date(baseLocal); proxima.setDate(proxima.getDate()+intervaloDias); }
+  else if (p[proximaKey]) proxima = pISO(p[proximaKey]);
+  else {
+    const base = baseSheet || baseLocal || (p.fechaP ? pISO(p.fechaP) : null);
+    if (!base) return { proxima:null, dias:null };
+    proxima = new Date(base); proxima.setDate(proxima.getDate()+intervaloDias);
+  }
+  return { proxima, dias: dd(TODAY, proxima) };
+};
 const estPlanta = p => {
   const hoy = TODAY, mes = hoy.getMonth()+1;
   const esVerano = CFG_PLA.mesesVerano.includes(mes);
   const limite = esVerano ? CFG_PLA.diasSinRiegoVerano : CFG_PLA.diasSinRiegoInvierno;
   const agua = aguaEfectiva(p);
   const diasSinAgua = agua ? dd(agua.fecha, hoy) : null;
-  const fert = ultimoEvento(p.id,'Fertiliz');
-  const baseFert = fert ? pISO(fert.fecha) : (p.fechaP ? pISO(p.fechaP) : null);
-  const diasFert = baseFert ? dd(baseFert, hoy) : null;
-  const plagas = ultimoEvento(p.id,'plagas');
-  const basePlagas = plagas ? pISO(plagas.fecha) : (p.fechaP ? pISO(p.fechaP) : null);
-  const diasPlagas = basePlagas ? dd(basePlagas, hoy) : null;
-  const poda = ultimoEvento(p.id,'Poda');
-  const basePoda = poda ? pISO(poda.fecha) : (p.fechaP ? pISO(p.fechaP) : null);
-  const diasPoda = basePoda ? dd(basePoda, hoy) : null;
+  const fert   = proxCalc(p, 'Fertiliz', 'ultimaFert',   'proximaFert',   CFG_PLA.diasFert);
+  const plagas = proxCalc(p, 'plagas',   'ultimaPlagas', 'proximaPlagas', CFG_PLA.diasPlagas);
+  const poda   = proxCalc(p, 'Poda',     'ultimaPoda',   'proximaPoda',   CFG_PLA.diasPoda);
   return {
     diasSinAgua, limite, agua,
     riegoUrg: diasSinAgua!=null && diasSinAgua>=limite,
     riegoProx: diasSinAgua!=null && diasSinAgua>=limite*0.7 && diasSinAgua<limite,
-    diasFert, fertUrg: diasFert!=null && diasFert>=CFG_PLA.diasFert,
-    diasPlagas, plagasUrg: diasPlagas!=null && diasPlagas>=CFG_PLA.diasPlagas,
-    diasPoda, podaProx: diasPoda!=null && diasPoda>=CFG_PLA.diasPoda-30,
+    proximaFert: fert.proxima, diasParaFert: fert.dias, fertUrg: fert.dias!=null && fert.dias<=0,
+    proximaPlagas: plagas.proxima, diasParaPlagas: plagas.dias, plagasUrg: plagas.dias!=null && plagas.dias<=0,
+    proximaPoda: poda.proxima, diasParaPoda: poda.dias, podaProx: poda.dias!=null && poda.dias<=30,
   };
 };
 const pLbl = p => p.nombre || `Planta ${p.id}`;
@@ -923,8 +941,8 @@ const renderDash = () => {
     const e = estPlanta(p);
     if (e.riegoUrg) als.push({c:'al-r',t:`${pLbl(p)} — regar`,b:`${e.diasSinAgua} días sin agua (límite ${e.limite})`});
     else if (e.riegoProx) als.push({c:'al-w',t:`${pLbl(p)} — riego pronto`,b:`${e.diasSinAgua} días sin agua`});
-    if (e.fertUrg) als.push({c:'al-w',t:`${pLbl(p)} — fertilizar`,b:`${e.diasFert} días desde la última`});
-    if (e.plagasUrg) als.push({c:'al-w',t:`${pLbl(p)} — revisar plagas`,b:`${e.diasPlagas} días desde la última revisión`});
+    if (e.fertUrg) als.push({c:'al-w',t:`${pLbl(p)} — fertilizar`,b: e.diasParaFert<0 ? `${-e.diasParaFert} días de atraso` : 'toca hoy'});
+    if (e.plagasUrg) als.push({c:'al-w',t:`${pLbl(p)} — revisar plagas`,b: e.diasParaPlagas<0 ? `${-e.diasParaPlagas} días de atraso` : 'toca hoy'});
   });
   if(!als.length) als.push({c:'al-ok',t:'Todo en orden 👍',b:'Sin alertas pendientes'});
   const ch = cdDia(fISO(TODAY)) || [...S.clima].sort((a,b)=>a.fecha>b.fecha?-1:1)[0];
@@ -1001,6 +1019,7 @@ const plantHTML = p => {
   return `<div class="sysc" onclick="openPla(${p.id})">
     <div class="sysc-top">
       <span class="sysc-name">${pLbl(p)}</span>
+      ${p.estado?`<span class="badge bv">${p.estado}</span>`:''}
     </div>
     ${meta?`<div class="sysc-meta">${meta}</div>`:''}
     <div class="pills" style="margin-top:8px">${badges.join('')||'<span class="badge bl">✅ Al día</span>'}</div>
@@ -1154,9 +1173,11 @@ window.openPla = id => {
       <tr><td>Variedad / Especie</td><td>${[p.variedad,p.especie].filter(Boolean).join(' / ')||'—'}</td></tr>
       <tr><td>Fecha plantación</td><td>${fmt(p.fechaP)}</td></tr>
       <tr><td>Ubicación</td><td>${p.ubicacion||'—'}</td></tr>
+      <tr><td>Estado</td><td>${p.estado||'—'}</td></tr>
       <tr><td>Días sin agua</td><td style="color:${e.riegoUrg?'var(--rust-mid)':e.riegoProx?'var(--umber-mid)':'var(--ink)'}">${e.diasSinAgua!=null?e.diasSinAgua+' días (límite '+e.limite+')':'—'}</td></tr>
-      <tr><td>Días desde última fertilización</td><td>${e.diasFert!=null?e.diasFert+' días':'—'}</td></tr>
-      <tr><td>Días desde última revisión de plagas</td><td>${e.diasPlagas!=null?e.diasPlagas+' días':'—'}</td></tr>
+      <tr><td>Próxima fertilización</td><td style="color:${e.fertUrg?'var(--umber-mid)':'var(--ink)'}">${e.proximaFert?fmt(fISO(e.proximaFert))+(e.diasParaFert<0?' — atrasada':''):'—'}</td></tr>
+      <tr><td>Próxima revisión de plagas</td><td style="color:${e.plagasUrg?'var(--sky-mid)':'var(--ink)'}">${e.proximaPlagas?fmt(fISO(e.proximaPlagas))+(e.diasParaPlagas<0?' — atrasada':''):'—'}</td></tr>
+      <tr><td>Próxima poda</td><td>${e.proximaPoda?fmt(fISO(e.proximaPoda)):'—'}</td></tr>
     </table>
     ${p.notas?`<div style="font-size:12px;color:var(--ink2);background:var(--paper2);padding:11px;border-radius:var(--r);margin:14px 0">${p.notas}</div>`:''}
     <div style="font-family:var(--serif);font-size:17px;color:var(--ink);margin:18px 0 10px">Historial</div>
