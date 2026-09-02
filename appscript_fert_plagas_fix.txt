@@ -1,0 +1,245 @@
+// ====================================================================
+//  FIX: "Próxima X" no se calculaba si editabas "Última X" a mano
+//  + Producto/dosis de fertilización por especie
+//  + Chuleta de tratamientos comunes en el recordatorio de plagas
+//
+//  CÓMO INSTALARLO:
+//  1. Reemplazá actualizarProximoEvento_(), perfilEspecie() y
+//     verificarEventosPlantas() por las versiones de acá abajo
+//     (buscá cada una por nombre y reemplazá la función completa).
+//  2. En la hoja "Especies", agregá 2 columnas nuevas al final
+//     (K: "Producto fertilizante", L: "Dosis sugerida") y completá
+//     con la tabla de abajo (o dejalas vacías en las que no quieras
+//     sugerencia — el sistema no rompe si están vacías).
+//  3. Correr actualizarFichaPlantas() para que recalcule "Próxima X"
+//     ya mismo con las fechas que cargaste a mano.
+//  4. Correr sincronizarPlantasAFirestore().
+//
+//  Tabla sugerida para las columnas K y L de "Especies":
+//
+//  Monstera            | Fertilizante líquido balanceado (ej. 20-20-20)      | Mitad de la dosis del envase, cada 30 días en temporada
+//  Palo de agua        | Fertilizante líquido para plantas verdes            | Mitad de dosis, cada 60 días en temporada — sensible al exceso
+//  Helecho nido de ave | Fertilizante líquido diluido                        | 1/4 de la dosis normal, cada 30 días — muy sensible a exceso de sales
+//  Helecho serrucho    | Fertilizante líquido diluido                        | 1/4 de la dosis normal, cada 30 días
+//  Pilea               | Fertilizante líquido balanceado                     | Mitad de dosis, cada 30 días en temporada
+//  Planta cebra        | Fertilizante líquido para plantas de flor (rico en potasio) | Mitad de dosis, cada 30 días en temporada
+//  Pata de elefante     | Fertilizante para cactus/suculentas o balanceado muy diluido | 1/4 de dosis, cada 60 días — bajo requerimiento
+// ====================================================================
+
+// ── REEMPLAZA a la función que ya tenías con el mismo nombre ──────────
+// Ahora también calcula "Próxima X" cuando "Última X" se cargó a mano
+// (antes solo reaccionaba a eventos nuevos en Registro Plantas).
+function actualizarProximoEvento_(shP, fila, idPlanta, tipoTexto, colUltima, colProxima, intervaloDias) {
+  var fechaEvento = obtenerUltimoEventoPlanta_(idPlanta, tipoTexto);
+  var actual = shP.getRange(fila, colUltima).getValue();
+  var actualDate = actual ? new Date(actual) : null;
+
+  if (fechaEvento && (!actualDate || isNaN(actualDate.getTime()) || fechaEvento.getTime() > actualDate.getTime())) {
+    shP.getRange(fila, colUltima).setValue(fechaEvento).setNumberFormat('DD/MM/YYYY');
+    actualDate = fechaEvento;
+  }
+
+  var proxima = shP.getRange(fila, colProxima).getValue();
+  if (!proxima && actualDate && !isNaN(actualDate.getTime())) {
+    var nuevaProxima = new Date(actualDate);
+    nuevaProxima.setDate(nuevaProxima.getDate() + intervaloDias);
+    shP.getRange(fila, colProxima).setValue(nuevaProxima).setNumberFormat('DD/MM/YYYY');
+  }
+}
+
+// ── REEMPLAZA a la función que ya tenías con el mismo nombre ──────────
+// Suma productoFert / dosisFert (columnas K y L de Especies).
+function perfilEspecie(especie) {
+  if (!especie) return null;
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(CFG_ESPECIES.sheet);
+  if (!sh || sh.getLastRow() < 2) return null;
+  var datos = sh.getDataRange().getValues();
+  var buscado = String(especie).toLowerCase().trim();
+  if (!buscado) return null;
+  for (var i = 1; i < datos.length; i++) {
+    var nombre = String(datos[i][0] || '').toLowerCase().trim();
+    if (!nombre) continue;
+    if (buscado.indexOf(nombre) >= 0 || nombre.indexOf(buscado) >= 0) {
+      return {
+        especie: datos[i][0], tipo: datos[i][1],
+        riegoVerano: Number(datos[i][2]), riegoInvierno: Number(datos[i][3]),
+        diasFert: Number(datos[i][4]), fertMesIni: Number(datos[i][5]), fertMesFin: Number(datos[i][6]),
+        tempMin: datos[i][7] !== '' ? Number(datos[i][7]) : null,
+        luz: datos[i][8], notas: datos[i][9],
+        productoFert: datos[i][10] || '', dosisFert: datos[i][11] || '',
+      };
+    }
+  }
+  return null;
+}
+
+// ── REEMPLAZA a la función que ya tenías con el mismo nombre ──────────
+// FERTILIZAR ahora incluye producto/dosis si están cargados en Especies.
+// REVISIÓN PLAGAS ahora incluye una chuleta general de tratamientos.
+function verificarEventosPlantas(cal, manana) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var shP = ss.getSheetByName(CFG_PLANTAS.sheetPlantas);
+  var shClima = ss.getSheetByName(CFG.sheetClima);
+  if (!shP || shP.getLastRow() < 2) return [];
+
+  var hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  var mes = hoy.getMonth() + 1;
+  var esVerano = CFG_PLANTAS.mesesVerano.indexOf(mes) >= 0;
+
+  var tempMin = null;
+  if (shClima) {
+    var climaDatos = shClima.getDataRange().getValues().slice(2);
+    if (climaDatos.length > 0) tempMin = Number(climaDatos[climaDatos.length - 1][3]);
+  }
+
+  var CHULETA_PLAGAS =
+    'Guía rápida:\n' +
+    '• Cochinillas (bultitos blancos algodonosos): algodón con alcohol isopropílico directo sobre cada una, repetir cada 4-5 días 2-3 veces.\n' +
+    '• Pulgones: jabón potásico o agua con unas gotas de jabón blanco, rociar toda la planta incl. envés.\n' +
+    '• Ácaros/araña roja (punteado amarillento, telarañas finas): subir humedad ambiente + aceite de neem o acaricida específico.\n' +
+    '• Mosca blanca: trampas amarillas pegajosas + jabón potásico.\n' +
+    '• Hongos/manchas/oidio: retirar hojas afectadas, fungicida cúprico o bicarbonato de sodio diluido en agua con jabón.\n' +
+    'Aplicar siempre a la tardecita, nunca con sol directo, y alejada de mascotas/niños hasta que seque.';
+
+  var datos = shP.getDataRange().getValues().slice(1);
+  var eventos = [];
+
+  datos.forEach(function (p) {
+    if (!p[0] || !p[1]) return;
+    var nombre = p[1];
+    var especie = p[3] || nombre;
+    var perfil = perfilEspecie(especie);
+    var esInterior = perfil && perfil.tipo === 'Interior';
+
+    // ── HELADA / FRÍO ──────────────────────────────────────────────
+    if (tempMin !== null) {
+      if (esInterior && perfil.tempMin !== null) {
+        if (tempMin <= perfil.tempMin + 2) {
+          eventos.push({
+            titulo: '🥶 FRÍO: alejar ' + nombre + ' de la ventana',
+            desc: 'Temperatura mínima pronosticada: ' + tempMin + '°C.\n' +
+              nombre + ' (' + especie + ') tolera hasta unos ' + perfil.tempMin + '°C.\n' +
+              'Acción: alejarla de ventanas/corrientes de aire esta noche.',
+            color: CalendarApp.EventColor.CYAN
+          });
+        }
+      } else if (!esInterior && tempMin <= CFG_PLANTAS.tempHeladaUmbral) {
+        var severa = tempMin <= CFG_PLANTAS.tempHeladaSevera;
+        eventos.push({
+          titulo: (severa ? '🧊 HELADA SEVERA' : '❄️ HELADA') + ': proteger ' + nombre + ' mañana',
+          desc: 'Temperatura mínima registrada: ' + tempMin + '°C\n' +
+            (severa
+              ? 'RIESGO ALTO de daño en hojas y brotes.\nAcción: cubrir con tela antihelada, regar el suelo esta tarde (retiene calor).'
+              : 'Riesgo moderado para cítrico joven.\nAcción: cubrir la planta esta noche con tela antihelada.'),
+          color: severa ? CalendarApp.EventColor.RED : CalendarApp.EventColor.CYAN
+        });
+      }
+    }
+
+    // ── RIEGO ──────────────────────────────────────────────────────
+    var ultimoRiego = p[16] ? new Date(p[16]) : null;
+    var aguaEfectiva = calcularUltimaAguaEfectiva(ultimoRiego, especie);
+
+    if (aguaEfectiva.fecha) {
+      var fechaAgua = new Date(aguaEfectiva.fecha); fechaAgua.setHours(0, 0, 0, 0);
+      var diasSinAgua = Math.floor((hoy - fechaAgua) / 86400000);
+      var limiteRiego = perfil
+        ? (esVerano ? perfil.riegoVerano : perfil.riegoInvierno)
+        : (esVerano ? CFG_PLANTAS.diasSinRiegoMax : CFG_PLANTAS.diasSinRiegoInv);
+
+      if (diasSinAgua >= limiteRiego) {
+        var contextoAgua = aguaEfectiva.tipo === 'lluvia'
+          ? 'Última agua efectiva: lluvia de ' + aguaEfectiva.mm + 'mm el ' +
+            Utilities.formatDate(aguaEfectiva.fecha, CFG.tz, 'dd/MM/yyyy') +
+            ' (umbral: ' + UMBRAL_LLUVIA_MM + 'mm)'
+          : 'Último riego: ' + Utilities.formatDate(aguaEfectiva.fecha, CFG.tz, 'dd/MM/yyyy');
+
+        eventos.push({
+          titulo: '💧 RIEGO: ' + nombre + ' (' + diasSinAgua + ' días sin agua efectiva)',
+          desc: nombre + ' lleva ' + diasSinAgua + ' días sin agua suficiente.\n' +
+            contextoAgua + '\n' +
+            'Límite para esta época: ' + limiteRiego + ' días (' + (esVerano ? 'verano' : 'invierno') + ').\n' +
+            (esInterior ? 'Regar hasta que drene un poco por debajo de la maceta.' :
+              'Cantidad sugerida: 10-15 litros por planta.\nAcción: regar mañana a la mañana temprano o al atardecer.'),
+          color: CalendarApp.EventColor.BLUE
+        });
+      } else if (diasSinAgua >= limiteRiego * 0.7) {
+        var diasRestantes = limiteRiego - diasSinAgua;
+        eventos.push({
+          titulo: '💧 RIEGO próximo: ' + nombre + ' (en ~' + diasRestantes + ' día(s))',
+          desc: nombre + ' lleva ' + diasSinAgua + ' días sin agua suficiente.\n' +
+            'Conviene regar en los próximos ' + diasRestantes + ' días.',
+          color: CalendarApp.EventColor.TEAL
+        });
+      } else if (aguaEfectiva.tipo === 'lluvia') {
+        Logger.log('[INFO] ' + nombre + ': sin alerta de riego — lluvia reciente de ' +
+          aguaEfectiva.mm + 'mm hace ' + diasSinAgua + ' días');
+      }
+    }
+
+    // ── FERTILIZACIÓN ──────────────────────────────────────────────
+    var proxFert = p[11] ? new Date(p[11]) : null;
+    var fueraDeTemporada = perfil && !mesEnTemporada_(mes, perfil.fertMesIni, perfil.fertMesFin);
+    if (proxFert && !fueraDeTemporada) {
+      proxFert.setHours(0, 0, 0, 0);
+      var diasParaFert = Math.floor((proxFert - hoy) / 86400000);
+      var sugerenciaFert = (perfil && perfil.productoFert)
+        ? '\nProducto sugerido: ' + perfil.productoFert + '.\nDosis: ' + (perfil.dosisFert || 'según el envase') + '.'
+        : '';
+      if (diasParaFert <= 0) {
+        eventos.push({
+          titulo: '🌿 FERTILIZAR: ' + nombre + (diasParaFert < 0 ? ' (' + Math.abs(diasParaFert) + ' días atrasado)' : ''),
+          desc: nombre + ' necesita fertilización.\n' +
+            (perfil
+              ? 'Según su perfil (' + especie + '): cada ' + perfil.diasFert + ' días, solo en temporada de crecimiento.'
+              : 'Dosis para cítrico joven: 100-150g de 15-15-15 alrededor del tronco (a 20cm), incorporar con agua.\nFrecuencia: cada ' + CFG_PLANTAS.diasFertilizante + ' días.') +
+            sugerenciaFert + '\n' +
+            'Acción: fertilizar y registrar en \'Registro Plantas\'.',
+          color: CalendarApp.EventColor.GREEN
+        });
+      } else if (diasParaFert <= 7) {
+        eventos.push({
+          titulo: '🌿 FERTILIZAR pronto: ' + nombre + ' (en ' + diasParaFert + ' días)',
+          desc: 'La próxima fertilización es el ' + Utilities.formatDate(proxFert, CFG.tz, 'dd/MM/yyyy') + '.' + sugerenciaFert,
+          color: CalendarApp.EventColor.TEAL
+        });
+      }
+    }
+
+    // ── REVISIÓN DE PLAGAS ─────────────────────────────────────────
+    var proxPlagas = p[15] ? new Date(p[15]) : null;
+    if (proxPlagas) {
+      proxPlagas.setHours(0, 0, 0, 0);
+      var diasParaPlagas = Math.floor((proxPlagas - hoy) / 86400000);
+      if (diasParaPlagas <= 0) {
+        eventos.push({
+          titulo: '🐛 REVISIÓN PLAGAS: ' + nombre,
+          desc: nombre + ' — revisión mensual de plagas y enfermedades.\n' +
+            'Qué revisar: hojas (manchas, decoloración), envés (cochinillas, pulgones, ácaros), tallos.\n\n' +
+            CHULETA_PLAGAS + '\n\n' +
+            'Acción: registrar hallazgos en \'Registro Plantas\'.',
+          color: CalendarApp.EventColor.YELLOW
+        });
+      }
+    }
+
+    // ── PODA ────────────────────────────────────────────────────────
+    var proxPoda = p[13] ? new Date(p[13]) : null;
+    if (proxPoda) {
+      proxPoda.setHours(0, 0, 0, 0);
+      var diasParaPoda = Math.floor((proxPoda - hoy) / 86400000);
+      if (diasParaPoda <= 30 && diasParaPoda >= 0) {
+        eventos.push({
+          titulo: '✂️ PODA/LIMPIEZA se acerca: ' + nombre + ' (en ' + diasParaPoda + ' días)',
+          desc: (esInterior
+            ? 'Revisá y quitá hojas secas o amarillas de ' + nombre + '.'
+            : 'Poda anual de formación de ' + nombre + '.\nMejor época para cítricos: ago-sep (fin de invierno).\nQué podar: ramas secas, cruzadas, las que crecen hacia adentro.\nNo más del 20-30% de la copa.'),
+          color: CalendarApp.EventColor.ORANGE
+        });
+      }
+    }
+  });
+
+  return eventos;
+}

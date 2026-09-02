@@ -1,0 +1,229 @@
+// ====================================================================
+//  ALTA DE LAS 7 PLANTAS DE INTERIOR + FIX: el riego no se sincronizaba
+//
+//  QUÉ HACE:
+//  1. cargarPlantasInterior() — crea las 7 fichas (Monstera, Palo de
+//     agua, Helecho nido de ave, Helecho serrucho, Pilea, Planta cebra,
+//     Pata de elefante), les pone "Último riego" = 01/09/2026 (el
+//     riego general que hiciste ayer) y deja un evento de Riego en
+//     "Registro Plantas" para el historial.
+//  2. Reemplaza actualizarFichaPlantas() por una versión que ADEMÁS
+//     sincroniza "Último riego" desde Registro Plantas — antes esto
+//     solo pasaba con fertilización/poda/plagas, el riego se quedaba
+//     desactualizado si lo registrabas por evento en vez de a mano en
+//     la ficha.
+//
+//  CÓMO INSTALARLO:
+//  1. Buscá tu función actualizarFichaPlantas() actual y reemplazala
+//     completa por la de acá abajo (seleccioná desde
+//     "function actualizarFichaPlantas() {" hasta su "}" de cierre y
+//     pegá esta versión encima).
+//  2. Pegá cargarPlantasInterior() en cualquier lugar del script
+//     (después de todo lo demás, por ejemplo).
+//  3. Ejecutar UNA VEZ cargarPlantasInterior() — da de alta las 7
+//     plantas. Si lo corrés dos veces por error, duplica las plantas,
+//     así que ejecutalo una sola vez.
+//  4. Ejecutar actualizarFichaPlantas().
+//  5. Ejecutar sincronizarPlantasAFirestore() para que la app las
+//     muestre.
+//
+//  Las fechas de plantación quedan puestas en el día de hoy porque no
+//  sé cuándo las adquiriste en realidad — si querés, editá "Fecha
+//  plantación" de cada una desde la app (Plantas → tocar la planta →
+//  Editar planta) con la fecha real.
+// ====================================================================
+
+// ── REEMPLAZA a la función que ya tenías con el mismo nombre ──────────
+function actualizarFichaPlantas() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var shP = ss.getSheetByName(CFG_PLANTAS.sheetPlantas);
+  var shR = ss.getSheetByName(CFG_PLANTAS.sheetRegistro);
+
+  if (!shP) {
+    Logger.log('[WARN] No existe hoja Plantas — ejecutar inicializarHojaPlantas primero');
+    return;
+  }
+
+  // ── Paso 1: sincronizar plantas nuevas desde Registro Plantas (igual que antes) ──
+  if (shR && shR.getLastRow() > 1) {
+    var regDatos = shR.getDataRange().getValues().slice(1);
+    var idsExistentes = {};
+    if (shP.getLastRow() > 1) {
+      var plantasDatos = shP.getDataRange().getValues().slice(1);
+      plantasDatos.forEach(function (p) { if (p[0]) idsExistentes[String(p[0])] = true; });
+    }
+
+    regDatos.forEach(function (r) {
+      if (!r[0] || !r[1]) return;
+      var idPlanta = String(r[0]);
+      var nombre = r[1];
+      var tipoEvento = String(r[3] || '');
+      if (tipoEvento.indexOf('Plantación') < 0 && tipoEvento.indexOf('Plantacion') < 0) return;
+      if (idsExistentes[idPlanta]) return;
+
+      var fechaPlantacion = r[2] ? new Date(r[2]) : new Date();
+      var detalle = String(r[4] || '');
+      var producto = String(r[5] || '');
+
+      var perfil = perfilEspecie(nombre) || perfilEspecie(detalle);
+      var diasFert = perfil ? perfil.diasFert : CFG_PLANTAS.diasFertilizante;
+
+      var proxFert = new Date(fechaPlantacion); proxFert.setDate(proxFert.getDate() + diasFert);
+      var proxPoda = new Date(fechaPlantacion); proxPoda.setDate(proxPoda.getDate() + CFG_PLANTAS.diasPoda);
+      var proxPlagas = new Date(fechaPlantacion); proxPlagas.setDate(proxPlagas.getDate() + CFG_PLANTAS.diasRevisionPlagas);
+
+      var fertGramos = '', fertFormula = '';
+      var matchFert = producto.match(/(\d+)\s*g/i);
+      if (matchFert) fertGramos = matchFert[1];
+      var matchForm = producto.match(/(\d+-\d+-\d+)/);
+      if (matchForm) fertFormula = matchForm[1];
+
+      var exposicion = perfil ? perfil.luz :
+        (detalle.indexOf('sol pleno') >= 0 ? 'Sol pleno' :
+          detalle.indexOf('media sombra') >= 0 ? 'Media sombra' : 'Sol pleno');
+      var tipoSuelo = detalle.indexOf('tierra directa') >= 0 ? 'Tierra directa' :
+        detalle.indexOf('maceta') >= 0 ? 'Maceta' : 'Tierra directa';
+
+      var nuevaFila = [
+        idPlanta, nombre, '', nombre, fechaPlantacion,
+        'Huerta', exposicion, tipoSuelo,
+        fertGramos, fertFormula,
+        fertGramos ? fechaPlantacion : '',
+        fertGramos ? proxFert : '',
+        '', proxPoda,
+        fechaPlantacion, proxPlagas,
+        fechaPlantacion,
+        '',
+        'Recién plantada 🌱',
+        'Plantada ' + Utilities.formatDate(fechaPlantacion, CFG.tz, 'dd/MM/yyyy') + (producto ? '. ' + producto + '.' : '')
+      ];
+
+      shP.appendRow(nuevaFila);
+      var filaNum = shP.getLastRow();
+      [5, 11, 12, 13, 14, 15, 16, 17].forEach(function (col) {
+        var cell = shP.getRange(filaNum, col);
+        if (nuevaFila[col - 1] instanceof Date) cell.setNumberFormat('DD/MM/YYYY');
+      });
+      shP.getRange(filaNum, 1, 1, 20)
+        .setFontFamily('Arial').setFontSize(9)
+        .setVerticalAlignment('middle').setHorizontalAlignment('center');
+      shP.getRange(filaNum, 2).setFontWeight('bold');
+      shP.getRange(filaNum, 20).setHorizontalAlignment('left');
+      shP.setRowHeight(filaNum, 22);
+      colorearEstadoPlanta(shP, filaNum, 'Recién plantada');
+
+      idsExistentes[idPlanta] = true;
+      Logger.log('[OK] Planta agregada a ficha: ' + nombre + ' (ID ' + idPlanta + ')');
+    });
+  }
+
+  // ── Paso 2: riego (por especie, sincronizado desde eventos) + fertilización/poda/plagas al día ──
+  var hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  var mes = hoy.getMonth() + 1;
+  var esVerano = CFG_PLANTAS.mesesVerano.indexOf(mes) >= 0;
+
+  if (shP.getLastRow() < 2) return;
+  var datos = shP.getDataRange().getValues();
+
+  for (var i = 1; i < datos.length; i++) {
+    var fila = i + 1;
+    if (!datos[i][0]) continue;
+    var idPlanta = datos[i][0];
+    var especie = datos[i][3] || datos[i][1] || '';
+    var perfil = perfilEspecie(especie);
+
+    // si hay un riego cargado (app o Sheet) más nuevo que lo que dice la ficha, actualizarlo
+    var ultimoRiego = datos[i][16] ? new Date(datos[i][16]) : null;
+    var riegoEvento = obtenerUltimoEventoPlanta_(idPlanta, 'Riego');
+    if (riegoEvento && (!ultimoRiego || riegoEvento.getTime() > ultimoRiego.getTime())) {
+      ultimoRiego = riegoEvento;
+      shP.getRange(fila, 17).setValue(riegoEvento).setNumberFormat('DD/MM/YYYY');
+    }
+
+    var aguaEfectiva = calcularUltimaAguaEfectiva(ultimoRiego, especie);
+    if (aguaEfectiva.fecha) {
+      var fechaAgua = new Date(aguaEfectiva.fecha); fechaAgua.setHours(0, 0, 0, 0);
+      var diasSinAgua = Math.floor((hoy - fechaAgua) / 86400000);
+      var limiteRiego = perfil
+        ? (esVerano ? perfil.riegoVerano : perfil.riegoInvierno)
+        : (esVerano ? CFG_PLANTAS.diasSinRiegoMax : CFG_PLANTAS.diasSinRiegoInv);
+
+      var textoContador = diasSinAgua + ' d' +
+        (aguaEfectiva.tipo === 'lluvia' ? ' (lluvia ' + aguaEfectiva.mm + 'mm)' : ' (riego)');
+      var cellDias = shP.getRange(fila, 18);
+      cellDias.setValue(textoContador);
+
+      if (diasSinAgua >= limiteRiego) cellDias.setBackground('#FF6B6B').setFontColor('#fff');
+      else if (diasSinAgua >= limiteRiego * 0.7) cellDias.setBackground('#FFD166').setFontColor('#333');
+      else cellDias.setBackground('#D8F3DC').setFontColor('#1B5E20');
+    }
+
+    actualizarProximoEvento_(shP, fila, idPlanta, 'Fertiliz', 11, 12, perfil ? perfil.diasFert : CFG_PLANTAS.diasFertilizante);
+    actualizarProximoEvento_(shP, fila, idPlanta, 'Poda', 13, 14, CFG_PLANTAS.diasPoda);
+    actualizarProximoEvento_(shP, fila, idPlanta, 'plagas', 15, 16, CFG_PLANTAS.diasRevisionPlagas);
+  }
+
+  Logger.log('[OK] Ficha de plantas actualizada — ' + (datos.length - 1) + ' plantas');
+}
+
+// ── NUEVA: da de alta las 7 plantas de interior de una sola vez ───────
+function cargarPlantasInterior() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var shP = ss.getSheetByName(CFG_PLANTAS.sheetPlantas);
+  var shR = ss.getSheetByName(CFG_PLANTAS.sheetRegistro);
+  if (!shP || !shR) { Logger.log('[ERROR] Faltan hojas Plantas/Registro Plantas'); return; }
+
+  var datosExistentes = shP.getDataRange().getValues();
+  var maxId = 0;
+  for (var i = 1; i < datosExistentes.length; i++) {
+    var n = Number(datosExistentes[i][0]);
+    if (!isNaN(n) && n > maxId) maxId = n;
+  }
+
+  var fechaRiego = new Date('2026-09-01T12:00:00'); // riego general que hiciste ayer
+  var fechaHoy = new Date();
+  var especies = ['Monstera', 'Palo de agua', 'Helecho nido de ave', 'Helecho serrucho', 'Pilea', 'Planta cebra', 'Pata de elefante'];
+
+  especies.forEach(function (nombreEspecie, idx) {
+    var id = maxId + 1 + idx;
+    var perfil = perfilEspecie(nombreEspecie);
+
+    var fila = [
+      id, nombreEspecie, '', nombreEspecie, fechaHoy,
+      'Interior', perfil ? perfil.luz : '', '',
+      '', '',
+      '', '',
+      '', '',
+      '', '',
+      fechaRiego,
+      '',
+      'Recién agregada 🌱',
+      'Cargada el ' + Utilities.formatDate(fechaHoy, CFG.tz, 'dd/MM/yyyy') + '. Ajustá ubicación y fecha real de adquisición desde la app.'
+    ];
+    shP.appendRow(fila);
+    var filaNum = shP.getLastRow();
+    [5, 17].forEach(function (col) { shP.getRange(filaNum, col).setNumberFormat('DD/MM/YYYY'); });
+    shP.getRange(filaNum, 1, 1, 20)
+      .setFontFamily('Arial').setFontSize(9)
+      .setVerticalAlignment('middle').setHorizontalAlignment('center');
+    shP.getRange(filaNum, 2).setFontWeight('bold');
+    shP.getRange(filaNum, 20).setHorizontalAlignment('left');
+    shP.setRowHeight(filaNum, 22);
+    colorearEstadoPlanta(shP, filaNum, 'Recién agregada');
+
+    var filaR = [id, nombreEspecie, fechaRiego, '💧 Riego', 'Riego general de todas las plantas de interior', '', '', '', '', ''];
+    shR.appendRow(filaR);
+    var filaRNum = shR.getLastRow();
+    shR.getRange(filaRNum, 3).setNumberFormat('DD/MM/YYYY');
+    shR.getRange(filaRNum, 1, 1, 10)
+      .setFontFamily('Arial').setFontSize(9)
+      .setVerticalAlignment('middle').setHorizontalAlignment('center');
+    shR.getRange(filaRNum, 5).setHorizontalAlignment('left');
+    shR.getRange(filaRNum, 10).setHorizontalAlignment('left');
+    shR.setRowHeight(filaRNum, 20);
+
+    Logger.log('[OK] Planta agregada: ' + nombreEspecie + ' (ID ' + id + ')');
+  });
+
+  Logger.log('[OK] ' + especies.length + ' plantas de interior cargadas. Ahora corré actualizarFichaPlantas() y sincronizarPlantasAFirestore().');
+}
