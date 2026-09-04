@@ -929,12 +929,66 @@ const sysHTML = s => {
   </div>`;
 };
 
+// ════ ANÁLISIS EXTRA — con los datos que se van acumulando ════
+const analisisExtra = () => {
+  const bySis = {};
+  [...S.revolcadas].sort((a,b)=>a.fecha>b.fecha?1:-1).forEach(r=>{
+    (bySis[r.sistema] ??= []).push(r.fecha);
+  });
+  let enTiempo=0, totalPares=0;
+  Object.values(bySis).forEach(arr=>{
+    for(let i=1;i<arr.length;i++){
+      totalPares++;
+      if (dd(pISO(arr[i-1]), pISO(arr[i])) <= 7) enTiempo++;
+    }
+  });
+  const pctRevolcadas = totalPares ? Math.round(enTiempo/totalPares*100) : null;
+
+  const totalPlantas = S.plantas.length;
+  let plantasOk = 0;
+  S.plantas.forEach(p=>{ const e=estPlanta(p); if(!e.riegoUrg && !e.fertUrg && !e.plagasUrg) plantasOk++; });
+  const pctPlantas = totalPlantas ? Math.round(plantasOk/totalPlantas*100) : null;
+
+  return { pctRevolcadas, totalPares, pctPlantas, plantasOk, totalPlantas };
+};
+
+// Sparkline SVG liviano (sin librerías) — temperatura (línea) + lluvia (barras)
+const climaSparkSVG = (dias=21) => {
+  const datos = [...S.clima].filter(c=>c.fecha<=fISO(TODAY) && c.temp!=null).sort((a,b)=>a.fecha>b.fecha?1:-1).slice(-dias);
+  if (datos.length < 2) return `<div style="font-size:12px;color:var(--ink3);padding:16px 0">Sin suficientes datos de clima todavía.</div>`;
+  const W=600, H=140, pad=10;
+  const temps = datos.map(d=>+d.temp);
+  const tMin = Math.min(...temps), tMax = Math.max(...temps);
+  const mmMax = Math.max(...datos.map(d=>+d.mm||0), 1);
+  const stepX = (W-pad*2)/(datos.length-1);
+  const yTemp = t => (H-pad*2)*0.55 + pad - ((t-tMin)/((tMax-tMin)||1))*((H-pad*2)*0.5);
+  const pts = datos.map((d,i)=>`${(pad+i*stepX).toFixed(1)},${yTemp(+d.temp).toFixed(1)}`).join(' ');
+  const bars = datos.map((d,i)=>{
+    const mm = +d.mm||0; if(!mm) return '';
+    const h = mm/mmMax*(H*0.32);
+    return `<rect x="${(pad+i*stepX-3).toFixed(1)}" y="${(H-pad-h).toFixed(1)}" width="6" height="${h.toFixed(1)}" fill="var(--sky-mid)" opacity="0.5" rx="2"/>`;
+  }).join('');
+  const dots = datos.map((d,i)=>`<circle cx="${(pad+i*stepX).toFixed(1)}" cy="${yTemp(+d.temp).toFixed(1)}" r="2.5" fill="var(--umber-mid)"/>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:130px;display:block">
+      ${bars}
+      <polyline points="${pts}" fill="none" stroke="var(--umber-mid)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+      ${dots}
+    </svg>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--ink3);margin-top:2px">
+      <span>${fmt(datos[0].fecha)}</span>
+      <span style="color:var(--umber-mid);font-weight:600">— temp (${n1(tMin)}°–${n1(tMax)}°)</span>
+      <span style="color:var(--sky-mid);font-weight:600">▮ lluvia</span>
+      <span>${fmt(datos[datos.length-1].fecha)}</span>
+    </div>`;
+};
+
 // ════ RENDER DASHBOARD ════
 const renderDash = () => {
   const activos = S.sistemas.filter(s=>s.inicioC).length;
   const enc     = S.sistemas.filter(s=>est(s).fase==='c').length;
   const lst     = S.sistemas.filter(s=>est(s).fase==='l').length;
   const an      = analisis();
+  const ax      = analisisExtra();
   const als     = [];
   S.sistemas.forEach(s=>{
     const p=proxRev(s); if(!p)return; const d=dd(TODAY,p);
@@ -955,11 +1009,15 @@ const renderDash = () => {
   const ch = cdDia(fISO(TODAY)) || [...S.clima].sort((a,b)=>a.fecha>b.fecha?-1:1)[0];
 
   document.getElementById('dash-c').innerHTML = `
-    <div class="g4" style="margin-bottom:20px">
+    <div class="g4" style="margin-bottom:10px">
       <div class="stat"><div class="stat-l">Activos</div><div class="stat-v">${activos}</div><div class="stat-s">de ${S.sistemas.length} sistemas</div></div>
       <div class="stat"><div class="stat-l">En carga</div><div class="stat-v">${enc}</div><div class="stat-s">residuos</div></div>
       <div class="stat"><div class="stat-l">Listos</div><div class="stat-v">${lst}</div><div class="stat-s">para usar</div></div>
       <div class="stat"><div class="stat-l">Revolcadas</div><div class="stat-v">${S.revolcadas.length}</div><div class="stat-s">registradas</div></div>
+    </div>
+    <div class="g2" style="margin-bottom:20px">
+      <div class="stat"><div class="stat-l">Plantas</div><div class="stat-v">${S.plantas.length}</div><div class="stat-s">registradas</div></div>
+      <div class="stat"><div class="stat-l">Al día</div><div class="stat-v" style="color:${ax.pctPlantas==null?'var(--ink)':ax.pctPlantas>=80?'var(--sage-mid)':ax.pctPlantas>=50?'var(--umber-mid)':'var(--rust-mid)'}">${ax.pctPlantas!=null?ax.pctPlantas+'%':'—'}</div><div class="stat-s">${ax.plantasOk}/${ax.totalPlantas} sin alertas</div></div>
     </div>
     <div class="dash-grid">
       <div>
@@ -1003,6 +1061,20 @@ const renderDash = () => {
         ${als.map(a=>`<div class="al ${a.c}"><div class="al-t">${a.t}</div>${a.b?`<div class="al-b">${a.b}</div>`:''}</div>`).join('')}
         <div class="sh">Sistemas activos</div>
         ${S.sistemas.filter(s=>s.inicioC).map(s=>sysHTML(s)).join('')||'<div style="font-size:13px;color:var(--ink3)">Sin sistemas activos.</div>'}
+        ${S.plantas.length?`<div class="sh">Plantas</div>${S.plantas.map(p=>plantHTML(p)).join('')}`:''}
+      </div>
+    </div>
+    <div class="sh">Análisis <span class="sh-sub">con los datos acumulados hasta ahora</span></div>
+    <div class="dash-grid">
+      <div class="card">
+        <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:8px">Temperatura y lluvia — últimos 21 días</div>
+        ${climaSparkSVG(21)}
+      </div>
+      <div class="g2">
+        <div class="stat"><div class="stat-l">Revolcadas en tiempo</div><div class="stat-v" style="color:${ax.pctRevolcadas==null?'var(--ink)':ax.pctRevolcadas>=80?'var(--sage-mid)':ax.pctRevolcadas>=50?'var(--umber-mid)':'var(--rust-mid)'}">${ax.pctRevolcadas!=null?ax.pctRevolcadas+'%':'—'}</div><div class="stat-s">${ax.totalPares?ax.totalPares+' intervalos medidos':'sin datos suficientes'}</div></div>
+        <div class="stat"><div class="stat-l">Lluvia acumulada</div><div class="stat-v">${n1(an.ll30)}<span style="font-size:16px"> mm</span></div><div class="stat-s">últimos 30 días</div></div>
+        <div class="stat"><div class="stat-l">Días sin lluvia</div><div class="stat-v">${an.sl}</div><div class="stat-s">racha actual</div></div>
+        <div class="stat"><div class="stat-l">Registros de clima</div><div class="stat-v">${S.clima.length}</div><div class="stat-s">días acumulados</div></div>
       </div>
     </div>`;
 };
