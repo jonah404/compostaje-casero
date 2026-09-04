@@ -27,15 +27,15 @@
   /* palette — tonos naturales (arena/eggshell dominante, helecho/oliva
      secundario, terracota "sedona" de acento; azul "cielo de tormenta"
      reservado para clima, terracota-ladrillo para alertas) */
-  --cream:     #f6f2e6;
-  --paper:     #efe8d7;
-  --paper2:    #e6ddc4;
-  --paper3:    #dbd0b0;
+  --cream:     #e4d7b3;
+  --paper:     #f9f3e3;
+  --paper2:    #eee2bd;
+  --paper3:    #e1cf9c;
   --ink:       #37301F;
   --ink2:      #6c6250;
-  --ink3:      #a3967c;
-  --rule:      #ddd1b4;
-  --rule2:     #c6b791;
+  --ink3:      #8f8265;
+  --rule:      #e1d3a9;
+  --rule2:     #c6ae76;
   --sage:      #4d6538;
   --sage-bg:   #e8ecd9;
   --sage-mid:  #66804c;
@@ -52,10 +52,10 @@
   --moss:      #5c6b34;
   --moss-bg:   #ecefdc;
   /* sidebar */
-  --side-bg:   #ece7d3;
+  --side-bg:   #dcd2a4;
   --side-on:   #4c6636;
-  --side-txt:  #8a8065;
-  --side-act:  #4c6636;
+  --side-txt:  #82784f;
+  --side-act:  #3e5a2c;
   /* fonts */
   --serif:     'DM Serif Display', Georgia, serif;
   --sans:      'DM Sans', system-ui, sans-serif;
@@ -70,9 +70,9 @@
 @media (prefers-color-scheme: dark) {
   :root {
     /* mismo espíritu natural, pero "tierra/corteza" en vez de negro puro */
-    --cream:#332b1f; --paper:#3c3325; --paper2:#443a29; --paper3:#4c412d;
-    --ink:#f1e9d7; --ink2:#c6b899; --ink3:#95886b;
-    --rule:#493e2c; --rule2:#5b4e38;
+    --cream:#241e12; --paper:#40361f; --paper2:#4a3e22; --paper3:#554626;
+    --ink:#f1e9d7; --ink2:#c6b899; --ink3:#93876a;
+    --rule:#544628; --rule2:#69582f;
     --sage:#93b06b; --sage-bg:#2a3520; --sage-mid:#a7c37e; --sage-lt:#212a18;
     --umber:#dc9c55; --umber-bg:#3b2b18; --umber-mid:#e5ac6c;
     --sky:#82a4bc; --sky-bg:#202e37; --sky-mid:#9cbcd1;
@@ -229,7 +229,6 @@ html, body { height: 100%; background: var(--cream); color: var(--ink); font-fam
   border-radius: var(--rl);
   padding: 14px 16px;
 }
-.stat-ic { width: 36px; height: 36px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 17px; color: #fff; margin-bottom: 10px; flex-shrink: 0; }
 .stat-l { font-size: 10px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--ink3); margin-bottom: 4px; }
 .stat-v { font-family: var(--serif); font-size: 30px; color: var(--ink); line-height: 1; letter-spacing: -.5px; }
 .stat-s { font-size: 11px; color: var(--ink3); margin-top: 3px; }
@@ -1006,7 +1005,7 @@ const climaSparkSVG = (dias=21) => {
 };
 
 // Donut multi-segmento (SVG, stroke-dasharray) — sin librerías
-const donutSVG = (segments, size=112, thickness=15) => {
+const donutSVG = (segments, size=112, thickness=15, centerLabel='sistemas') => {
   const total = segments.reduce((s,x)=>s+x.value,0);
   const r = (size-thickness)/2, c = 2*Math.PI*r, cx=size/2, cy=size/2;
   const base = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--paper3)" stroke-width="${thickness}"/>`;
@@ -1020,8 +1019,20 @@ const donutSVG = (segments, size=112, thickness=15) => {
   }).join('');
   return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">${base}${arcs}
     <text x="50%" y="47%" text-anchor="middle" font-family="var(--serif)" font-size="${size*0.24}" fill="var(--ink)">${total}</text>
-    <text x="50%" y="65%" text-anchor="middle" font-family="var(--sans)" font-size="${size*0.09}" fill="var(--ink3)">sistemas</text>
+    <text x="50%" y="65%" text-anchor="middle" font-family="var(--sans)" font-size="${size*0.09}" fill="var(--ink3)">${centerLabel}</text>
   </svg>`;
+};
+
+// Barras horizontales (SVG) — compara un valor por etiqueta
+const hbarSVG = (rows, max) => {
+  const m = max || Math.max(1, ...rows.map(r=>r.value));
+  return `<div style="display:flex;flex-direction:column;gap:10px">${rows.map(r=>`
+    <div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink2);margin-bottom:3px"><span>${r.label}</span><b style="color:var(--ink)">${r.value}</b></div>
+      <div style="height:9px;background:var(--paper3);border-radius:5px;overflow:hidden">
+        <div style="height:100%;width:${Math.max(3,r.value/m*100)}%;background:${r.color};border-radius:5px"></div>
+      </div>
+    </div>`).join('')}</div>`;
 };
 
 // Anillo de porcentaje único (SVG, stroke-dasharray) — sin librerías
@@ -1036,10 +1047,9 @@ const ringSVG = (pct, color, size=76, thickness=8) => {
   </svg>`;
 };
 
-// Tarjeta de stat con ícono en insignia de color
-const statTile = (icon, colorVar, label, value, sub) => `
-  <div class="stat">
-    <div class="stat-ic" style="background:var(${colorVar})"><i class="ti ${icon}"></i></div>
+// Tarjeta de stat con acento de color arriba
+const statTile = (colorVar, label, value, sub) => `
+  <div class="stat" style="border-top:3px solid var(${colorVar})">
     <div class="stat-l">${label}</div>
     <div class="stat-v">${value}</div>
     <div class="stat-s">${sub}</div>
@@ -1052,18 +1062,36 @@ const renderDash = () => {
   const lst     = S.sistemas.filter(s=>est(s).fase==='l').length;
   const an      = analisis();
   const ax      = analisisExtra();
+  const nCarga = S.sistemas.filter(s=>s.inicioC && est(s).fase==='c').length;
+  const nEstanque = S.sistemas.filter(s=>s.inicioC && est(s).fase==='s').length;
+  const nCasi = S.sistemas.filter(s=>s.inicioC && est(s).fase==='q').length;
+  const nListo = S.sistemas.filter(s=>s.inicioC && est(s).fase==='l').length;
   const sisEstadoDonut = donutSVG([
-    {value: S.sistemas.filter(s=>s.inicioC && est(s).fase==='c').length, color:'var(--umber)'},
-    {value: S.sistemas.filter(s=>s.inicioC && est(s).fase==='s').length, color:'var(--sky)'},
-    {value: S.sistemas.filter(s=>s.inicioC && est(s).fase==='q').length, color:'var(--umber-mid)'},
-    {value: S.sistemas.filter(s=>s.inicioC && est(s).fase==='l').length, color:'var(--moss)'},
+    {value: nCarga, color:'var(--sage)'},
+    {value: nEstanque, color:'var(--sky)'},
+    {value: nCasi, color:'var(--umber)'},
+    {value: nListo, color:'var(--moss)'},
   ]);
   const sisEstadoLegend = [
-    {n:'En carga', v:S.sistemas.filter(s=>s.inicioC && est(s).fase==='c').length, c:'var(--umber)'},
-    {n:'En estanque', v:S.sistemas.filter(s=>s.inicioC && est(s).fase==='s').length, c:'var(--sky)'},
-    {n:'Casi listo', v:S.sistemas.filter(s=>s.inicioC && est(s).fase==='q').length, c:'var(--umber-mid)'},
-    {n:'Listo', v:S.sistemas.filter(s=>s.inicioC && est(s).fase==='l').length, c:'var(--moss)'},
+    {n:'En carga', v:nCarga, c:'var(--sage)'},
+    {n:'En estanque', v:nEstanque, c:'var(--sky)'},
+    {n:'Casi listo', v:nCasi, c:'var(--umber)'},
+    {n:'Listo', v:nListo, c:'var(--moss)'},
   ];
+  const nRiegoOk = S.plantas.filter(p=>!estPlanta(p).riegoUrg && !estPlanta(p).riegoProx).length;
+  const nRiegoProx = S.plantas.filter(p=>estPlanta(p).riegoProx).length;
+  const nRiegoUrg = S.plantas.filter(p=>estPlanta(p).riegoUrg).length;
+  const riegoDonut = donutSVG([
+    {value: nRiegoOk, color:'var(--sage)'},
+    {value: nRiegoProx, color:'var(--umber)'},
+    {value: nRiegoUrg, color:'var(--rust)'},
+  ], 112, 15, 'plantas');
+  const riegoLegend = [
+    {n:'Al día', v:nRiegoOk, c:'var(--sage)'},
+    {n:'Riego pronto', v:nRiegoProx, c:'var(--umber)'},
+    {n:'Regar ahora', v:nRiegoUrg, c:'var(--rust)'},
+  ];
+  const revBarMax = Math.max(1, ...S.sistemas.map(s=>S.revolcadas.filter(r=>r.sistema===s.id).length));
   const als     = [];
   S.sistemas.forEach(s=>{
     const p=proxRev(s); if(!p)return; const d=dd(TODAY,p);
@@ -1085,14 +1113,14 @@ const renderDash = () => {
 
   document.getElementById('dash-c').innerHTML = `
     <div class="g3" style="margin-bottom:10px">
-      ${statTile('ti-recycle','--sage','Activos', activos, `de ${S.sistemas.length} sistemas`)}
-      ${statTile('ti-box','--umber','En carga', enc, 'residuos')}
-      ${statTile('ti-circle-check','--moss','Listos', lst, 'para usar')}
+      ${statTile('--sage','Activos', activos, `de ${S.sistemas.length} sistemas`)}
+      ${statTile('--umber','En carga', enc, 'residuos')}
+      ${statTile('--moss','Listos', lst, 'para usar')}
     </div>
     <div class="g3" style="margin-bottom:20px">
-      ${statTile('ti-refresh','--sky','Revolcadas', S.revolcadas.length, 'registradas')}
-      ${statTile('ti-leaf','--sage-mid','Plantas', S.plantas.length, 'registradas')}
-      ${statTile('ti-sparkles', ax.pctPlantas==null?'--ink3':ax.pctPlantas>=80?'--sage':ax.pctPlantas>=50?'--umber':'--rust', 'Al día', ax.pctPlantas!=null?ax.pctPlantas+'%':'—', `${ax.plantasOk}/${ax.totalPlantas} sin alertas`)}
+      ${statTile('--sky','Revolcadas', S.revolcadas.length, 'registradas')}
+      ${statTile('--sage-mid','Plantas', S.plantas.length, 'registradas')}
+      ${statTile(ax.pctPlantas==null?'--ink3':ax.pctPlantas>=80?'--sage':ax.pctPlantas>=50?'--umber':'--rust', 'Al día', ax.pctPlantas!=null?ax.pctPlantas+'%':'—', `${ax.plantasOk}/${ax.totalPlantas} sin alertas`)}
     </div>
     <div class="dash-grid">
       <div>
@@ -1173,6 +1201,27 @@ const renderDash = () => {
             <div class="ring-tile-s">${ax.totalPlantas} plantas</div>
           </div>
         </div>
+      </div>
+    </div>
+    <div class="dash-grid" style="margin-top:10px">
+      <div class="card">
+        <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:10px">Riego de plantas</div>
+        ${S.plantas.length?`<div class="donut-wrap">
+          ${riegoDonut}
+          <div class="donut-legend">
+            ${riegoLegend.map(l=>`<div class="donut-legend-item"><span style="display:flex;align-items:center;gap:7px"><span class="donut-dot" style="background:${l.c}"></span>${l.n}</span><b>${l.v}</b></div>`).join('')}
+          </div>
+        </div>`:`<div style="font-size:13px;color:var(--ink3)">Sin plantas registradas.</div>`}
+      </div>
+      <div class="card">
+        <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:10px">Revolcadas por sistema</div>
+        ${S.sistemas.some(s=>s.inicioC)?hbarSVG(
+          S.sistemas.filter(s=>s.inicioC).map((s,i)=>({
+            label: sLbl(s),
+            value: S.revolcadas.filter(r=>r.sistema===s.id).length,
+            color: [`var(--sage)`,`var(--sky)`,`var(--umber)`,`var(--moss)`,`var(--rust)`][i%5]
+          })), revBarMax
+        ):`<div style="font-size:13px;color:var(--ink3)">Sin sistemas activos.</div>`}
       </div>
     </div>`;
 };
