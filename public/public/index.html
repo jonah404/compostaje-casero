@@ -27,14 +27,14 @@
   /* palette — tonos naturales (arena/eggshell dominante, helecho/oliva
      secundario, terracota "sedona" de acento; azul "cielo de tormenta"
      reservado para clima, terracota-ladrillo para alertas) */
-  --cream:     #e4d7b3;
-  --paper:     #f9f3e3;
-  --paper2:    #eee2bd;
-  --paper3:    #e1cf9c;
+  --cream:     #ddcda3;
+  --paper:     #f1e6cc;
+  --paper2:    #e8d9b3;
+  --paper3:    #dbc590;
   --ink:       #37301F;
   --ink2:      #6c6250;
   --ink3:      #8f8265;
-  --rule:      #e1d3a9;
+  --rule:      #dbc998;
   --rule2:     #c6ae76;
   --sage:      #4d6538;
   --sage-bg:   #e8ecd9;
@@ -51,8 +51,15 @@
   --rust-mid:  #bf5a41;
   --moss:      #5c6b34;
   --moss-bg:   #ecefdc;
+  /* acentos "neón" reservados para gráficos/datos (líneas, donuts,
+     barras, anillos) — el resto de la UI se queda en la paleta natural */
+  --chart-1:   #2f9150;
+  --chart-2:   #1789ad;
+  --chart-3:   #e08a12;
+  --chart-4:   #d9432e;
+  --chart-5:   #8451c4;
   /* sidebar */
-  --side-bg:   #dcd2a4;
+  --side-bg:   #d4c496;
   --side-on:   #4c6636;
   --side-txt:  #82784f;
   --side-act:  #3e5a2c;
@@ -70,15 +77,21 @@
 @media (prefers-color-scheme: dark) {
   :root {
     /* mismo espíritu natural, pero "tierra/corteza" en vez de negro puro */
-    --cream:#241e12; --paper:#40361f; --paper2:#4a3e22; --paper3:#554626;
-    --ink:#f1e9d7; --ink2:#c6b899; --ink3:#93876a;
-    --rule:#544628; --rule2:#69582f;
+    --cream:#1c170e; --paper:#332a18; --paper2:#3c311c; --paper3:#473a20;
+    --ink:#f1e9d7; --ink2:#c6b899; --ink3:#9c8f70;
+    --rule:#4a3c22; --rule2:#5f4e2b;
     --sage:#93b06b; --sage-bg:#2a3520; --sage-mid:#a7c37e; --sage-lt:#212a18;
     --umber:#dc9c55; --umber-bg:#3b2b18; --umber-mid:#e5ac6c;
     --sky:#82a4bc; --sky-bg:#202e37; --sky-mid:#9cbcd1;
     --rust:#db7a63; --rust-bg:#3b251e; --rust-mid:#e18d76;
     --moss:#a0b96d; --moss-bg:#283017;
-    --side-bg:#2b2e1f; --side-on:#a7c37e; --side-txt:#726a4f; --side-act:#bbdb94;
+    /* acentos neón para gráficos — brillan sobre el fondo oscuro */
+    --chart-1:   #4fe07a;
+    --chart-2:   #37d3e8;
+    --chart-3:   #ffbf3f;
+    --chart-4:   #ff6e58;
+    --chart-5:   #b98bff;
+    --side-bg:#26210f; --side-on:#a7c37e; --side-txt:#6b6142; --side-act:#bbdb94;
   }
 }
 
@@ -284,7 +297,7 @@ html, body { height: 100%; background: var(--cream); color: var(--ink); font-fam
 /* progress */
 .prog { height: 5px; background: var(--paper3); border-radius: 3px; overflow: hidden; margin: 8px 0 3px; }
 .pf { height: 100%; border-radius: 3px; transition: width .5s ease; }
-.pfb { background: var(--sky-mid); } .pfa { background: var(--umber-mid); } .pfg { background: var(--sage-mid); }
+.pfb { background: var(--chart-2); } .pfa { background: var(--chart-3); } .pfg { background: var(--chart-1); }
 .prog-lb { display: flex; justify-content: space-between; font-size: 10px; color: var(--ink3); }
 
 /* clima hero */
@@ -917,7 +930,7 @@ const analisis = () => {
   const il = Math.min(100, ll7*3);
   const idx = Math.round(it*0.5+ih*0.3+il*0.2);
   const il2 = idx>=80?'Excelente 🌟':idx>=60?'Buena ✅':idx>=40?'Regular ⚠️':'Desfavorable ❌';
-  const ic = idx>=80?'var(--sage-mid)':idx>=60?'var(--sage-mid)':idx>=40?'var(--umber-mid)':'var(--rust-mid)';
+  const ic = idx>=80?'var(--chart-1)':idx>=60?'var(--chart-1)':idx>=40?'var(--chart-3)':'var(--chart-4)';
   return {ll3,ll7,ll30,tp7,tx7,hp7,ev7,vp7,sl,df,idx,il2,ic,
     cr: tp7===null || (tp7>5 && (hp7===null||hp7>30)),
     nr: sl>=3 && hp7!=null && hp7<40};
@@ -983,23 +996,23 @@ const climaSparkSVG = (dias=21) => {
   const bars = datos.map((d,i)=>{
     const mm = +d.mm||0; if(!mm) return '';
     const h = mm/mmMax*(barZone-4);
-    return `<rect x="${(pad+i*stepX-3).toFixed(1)}" y="${(H-pad-h).toFixed(1)}" width="6" height="${h.toFixed(1)}" fill="var(--sky-mid)" opacity="0.7" rx="2"/>`;
+    return `<rect x="${(pad+i*stepX-3).toFixed(1)}" y="${(H-pad-h).toFixed(1)}" width="6" height="${h.toFixed(1)}" fill="var(--chart-2)" opacity="0.85" rx="2"/>`;
   }).join('');
-  const dots = datos.map((d,i)=>`<circle cx="${(pad+i*stepX).toFixed(1)}" cy="${yTemp(+d.temp).toFixed(1)}" r="2.5" fill="var(--umber)"/>`).join('');
+  const dots = datos.map((d,i)=>`<circle cx="${(pad+i*stepX).toFixed(1)}" cy="${yTemp(+d.temp).toFixed(1)}" r="2.5" fill="var(--chart-3)"/>`).join('');
   return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:150px;display:block">
       <defs><linearGradient id="climaGrad" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="var(--umber-mid)" stop-opacity="0.5"/>
-        <stop offset="100%" stop-color="var(--umber-mid)" stop-opacity="0.02"/>
+        <stop offset="0%" stop-color="var(--chart-3)" stop-opacity="0.55"/>
+        <stop offset="100%" stop-color="var(--chart-3)" stop-opacity="0.02"/>
       </linearGradient></defs>
       ${bars}
       <polygon points="${areaPts}" fill="url(#climaGrad)"/>
-      <polyline points="${pts}" fill="none" stroke="var(--umber)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+      <polyline points="${pts}" fill="none" stroke="var(--chart-3)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
       ${dots}
     </svg>
     <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--ink3);margin-top:2px">
       <span>${fmt(datos[0].fecha)}</span>
-      <span style="color:var(--umber);font-weight:600">— temp (${n1(tMin)}°–${n1(tMax)}°)</span>
-      <span style="color:var(--sky-mid);font-weight:600">▮ lluvia</span>
+      <span style="color:var(--chart-3);font-weight:600">— temp (${n1(tMin)}°–${n1(tMax)}°)</span>
+      <span style="color:var(--chart-2);font-weight:600">▮ lluvia</span>
       <span>${fmt(datos[datos.length-1].fecha)}</span>
     </div>`;
 };
@@ -1067,29 +1080,29 @@ const renderDash = () => {
   const nCasi = S.sistemas.filter(s=>s.inicioC && est(s).fase==='q').length;
   const nListo = S.sistemas.filter(s=>s.inicioC && est(s).fase==='l').length;
   const sisEstadoDonut = donutSVG([
-    {value: nCarga, color:'var(--sage)'},
-    {value: nEstanque, color:'var(--sky)'},
-    {value: nCasi, color:'var(--umber)'},
-    {value: nListo, color:'var(--moss)'},
+    {value: nCarga, color:'var(--chart-1)'},
+    {value: nEstanque, color:'var(--chart-2)'},
+    {value: nCasi, color:'var(--chart-3)'},
+    {value: nListo, color:'var(--chart-5)'},
   ]);
   const sisEstadoLegend = [
-    {n:'En carga', v:nCarga, c:'var(--sage)'},
-    {n:'En estanque', v:nEstanque, c:'var(--sky)'},
-    {n:'Casi listo', v:nCasi, c:'var(--umber)'},
-    {n:'Listo', v:nListo, c:'var(--moss)'},
+    {n:'En carga', v:nCarga, c:'var(--chart-1)'},
+    {n:'En estanque', v:nEstanque, c:'var(--chart-2)'},
+    {n:'Casi listo', v:nCasi, c:'var(--chart-3)'},
+    {n:'Listo', v:nListo, c:'var(--chart-5)'},
   ];
   const nRiegoOk = S.plantas.filter(p=>!estPlanta(p).riegoUrg && !estPlanta(p).riegoProx).length;
   const nRiegoProx = S.plantas.filter(p=>estPlanta(p).riegoProx).length;
   const nRiegoUrg = S.plantas.filter(p=>estPlanta(p).riegoUrg).length;
   const riegoDonut = donutSVG([
-    {value: nRiegoOk, color:'var(--sage)'},
-    {value: nRiegoProx, color:'var(--umber)'},
-    {value: nRiegoUrg, color:'var(--rust)'},
+    {value: nRiegoOk, color:'var(--chart-1)'},
+    {value: nRiegoProx, color:'var(--chart-3)'},
+    {value: nRiegoUrg, color:'var(--chart-4)'},
   ], 112, 15, 'plantas');
   const riegoLegend = [
-    {n:'Al día', v:nRiegoOk, c:'var(--sage)'},
-    {n:'Riego pronto', v:nRiegoProx, c:'var(--umber)'},
-    {n:'Regar ahora', v:nRiegoUrg, c:'var(--rust)'},
+    {n:'Al día', v:nRiegoOk, c:'var(--chart-1)'},
+    {n:'Riego pronto', v:nRiegoProx, c:'var(--chart-3)'},
+    {n:'Regar ahora', v:nRiegoUrg, c:'var(--chart-4)'},
   ];
   const revBarMax = Math.max(1, ...S.sistemas.map(s=>S.revolcadas.filter(r=>r.sistema===s.id).length));
   const als     = [];
@@ -1191,12 +1204,12 @@ const renderDash = () => {
         </div>
         <div class="ring-row">
           <div class="ring-tile">
-            ${ringSVG(ax.pctRevolcadas, ax.pctRevolcadas==null?'var(--ink3)':ax.pctRevolcadas>=80?'var(--sage)':ax.pctRevolcadas>=50?'var(--umber)':'var(--rust)')}
+            ${ringSVG(ax.pctRevolcadas, ax.pctRevolcadas==null?'var(--ink3)':ax.pctRevolcadas>=80?'var(--chart-1)':ax.pctRevolcadas>=50?'var(--chart-3)':'var(--chart-4)')}
             <div class="ring-tile-l">Revolcadas en tiempo</div>
             <div class="ring-tile-s">${ax.totalPares?ax.totalPares+' intervalos':'sin datos'}</div>
           </div>
           <div class="ring-tile">
-            ${ringSVG(ax.pctPlantas, ax.pctPlantas==null?'var(--ink3)':ax.pctPlantas>=80?'var(--sage)':ax.pctPlantas>=50?'var(--umber)':'var(--rust)')}
+            ${ringSVG(ax.pctPlantas, ax.pctPlantas==null?'var(--ink3)':ax.pctPlantas>=80?'var(--chart-1)':ax.pctPlantas>=50?'var(--chart-3)':'var(--chart-4)')}
             <div class="ring-tile-l">Plantas al día</div>
             <div class="ring-tile-s">${ax.totalPlantas} plantas</div>
           </div>
@@ -1219,7 +1232,7 @@ const renderDash = () => {
           S.sistemas.filter(s=>s.inicioC).map((s,i)=>({
             label: sLbl(s),
             value: S.revolcadas.filter(r=>r.sistema===s.id).length,
-            color: [`var(--sage)`,`var(--sky)`,`var(--umber)`,`var(--moss)`,`var(--rust)`][i%5]
+            color: [`var(--chart-1)`,`var(--chart-2)`,`var(--chart-3)`,`var(--chart-5)`,`var(--chart-4)`][i%5]
           })), revBarMax
         ):`<div style="font-size:13px;color:var(--ink3)">Sin sistemas activos.</div>`}
       </div>
