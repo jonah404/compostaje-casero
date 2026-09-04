@@ -229,9 +229,21 @@ html, body { height: 100%; background: var(--cream); color: var(--ink); font-fam
   border-radius: var(--rl);
   padding: 14px 16px;
 }
+.stat-ic { width: 36px; height: 36px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 17px; color: #fff; margin-bottom: 10px; flex-shrink: 0; }
 .stat-l { font-size: 10px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--ink3); margin-bottom: 4px; }
 .stat-v { font-family: var(--serif); font-size: 30px; color: var(--ink); line-height: 1; letter-spacing: -.5px; }
 .stat-s { font-size: 11px; color: var(--ink3); margin-top: 3px; }
+
+/* donut / ring charts */
+.donut-wrap { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.donut-legend { display: flex; flex-direction: column; gap: 7px; font-size: 12px; flex: 1; min-width: 120px; }
+.donut-legend-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--ink2); }
+.donut-legend-item b { color: var(--ink); }
+.donut-dot { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
+.ring-row { display: flex; gap: 14px; }
+.ring-tile { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; background: var(--paper); border: 1px solid var(--rule); border-radius: var(--rl); padding: 14px 10px; }
+.ring-tile-l { font-size: 10px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--ink3); }
+.ring-tile-s { font-size: 11px; color: var(--ink3); }
 
 /* card */
 .card { background: var(--paper); border: 1px solid var(--rule); border-radius: var(--rl); padding: 16px 18px; margin-bottom: 10px; }
@@ -955,35 +967,83 @@ const analisisExtra = () => {
   return { pctRevolcadas, totalPares, pctPlantas, plantasOk, totalPlantas };
 };
 
-// Sparkline SVG liviano (sin librerías) — temperatura (línea) + lluvia (barras)
+// Gráfico de área SVG liviano (sin librerías) — temperatura (línea+relleno) + lluvia (barras)
 const climaSparkSVG = (dias=21) => {
   const datos = [...S.clima].filter(c=>c.fecha<=fISO(TODAY) && c.temp!=null).sort((a,b)=>a.fecha>b.fecha?1:-1).slice(-dias);
   if (datos.length < 2) return `<div style="font-size:12px;color:var(--ink3);padding:16px 0">Sin suficientes datos de clima todavía.</div>`;
-  const W=600, H=140, pad=10;
+  const W=600, H=150, pad=10, barZone=26;
   const temps = datos.map(d=>+d.temp);
   const tMin = Math.min(...temps), tMax = Math.max(...temps);
   const mmMax = Math.max(...datos.map(d=>+d.mm||0), 1);
   const stepX = (W-pad*2)/(datos.length-1);
-  const yTemp = t => (H-pad*2)*0.55 + pad - ((t-tMin)/((tMax-tMin)||1))*((H-pad*2)*0.5);
+  const yBase = H-pad-barZone, yTop = pad;
+  const yTemp = t => yBase - ((t-tMin)/((tMax-tMin)||1))*(yBase-yTop);
+  const lastX = pad+(datos.length-1)*stepX;
   const pts = datos.map((d,i)=>`${(pad+i*stepX).toFixed(1)},${yTemp(+d.temp).toFixed(1)}`).join(' ');
+  const areaPts = `${pad.toFixed(1)},${yBase.toFixed(1)} ${pts} ${lastX.toFixed(1)},${yBase.toFixed(1)}`;
   const bars = datos.map((d,i)=>{
     const mm = +d.mm||0; if(!mm) return '';
-    const h = mm/mmMax*(H*0.32);
-    return `<rect x="${(pad+i*stepX-3).toFixed(1)}" y="${(H-pad-h).toFixed(1)}" width="6" height="${h.toFixed(1)}" fill="var(--sky-mid)" opacity="0.5" rx="2"/>`;
+    const h = mm/mmMax*(barZone-4);
+    return `<rect x="${(pad+i*stepX-3).toFixed(1)}" y="${(H-pad-h).toFixed(1)}" width="6" height="${h.toFixed(1)}" fill="var(--sky-mid)" opacity="0.7" rx="2"/>`;
   }).join('');
-  const dots = datos.map((d,i)=>`<circle cx="${(pad+i*stepX).toFixed(1)}" cy="${yTemp(+d.temp).toFixed(1)}" r="2.5" fill="var(--umber-mid)"/>`).join('');
-  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:130px;display:block">
+  const dots = datos.map((d,i)=>`<circle cx="${(pad+i*stepX).toFixed(1)}" cy="${yTemp(+d.temp).toFixed(1)}" r="2.5" fill="var(--umber)"/>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:150px;display:block">
+      <defs><linearGradient id="climaGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="var(--umber-mid)" stop-opacity="0.5"/>
+        <stop offset="100%" stop-color="var(--umber-mid)" stop-opacity="0.02"/>
+      </linearGradient></defs>
       ${bars}
-      <polyline points="${pts}" fill="none" stroke="var(--umber-mid)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+      <polygon points="${areaPts}" fill="url(#climaGrad)"/>
+      <polyline points="${pts}" fill="none" stroke="var(--umber)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
       ${dots}
     </svg>
     <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--ink3);margin-top:2px">
       <span>${fmt(datos[0].fecha)}</span>
-      <span style="color:var(--umber-mid);font-weight:600">— temp (${n1(tMin)}°–${n1(tMax)}°)</span>
+      <span style="color:var(--umber);font-weight:600">— temp (${n1(tMin)}°–${n1(tMax)}°)</span>
       <span style="color:var(--sky-mid);font-weight:600">▮ lluvia</span>
       <span>${fmt(datos[datos.length-1].fecha)}</span>
     </div>`;
 };
+
+// Donut multi-segmento (SVG, stroke-dasharray) — sin librerías
+const donutSVG = (segments, size=112, thickness=15) => {
+  const total = segments.reduce((s,x)=>s+x.value,0);
+  const r = (size-thickness)/2, c = 2*Math.PI*r, cx=size/2, cy=size/2;
+  const base = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--paper3)" stroke-width="${thickness}"/>`;
+  if (!total) return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">${base}</svg>`;
+  let offset = 0;
+  const arcs = segments.filter(s=>s.value>0).map(s=>{
+    const dash = (s.value/total)*c;
+    const el = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${s.color}" stroke-width="${thickness}" stroke-dasharray="${dash.toFixed(1)} ${(c-dash).toFixed(1)}" stroke-dashoffset="${(-offset).toFixed(1)}" transform="rotate(-90 ${cx} ${cy})"/>`;
+    offset += dash;
+    return el;
+  }).join('');
+  return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">${base}${arcs}
+    <text x="50%" y="47%" text-anchor="middle" font-family="var(--serif)" font-size="${size*0.24}" fill="var(--ink)">${total}</text>
+    <text x="50%" y="65%" text-anchor="middle" font-family="var(--sans)" font-size="${size*0.09}" fill="var(--ink3)">sistemas</text>
+  </svg>`;
+};
+
+// Anillo de porcentaje único (SVG, stroke-dasharray) — sin librerías
+const ringSVG = (pct, color, size=76, thickness=8) => {
+  const r = (size-thickness)/2, c = 2*Math.PI*r, cx=size/2, cy=size/2;
+  const p = pct==null ? 0 : Math.max(0, Math.min(100, pct));
+  const dash = p/100*c;
+  return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--paper3)" stroke-width="${thickness}"/>
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="${thickness}" stroke-linecap="round" stroke-dasharray="${dash.toFixed(1)} ${(c-dash).toFixed(1)}" transform="rotate(-90 ${cx} ${cy})"/>
+    <text x="50%" y="53%" text-anchor="middle" font-family="var(--serif)" font-size="${size*0.24}" fill="var(--ink)">${pct==null?'—':Math.round(pct)+'%'}</text>
+  </svg>`;
+};
+
+// Tarjeta de stat con ícono en insignia de color
+const statTile = (icon, colorVar, label, value, sub) => `
+  <div class="stat">
+    <div class="stat-ic" style="background:var(${colorVar})"><i class="ti ${icon}"></i></div>
+    <div class="stat-l">${label}</div>
+    <div class="stat-v">${value}</div>
+    <div class="stat-s">${sub}</div>
+  </div>`;
 
 // ════ RENDER DASHBOARD ════
 const renderDash = () => {
@@ -992,6 +1052,18 @@ const renderDash = () => {
   const lst     = S.sistemas.filter(s=>est(s).fase==='l').length;
   const an      = analisis();
   const ax      = analisisExtra();
+  const sisEstadoDonut = donutSVG([
+    {value: S.sistemas.filter(s=>s.inicioC && est(s).fase==='c').length, color:'var(--umber)'},
+    {value: S.sistemas.filter(s=>s.inicioC && est(s).fase==='s').length, color:'var(--sky)'},
+    {value: S.sistemas.filter(s=>s.inicioC && est(s).fase==='q').length, color:'var(--umber-mid)'},
+    {value: S.sistemas.filter(s=>s.inicioC && est(s).fase==='l').length, color:'var(--moss)'},
+  ]);
+  const sisEstadoLegend = [
+    {n:'En carga', v:S.sistemas.filter(s=>s.inicioC && est(s).fase==='c').length, c:'var(--umber)'},
+    {n:'En estanque', v:S.sistemas.filter(s=>s.inicioC && est(s).fase==='s').length, c:'var(--sky)'},
+    {n:'Casi listo', v:S.sistemas.filter(s=>s.inicioC && est(s).fase==='q').length, c:'var(--umber-mid)'},
+    {n:'Listo', v:S.sistemas.filter(s=>s.inicioC && est(s).fase==='l').length, c:'var(--moss)'},
+  ];
   const als     = [];
   S.sistemas.forEach(s=>{
     const p=proxRev(s); if(!p)return; const d=dd(TODAY,p);
@@ -1012,15 +1084,15 @@ const renderDash = () => {
   const ch = cdDia(fISO(TODAY)) || [...S.clima].sort((a,b)=>a.fecha>b.fecha?-1:1)[0];
 
   document.getElementById('dash-c').innerHTML = `
-    <div class="g4" style="margin-bottom:10px">
-      <div class="stat"><div class="stat-l">Activos</div><div class="stat-v">${activos}</div><div class="stat-s">de ${S.sistemas.length} sistemas</div></div>
-      <div class="stat"><div class="stat-l">En carga</div><div class="stat-v">${enc}</div><div class="stat-s">residuos</div></div>
-      <div class="stat"><div class="stat-l">Listos</div><div class="stat-v">${lst}</div><div class="stat-s">para usar</div></div>
-      <div class="stat"><div class="stat-l">Revolcadas</div><div class="stat-v">${S.revolcadas.length}</div><div class="stat-s">registradas</div></div>
+    <div class="g3" style="margin-bottom:10px">
+      ${statTile('ti-recycle','--sage','Activos', activos, `de ${S.sistemas.length} sistemas`)}
+      ${statTile('ti-box','--umber','En carga', enc, 'residuos')}
+      ${statTile('ti-circle-check','--moss','Listos', lst, 'para usar')}
     </div>
-    <div class="g2" style="margin-bottom:20px">
-      <div class="stat"><div class="stat-l">Plantas</div><div class="stat-v">${S.plantas.length}</div><div class="stat-s">registradas</div></div>
-      <div class="stat"><div class="stat-l">Al día</div><div class="stat-v" style="color:${ax.pctPlantas==null?'var(--ink)':ax.pctPlantas>=80?'var(--sage-mid)':ax.pctPlantas>=50?'var(--umber-mid)':'var(--rust-mid)'}">${ax.pctPlantas!=null?ax.pctPlantas+'%':'—'}</div><div class="stat-s">${ax.plantasOk}/${ax.totalPlantas} sin alertas</div></div>
+    <div class="g3" style="margin-bottom:20px">
+      ${statTile('ti-refresh','--sky','Revolcadas', S.revolcadas.length, 'registradas')}
+      ${statTile('ti-leaf','--sage-mid','Plantas', S.plantas.length, 'registradas')}
+      ${statTile('ti-sparkles', ax.pctPlantas==null?'--ink3':ax.pctPlantas>=80?'--sage':ax.pctPlantas>=50?'--umber':'--rust', 'Al día', ax.pctPlantas!=null?ax.pctPlantas+'%':'—', `${ax.plantasOk}/${ax.totalPlantas} sin alertas`)}
     </div>
     <div class="dash-grid">
       <div>
@@ -1072,12 +1144,35 @@ const renderDash = () => {
       <div class="card">
         <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:8px">Temperatura y lluvia — últimos 21 días</div>
         ${climaSparkSVG(21)}
+        <div class="sep"></div>
+        <div class="g3">
+          <div style="font-size:12px;color:var(--ink3)">Lluvia 30d<br><b style="font-family:var(--serif);font-size:20px;color:var(--ink)">${n1(an.ll30)}</b> mm</div>
+          <div style="font-size:12px;color:var(--ink3)">Sin lluvia<br><b style="font-family:var(--serif);font-size:20px;color:var(--ink)">${an.sl}</b> días</div>
+          <div style="font-size:12px;color:var(--ink3)">Registros<br><b style="font-family:var(--serif);font-size:20px;color:var(--ink)">${S.clima.length}</b> días</div>
+        </div>
       </div>
-      <div class="g2">
-        <div class="stat"><div class="stat-l">Revolcadas en tiempo</div><div class="stat-v" style="color:${ax.pctRevolcadas==null?'var(--ink)':ax.pctRevolcadas>=80?'var(--sage-mid)':ax.pctRevolcadas>=50?'var(--umber-mid)':'var(--rust-mid)'}">${ax.pctRevolcadas!=null?ax.pctRevolcadas+'%':'—'}</div><div class="stat-s">${ax.totalPares?ax.totalPares+' intervalos medidos':'sin datos suficientes'}</div></div>
-        <div class="stat"><div class="stat-l">Lluvia acumulada</div><div class="stat-v">${n1(an.ll30)}<span style="font-size:16px"> mm</span></div><div class="stat-s">últimos 30 días</div></div>
-        <div class="stat"><div class="stat-l">Días sin lluvia</div><div class="stat-v">${an.sl}</div><div class="stat-s">racha actual</div></div>
-        <div class="stat"><div class="stat-l">Registros de clima</div><div class="stat-v">${S.clima.length}</div><div class="stat-s">días acumulados</div></div>
+      <div>
+        <div class="card">
+          <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:10px">Estado de sistemas</div>
+          <div class="donut-wrap">
+            ${sisEstadoDonut}
+            <div class="donut-legend">
+              ${sisEstadoLegend.map(l=>`<div class="donut-legend-item"><span style="display:flex;align-items:center;gap:7px"><span class="donut-dot" style="background:${l.c}"></span>${l.n}</span><b>${l.v}</b></div>`).join('')}
+            </div>
+          </div>
+        </div>
+        <div class="ring-row">
+          <div class="ring-tile">
+            ${ringSVG(ax.pctRevolcadas, ax.pctRevolcadas==null?'var(--ink3)':ax.pctRevolcadas>=80?'var(--sage)':ax.pctRevolcadas>=50?'var(--umber)':'var(--rust)')}
+            <div class="ring-tile-l">Revolcadas en tiempo</div>
+            <div class="ring-tile-s">${ax.totalPares?ax.totalPares+' intervalos':'sin datos'}</div>
+          </div>
+          <div class="ring-tile">
+            ${ringSVG(ax.pctPlantas, ax.pctPlantas==null?'var(--ink3)':ax.pctPlantas>=80?'var(--sage)':ax.pctPlantas>=50?'var(--umber)':'var(--rust)')}
+            <div class="ring-tile-l">Plantas al día</div>
+            <div class="ring-tile-s">${ax.totalPlantas} plantas</div>
+          </div>
+        </div>
       </div>
     </div>`;
 };
