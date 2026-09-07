@@ -44,9 +44,11 @@ var CFG = {
 
 // ====================================================================
 //  TRIGGERS SEPARADOS — configurar con configurarTriggerDiario()
-//  registrarClimaHoy   → 23:00
-//  actualizarAnalisis  → 07:00
-//  verificarYCrearEventos → 08:00
+//  registrarClimaHoy      → 00:30 (registra el clima del día que acaba de cerrar)
+//  verificarYCrearEventos → 00:30 (alertas para HOY, el día que recién empieza)
+//  actualizarAnalisis     → 07:00
+//  actualizarFichaPlantas → 07:00 (refresco extra; el sync principal ya
+//                                   corrió a las 00:30 dentro de verificarYCrearEventos)
 // ====================================================================
 
 function ejecutarDiario() {
@@ -142,10 +144,13 @@ function registrarClimaHoy() {
     crearEncabezadosClima(sheet);
   }
 
-  var tz       = CFG.tz;
-  var fechaObj = Utilities.formatDate(new Date(), tz, "yyyy-MM-dd");
+  var tz   = CFG.tz;
+  // Corre a las 00:30 → el día que hay que registrar es el que recién cerró
+  // (si tomara "hoy" a esta hora, sería un día que arrancó hace 30 minutos).
+  var ayer = new Date(); ayer.setDate(ayer.getDate() - 1);
+  var fechaObj = Utilities.formatDate(ayer, tz, "yyyy-MM-dd");
 
-  // Verificar si ya existe registro para hoy
+  // Verificar si ya existe registro para ese día
   var datos = sheet.getDataRange().getValues();
   for (var i = 1; i < datos.length; i++) {
     var celda = datos[i][0];
@@ -873,10 +878,18 @@ function obtenerClimaFecha(fechaStr) {
 var UMBRAL_LLUVIA_MM = 8; // mm mínimos para considerar lluvia efectiva
 
 // ====================================================================
-//  REEMPLAZAR verificarYCrearEventos() — AHORA CREA EVENTOS PARA MAÑANA
+//  verificarYCrearEventos() — corre a las 00:30 y crea los eventos de HOY
 // ====================================================================
 
 function verificarYCrearEventos() {
+  // Sincronizar la ficha de plantas (riego/fert/poda/plagas) ANTES de generar
+  // alertas. Si no se hace acá, un riego cargado durante el día en 'Registro
+  // Plantas' recién se reflejaba en la columna "Último riego" a las 07:00 del
+  // día siguiente — y este chequeo, corriendo antes, generaba una alerta de
+  // riego con datos viejos que después quedaba pegada en el calendario aunque
+  // la ficha ya estuviera al día.
+  actualizarFichaPlantas();
+
   var ss      = SpreadsheetApp.getActiveSpreadsheet();
   var shSis   = ss.getSheetByName(CFG.sheetSistemas);
   var shClima = ss.getSheetByName(CFG.sheetClima);
@@ -885,12 +898,11 @@ function verificarYCrearEventos() {
   var cal = CalendarApp.getCalendarById(CFG.calendarId);
   if (!cal) { Logger.log("[ERROR] Calendario no encontrado"); return; }
 
-  // ── Crear eventos para MAÑANA (preventivo) ─────────────────────
-  var manana = new Date();
-  manana.setDate(manana.getDate() + 1);
-  manana.setHours(0,0,0,0);
-
-  var hoy        = new Date(); hoy.setHours(0,0,0,0);
+  // ── Crear eventos para HOY ──────────────────────────────────────
+  // El chequeo corre a las 00:30, así que "hoy" ya es el día para el que
+  // hay que actuar (antes corría a las 23:00 y apuntaba a "mañana").
+  var hoy         = new Date(); hoy.setHours(0,0,0,0);
+  var diaObjetivo = hoy;
   var sisDatos   = shSis.getDataRange().getValues().slice(2);
   var climaDatos = shClima.getDataRange().getValues().slice(2);
   var climaAyer  = climaDatos.length ? climaDatos[climaDatos.length-1] : null;
@@ -918,26 +930,26 @@ function verificarYCrearEventos() {
   // ── ALERTAS CLIMA ───────────────────────────────────────────────
   if (tempMax !== null && tempMax >= CFG.tempCalor) {
     eventos.push({
-      titulo: "🔥 COMPOST: Calor extremo mañana - revisar humedad",
+      titulo: "🔥 COMPOST: Calor extremo hoy - revisar humedad",
       desc: "Temperatura máxima registrada ayer: " + tempMax + "°C\n" +
-            "Acción para mañana: revisá humedad del compost y regá si es necesario.",
+            "Acción para hoy: revisá humedad del compost y regá si es necesario.",
       color: CalendarApp.EventColor.RED
     });
   }
   if (diasSinLluvia >= CFG.diasSinLluvia && humHoy !== null && humHoy < CFG.humedadBajaUmbral) {
     eventos.push({
-      titulo: "💧 COMPOST: Regar mañana",
+      titulo: "💧 COMPOST: Regar hoy",
       desc: diasSinLluvia + " días sin lluvia. Humedad ambiente: " + humHoy + "%\n" +
-            "Acción para mañana: regar el compost y aprovechá para revolver.",
+            "Acción para hoy: regar el compost y aprovechá para revolver.",
       color: CalendarApp.EventColor.BLUE
     });
   }
   if (evapoHoy !== null && vientoHoy !== null &&
       evapoHoy >= CFG.evapotranspAlta && vientoHoy >= CFG.vientoFuerte && mmHoy === 0) {
     eventos.push({
-      titulo: "🌬️ COMPOST: Estrés hídrico - revisá cobertura mañana",
+      titulo: "🌬️ COMPOST: Estrés hídrico - revisá cobertura hoy",
       desc: "Evapotranspiración: " + evapoHoy + " mm | Viento: " + vientoHoy + " km/h\n" +
-            "Acción para mañana: revisá la cobertura del compost.",
+            "Acción para hoy: revisá la cobertura del compost.",
       color: CalendarApp.EventColor.YELLOW
     });
   }
@@ -965,14 +977,14 @@ function verificarYCrearEventos() {
       if (diasDesdeBase >= CFG.diasSinRevolver) {
         var diasAtraso = diasDesdeBase - CFG.diasSinRevolver;
         eventos.push({
-          titulo: "🔄 COMPOST: Revolver Sistema " + numSis + " mañana" +
+          titulo: "🔄 COMPOST: Revolver Sistema " + numSis + " hoy" +
                   (diasAtraso > 0 ? " (" + diasAtraso + " día(s) de atraso)" : ""),
           desc: "Han pasado " + diasDesdeBase + " días desde la última revolcada" +
                 (ultimaRev ? " (" + Utilities.formatDate(ultimaRev, CFG.tz, "dd/MM/yyyy") + ")" :
                              " (inicio: " + Utilities.formatDate(fechaInicio, CFG.tz, "dd/MM/yyyy") + ")") + ".\n" +
                 "Frecuencia recomendada: cada " + CFG.diasSinRevolver + " días.\n" +
                 (mmHoy > 0 ? "Ayer llovió " + mmHoy + " mm — buen momento.\n" : "") +
-                "Acción: revolver mañana y registrar en 'Registro Revolcadas'.",
+                "Acción: revolver hoy y registrar en 'Registro Revolcadas'.",
           color: CalendarApp.EventColor.ORANGE
         });
       } else if (diasDesdeBase === CFG.diasSinRevolver - 1) {
@@ -1011,17 +1023,17 @@ function verificarYCrearEventos() {
   });
 
   // ── ALERTAS DE PLANTAS ──────────────────────────────────────────
-  var eventosPlantas = verificarEventosPlantas(cal, manana);
+  var eventosPlantas = verificarEventosPlantas(cal, diaObjetivo);
   if (eventosPlantas) eventos = eventos.concat(eventosPlantas);
 
   if (eventos.length === 0) {
-    Logger.log("[OK] Sin eventos para crear mañana");
+    Logger.log("[OK] Sin eventos para crear hoy");
     return;
   }
 
-  // Verificar duplicados en el día de mañana
-  var ini = new Date(manana); ini.setHours(0,0,0,0);
-  var fin = new Date(manana); fin.setHours(23,59,59,999);
+  // Verificar duplicados en el día de hoy
+  var ini = new Date(diaObjetivo); ini.setHours(0,0,0,0);
+  var fin = new Date(diaObjetivo); fin.setHours(23,59,59,999);
   var titulosExistentes = cal.getEvents(ini, fin).map(function(e){ return e.getTitle(); });
 
   var creados = 0;
@@ -1030,9 +1042,9 @@ function verificarYCrearEventos() {
       Logger.log("[SKIP] Ya existe: " + ev.titulo);
       return;
     }
-    var evento = cal.createAllDayEvent(ev.titulo, manana, { description: ev.desc });
+    var evento = cal.createAllDayEvent(ev.titulo, diaObjetivo, { description: ev.desc });
     try { evento.setColor(ev.color); } catch(e) {}
-    Logger.log("[CAL] Creado para " + Utilities.formatDate(manana, CFG.tz, "dd/MM") + ": " + ev.titulo);
+    Logger.log("[CAL] Creado para " + Utilities.formatDate(diaObjetivo, CFG.tz, "dd/MM") + ": " + ev.titulo);
     creados++;
   });
   Logger.log("[OK] Eventos creados: " + creados + " / " + eventos.length);
@@ -1040,22 +1052,34 @@ function verificarYCrearEventos() {
 
 // ====================================================================
 //  REEMPLAZAR configurarTriggerDiario()
-//  Ahora verificarYCrearEventos corre a las 23hs junto con el clima
-//  para que los eventos aparezcan en el calendario del DÍA SIGUIENTE
+//  Ahora registrarClimaHoy y verificarYCrearEventos corren a las 00:30
+//  para que los eventos aparezcan en el calendario del MISMO día en que
+//  hay que actuar (antes corrían a las 23:00 y quedaban fechados para
+//  el día siguiente). Sólo toca los triggers de las 4 funciones que
+//  administra — no borra los de sincronización a Firestore (07:30-07:45)
+//  ni ningún otro trigger que se haya agregado por separado.
 // ====================================================================
 
 function configurarTriggerDiario() {
+  var FUNCIONES_MANEJADAS = [
+    "registrarClimaHoy", "verificarYCrearEventos",
+    "actualizarAnalisis", "actualizarFichaPlantas"
+  ];
   ScriptApp.getProjectTriggers().forEach(function(t){
-    ScriptApp.deleteTrigger(t);
+    if (FUNCIONES_MANEJADAS.indexOf(t.getHandlerFunction()) >= 0) {
+      ScriptApp.deleteTrigger(t);
+    }
   });
 
-  // 23:00 — registrar clima del día Y crear eventos preventivos para mañana
+  // 00:30 — registrar el clima del día que acaba de cerrar Y crear/actualizar
+  // los eventos de HOY (incluye el sync de la ficha de plantas, así que el
+  // riego que cargaste ayer ya se ve reflejado antes de generar alertas)
   ScriptApp.newTrigger("registrarClimaHoy")
-    .timeBased().atHour(23).everyDays(1)
+    .timeBased().atHour(0).nearMinute(30).everyDays(1)
     .inTimezone(CFG.tz).create();
 
   ScriptApp.newTrigger("verificarYCrearEventos")
-    .timeBased().atHour(23).everyDays(1)
+    .timeBased().atHour(0).nearMinute(30).everyDays(1)
     .inTimezone(CFG.tz).create();
 
   // 07:00 — actualizar análisis con datos del día anterior
@@ -1063,12 +1087,13 @@ function configurarTriggerDiario() {
     .timeBased().atHour(7).everyDays(1)
     .inTimezone(CFG.tz).create();
 
-  // 07:00 — actualizar ficha de plantas (días desde riego, colores)
+  // 07:00 — refresco extra de la ficha de plantas (el sync principal ya
+  // corrió a las 00:30 dentro de verificarYCrearEventos)
   ScriptApp.newTrigger("actualizarFichaPlantas")
     .timeBased().atHour(7).everyDays(1)
     .inTimezone(CFG.tz).create();
 
-  Logger.log("[OK] Triggers: clima+eventos 23hs / análisis+plantas 7hs");
+  Logger.log("[OK] Triggers: clima+eventos 00:30 / análisis+plantas 7hs (no se tocaron otros triggers)");
 }
 
 // ====================================================================
@@ -1695,7 +1720,7 @@ function verificarEventosPlantas(cal, manana) {
       } else if (!esInterior && tempMin <= CFG_PLANTAS.tempHeladaUmbral) {
         var severa = tempMin <= CFG_PLANTAS.tempHeladaSevera;
         eventos.push({
-          titulo: (severa ? '🧊 HELADA SEVERA' : '❄️ HELADA') + ': proteger ' + nombre + ' mañana',
+          titulo: (severa ? '🧊 HELADA SEVERA' : '❄️ HELADA') + ': proteger ' + nombre + ' hoy',
           desc: 'Temperatura mínima registrada: ' + tempMin + '°C\n' +
             (severa
               ? 'RIESGO ALTO de daño en hojas y brotes.\nAcción: cubrir con tela antihelada, regar el suelo esta tarde (retiene calor).'
@@ -1729,7 +1754,7 @@ function verificarEventosPlantas(cal, manana) {
             contextoAgua + '\n' +
             'Límite para esta época: ' + limiteRiego + ' días (' + (esVerano ? 'verano' : 'invierno') + ').\n' +
             (esInterior ? 'Regar hasta que drene un poco por debajo de la maceta.' :
-              'Cantidad sugerida: 10-15 litros por planta.\nAcción: regar mañana a la mañana temprano o al atardecer.'),
+              'Cantidad sugerida: 10-15 litros por planta.\nAcción: regar hoy temprano a la mañana o al atardecer.'),
           color: CalendarApp.EventColor.BLUE
         });
       } else if (diasSinAgua >= limiteRiego * 0.7) {
