@@ -1696,7 +1696,21 @@ function verificarEventosPlantas(cal, manana) {
     'Aplicar siempre a la tardecita, nunca con sol directo, y alejada de mascotas/niños hasta que seque.';
 
   var datos = shP.getDataRange().getValues().slice(1);
-  var eventos = [];
+
+  // Se agrupa por categoría en vez de crear un evento por planta — con varias
+  // plantas, un evento por planta hacía el calendario ilegible. Cada categoría
+  // se junta en UN solo evento con la lista de plantas en la descripción.
+  var grupos = {
+    frioInterior:  [], // { nombre, tempTolerado }
+    heladaExterior: { severa: false, plantas: [] },
+    riegoUrgente:  [], // { nombre, diasSinAgua, limiteRiego, contexto }
+    riegoProximo:  [], // { nombre, diasRestantes }
+    fertilizarUrgente: [], // { nombre, diasAtraso, detalle }
+    fertilizarPronto:  [], // { nombre, fecha, detalle }
+    plagas: [],        // nombre
+    podaExterior: [],  // { nombre, dias }
+    limpiezaInterior: [], // { nombre, dias }
+  };
 
   datos.forEach(function (p) {
     if (!p[0] || !p[1]) return;
@@ -1709,24 +1723,11 @@ function verificarEventosPlantas(cal, manana) {
     if (tempMin !== null) {
       if (esInterior && perfil.tempMin !== null) {
         if (tempMin <= perfil.tempMin + 2) {
-          eventos.push({
-            titulo: '🥶 FRÍO: alejar ' + nombre + ' de la ventana',
-            desc: 'Temperatura mínima pronosticada: ' + tempMin + '°C.\n' +
-              nombre + ' (' + especie + ') tolera hasta unos ' + perfil.tempMin + '°C.\n' +
-              'Acción: alejarla de ventanas/corrientes de aire esta noche.',
-            color: CalendarApp.EventColor.CYAN
-          });
+          grupos.frioInterior.push({ nombre: nombre, tempTolerado: perfil.tempMin });
         }
       } else if (!esInterior && tempMin <= CFG_PLANTAS.tempHeladaUmbral) {
-        var severa = tempMin <= CFG_PLANTAS.tempHeladaSevera;
-        eventos.push({
-          titulo: (severa ? '🧊 HELADA SEVERA' : '❄️ HELADA') + ': proteger ' + nombre + ' hoy',
-          desc: 'Temperatura mínima registrada: ' + tempMin + '°C\n' +
-            (severa
-              ? 'RIESGO ALTO de daño en hojas y brotes.\nAcción: cubrir con tela antihelada, regar el suelo esta tarde (retiene calor).'
-              : 'Riesgo moderado para cítrico joven.\nAcción: cubrir la planta esta noche con tela antihelada.'),
-          color: severa ? CalendarApp.EventColor.RED : CalendarApp.EventColor.CYAN
-        });
+        grupos.heladaExterior.severa = tempMin <= CFG_PLANTAS.tempHeladaSevera;
+        grupos.heladaExterior.plantas.push(nombre);
       }
     }
 
@@ -1743,28 +1744,14 @@ function verificarEventosPlantas(cal, manana) {
 
       if (diasSinAgua >= limiteRiego) {
         var contextoAgua = aguaEfectiva.tipo === 'lluvia'
-          ? 'Última agua efectiva: lluvia de ' + aguaEfectiva.mm + 'mm el ' +
-            Utilities.formatDate(aguaEfectiva.fecha, CFG.tz, 'dd/MM/yyyy') +
-            ' (umbral: ' + UMBRAL_LLUVIA_MM + 'mm)'
-          : 'Último riego: ' + Utilities.formatDate(aguaEfectiva.fecha, CFG.tz, 'dd/MM/yyyy');
-
-        eventos.push({
-          titulo: '💧 RIEGO: ' + nombre + ' (' + diasSinAgua + ' días sin agua efectiva)',
-          desc: nombre + ' lleva ' + diasSinAgua + ' días sin agua suficiente.\n' +
-            contextoAgua + '\n' +
-            'Límite para esta época: ' + limiteRiego + ' días (' + (esVerano ? 'verano' : 'invierno') + ').\n' +
-            (esInterior ? 'Regar hasta que drene un poco por debajo de la maceta.' :
-              'Cantidad sugerida: 10-15 litros por planta.\nAcción: regar hoy temprano a la mañana o al atardecer.'),
-          color: CalendarApp.EventColor.BLUE
+          ? 'lluvia de ' + aguaEfectiva.mm + 'mm el ' + Utilities.formatDate(aguaEfectiva.fecha, CFG.tz, 'dd/MM/yyyy')
+          : 'riego del ' + Utilities.formatDate(aguaEfectiva.fecha, CFG.tz, 'dd/MM/yyyy');
+        grupos.riegoUrgente.push({
+          nombre: nombre, diasSinAgua: diasSinAgua, limiteRiego: limiteRiego,
+          contexto: contextoAgua, esInterior: esInterior
         });
       } else if (diasSinAgua >= limiteRiego * 0.7) {
-        var diasRestantes = limiteRiego - diasSinAgua;
-        eventos.push({
-          titulo: '💧 RIEGO próximo: ' + nombre + ' (en ~' + diasRestantes + ' día(s))',
-          desc: nombre + ' lleva ' + diasSinAgua + ' días sin agua suficiente.\n' +
-            'Conviene regar en los próximos ' + diasRestantes + ' días.',
-          color: CalendarApp.EventColor.TEAL
-        });
+        grupos.riegoProximo.push({ nombre: nombre, diasRestantes: limiteRiego - diasSinAgua });
       } else if (aguaEfectiva.tipo === 'lluvia') {
         Logger.log('[INFO] ' + nombre + ': sin alerta de riego — lluvia reciente de ' +
           aguaEfectiva.mm + 'mm hace ' + diasSinAgua + ' días');
@@ -1777,26 +1764,17 @@ function verificarEventosPlantas(cal, manana) {
     if (proxFert && !fueraDeTemporada) {
       proxFert.setHours(0, 0, 0, 0);
       var diasParaFert = Math.floor((proxFert - hoy) / 86400000);
-      var sugerenciaFert = (perfil && perfil.productoFert)
-        ? '\nProducto sugerido: ' + perfil.productoFert + '.\nDosis: ' + (perfil.dosisFert || 'según el envase') + '.'
-        : '';
+      var detalleFert = perfil && perfil.productoFert
+        ? perfil.productoFert + ' (' + (perfil.dosisFert || 'según el envase') + ')'
+        : (perfil
+          ? 'cada ' + perfil.diasFert + ' días, solo en temporada de crecimiento'
+          : '100-150g de 15-15-15 alrededor del tronco (a 20cm), incorporar con agua');
       if (diasParaFert <= 0) {
-        eventos.push({
-          titulo: '🌿 FERTILIZAR: ' + nombre + (diasParaFert < 0 ? ' (' + Math.abs(diasParaFert) + ' días atrasado)' : ''),
-          desc: nombre + ' necesita fertilización.\n' +
-            (perfil
-              ? 'Según su perfil (' + especie + '): cada ' + perfil.diasFert + ' días, solo en temporada de crecimiento.'
-              : 'Dosis para cítrico joven: 100-150g de 15-15-15 alrededor del tronco (a 20cm), incorporar con agua.\nFrecuencia: cada ' + CFG_PLANTAS.diasFertilizante + ' días.') +
-            sugerenciaFert + '\n' +
-            'Acción: fertilizar y registrar en \'Registro Plantas\'.',
-          color: CalendarApp.EventColor.GREEN
+        grupos.fertilizarUrgente.push({
+          nombre: nombre, diasAtraso: diasParaFert < 0 ? Math.abs(diasParaFert) : 0, detalle: detalleFert
         });
       } else if (diasParaFert <= 7) {
-        eventos.push({
-          titulo: '🌿 FERTILIZAR pronto: ' + nombre + ' (en ' + diasParaFert + ' días)',
-          desc: 'La próxima fertilización es el ' + Utilities.formatDate(proxFert, CFG.tz, 'dd/MM/yyyy') + '.' + sugerenciaFert,
-          color: CalendarApp.EventColor.TEAL
-        });
+        grupos.fertilizarPronto.push({ nombre: nombre, fecha: proxFert, detalle: detalleFert });
       }
     }
 
@@ -1805,16 +1783,7 @@ function verificarEventosPlantas(cal, manana) {
     if (proxPlagas) {
       proxPlagas.setHours(0, 0, 0, 0);
       var diasParaPlagas = Math.floor((proxPlagas - hoy) / 86400000);
-      if (diasParaPlagas <= 0) {
-        eventos.push({
-          titulo: '🐛 REVISIÓN PLAGAS: ' + nombre,
-          desc: nombre + ' — revisión mensual de plagas y enfermedades.\n' +
-            'Qué revisar: hojas (manchas, decoloración), envés (cochinillas, pulgones, ácaros), tallos.\n\n' +
-            CHULETA_PLAGAS + '\n\n' +
-            'Acción: registrar hallazgos en \'Registro Plantas\'.',
-          color: CalendarApp.EventColor.YELLOW
-        });
-      }
+      if (diasParaPlagas <= 0) grupos.plagas.push(nombre);
     }
 
     // ── PODA ────────────────────────────────────────────────────────
@@ -1823,16 +1792,122 @@ function verificarEventosPlantas(cal, manana) {
       proxPoda.setHours(0, 0, 0, 0);
       var diasParaPoda = Math.floor((proxPoda - hoy) / 86400000);
       if (diasParaPoda <= 30 && diasParaPoda >= 0) {
-        eventos.push({
-          titulo: '✂️ PODA/LIMPIEZA se acerca: ' + nombre + ' (en ' + diasParaPoda + ' días)',
-          desc: (esInterior
-            ? 'Revisá y quitá hojas secas o amarillas de ' + nombre + '.'
-            : 'Poda anual de formación de ' + nombre + '.\nMejor época para cítricos: ago-sep (fin de invierno).\nQué podar: ramas secas, cruzadas, las que crecen hacia adentro.\nNo más del 20-30% de la copa.'),
-          color: CalendarApp.EventColor.ORANGE
-        });
+        (esInterior ? grupos.limpiezaInterior : grupos.podaExterior)
+          .push({ nombre: nombre, dias: diasParaPoda });
       }
     }
   });
+
+  // ── Armar UN evento por categoría con todas las plantas ──────────
+  var eventos = [];
+
+  if (grupos.frioInterior.length) {
+    eventos.push({
+      titulo: '🥶 FRÍO: alejar de la ventana (' + grupos.frioInterior.length + ')',
+      desc: 'Temperatura mínima pronosticada: ' + tempMin + '°C.\n\n' +
+        grupos.frioInterior.map(function (x) {
+          return '• ' + x.nombre + ' (tolera hasta ~' + x.tempTolerado + '°C)';
+        }).join('\n') +
+        '\n\nAcción: alejarlas de ventanas/corrientes de aire esta noche.',
+      color: CalendarApp.EventColor.CYAN
+    });
+  }
+
+  if (grupos.heladaExterior.plantas.length) {
+    var severa = grupos.heladaExterior.severa;
+    eventos.push({
+      titulo: (severa ? '🧊 HELADA SEVERA' : '❄️ HELADA') + ': proteger plantas de exterior hoy (' +
+        grupos.heladaExterior.plantas.length + ')',
+      desc: 'Temperatura mínima registrada: ' + tempMin + '°C\n\n' +
+        grupos.heladaExterior.plantas.map(function (n) { return '• ' + n; }).join('\n') + '\n\n' +
+        (severa
+          ? 'RIESGO ALTO de daño en hojas y brotes.\nAcción: cubrir con tela antihelada, regar el suelo esta tarde (retiene calor).'
+          : 'Riesgo moderado para cítrico joven.\nAcción: cubrir con tela antihelada esta noche.'),
+      color: severa ? CalendarApp.EventColor.RED : CalendarApp.EventColor.CYAN
+    });
+  }
+
+  if (grupos.riegoUrgente.length) {
+    var hayInterior = grupos.riegoUrgente.some(function (x) { return x.esInterior; });
+    var hayExterior = grupos.riegoUrgente.some(function (x) { return !x.esInterior; });
+    eventos.push({
+      titulo: '💧 RIEGO: ' + grupos.riegoUrgente.length + ' planta(s) necesitan agua',
+      desc: grupos.riegoUrgente.map(function (x) {
+        return '• ' + x.nombre + ' — ' + x.diasSinAgua + ' días sin agua efectiva (último ' + x.contexto +
+          ', límite ' + x.limiteRiego + 'd)';
+      }).join('\n') + '\n\n' +
+        (hayExterior ? 'Exterior: 10-15 litros por planta.\n' : '') +
+        (hayInterior ? 'Interior: regar hasta que drene un poco por debajo de la maceta.\n' : '') +
+        'Acción: regar hoy temprano a la mañana o al atardecer.',
+      color: CalendarApp.EventColor.BLUE
+    });
+  }
+
+  if (grupos.riegoProximo.length) {
+    eventos.push({
+      titulo: '💧 RIEGO próximo: ' + grupos.riegoProximo.length + ' planta(s) en los próximos días',
+      desc: grupos.riegoProximo.map(function (x) {
+        return '• ' + x.nombre + ' — en ~' + x.diasRestantes + ' día(s)';
+      }).join('\n'),
+      color: CalendarApp.EventColor.TEAL
+    });
+  }
+
+  if (grupos.fertilizarUrgente.length) {
+    eventos.push({
+      titulo: '🌿 FERTILIZAR: ' + grupos.fertilizarUrgente.length + ' planta(s)',
+      desc: grupos.fertilizarUrgente.map(function (x) {
+        return '• ' + x.nombre + (x.diasAtraso > 0 ? ' (' + x.diasAtraso + ' días atrasado)' : '') +
+          ' — ' + x.detalle;
+      }).join('\n') + '\n\nAcción: fertilizar y registrar en \'Registro Plantas\'.',
+      color: CalendarApp.EventColor.GREEN
+    });
+  }
+
+  if (grupos.fertilizarPronto.length) {
+    eventos.push({
+      titulo: '🌿 FERTILIZAR pronto: ' + grupos.fertilizarPronto.length + ' planta(s)',
+      desc: grupos.fertilizarPronto.map(function (x) {
+        return '• ' + x.nombre + ' — próxima el ' + Utilities.formatDate(x.fecha, CFG.tz, 'dd/MM/yyyy') +
+          ' (' + x.detalle + ')';
+      }).join('\n'),
+      color: CalendarApp.EventColor.TEAL
+    });
+  }
+
+  if (grupos.plagas.length) {
+    eventos.push({
+      titulo: '🐛 REVISIÓN PLAGAS: ' + grupos.plagas.length + ' planta(s)',
+      desc: 'Revisión mensual de plagas y enfermedades:\n\n' +
+        grupos.plagas.map(function (n) { return '• ' + n; }).join('\n') + '\n\n' +
+        'Qué revisar: hojas (manchas, decoloración), envés (cochinillas, pulgones, ácaros), tallos.\n\n' +
+        CHULETA_PLAGAS + '\n\n' +
+        'Acción: registrar hallazgos en \'Registro Plantas\'.',
+      color: CalendarApp.EventColor.YELLOW
+    });
+  }
+
+  if (grupos.podaExterior.length) {
+    eventos.push({
+      titulo: '✂️ PODA se acerca: ' + grupos.podaExterior.length + ' planta(s)',
+      desc: grupos.podaExterior.map(function (x) {
+        return '• ' + x.nombre + ' — en ' + x.dias + ' días';
+      }).join('\n') + '\n\n' +
+        'Poda anual de formación. Mejor época para cítricos: ago-sep (fin de invierno).\n' +
+        'Qué podar: ramas secas, cruzadas, las que crecen hacia adentro.\nNo más del 20-30% de la copa.',
+      color: CalendarApp.EventColor.ORANGE
+    });
+  }
+
+  if (grupos.limpiezaInterior.length) {
+    eventos.push({
+      titulo: '✂️ LIMPIEZA se acerca: ' + grupos.limpiezaInterior.length + ' planta(s)',
+      desc: grupos.limpiezaInterior.map(function (x) {
+        return '• ' + x.nombre + ' — en ' + x.dias + ' días';
+      }).join('\n') + '\n\nAcción: revisá y quitá hojas secas o amarillas.',
+      color: CalendarApp.EventColor.ORANGE
+    });
+  }
 
   return eventos;
 }
