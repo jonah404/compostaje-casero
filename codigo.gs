@@ -963,6 +963,15 @@ function verificarYCrearEventos() {
   }
 
   // ── ALERTAS POR SISTEMA DE COMPOST ──────────────────────────────
+  // Igual que con las plantas: se agrupa por categoría en vez de un evento
+  // por sistema, para no llenar el calendario si hay varios sistemas.
+  var gruposCompost = {
+    revolverUrgente: [], // { numSis, diasDesdeBase, diasAtraso, referencia }
+    revolverAviso:   [], // numSis (mañana toca revolver)
+    listoCosechar:   [], // { numSis, diasEstanq }
+    revisarMaduracion: [], // { numSis, diasEstanq, fechaEstimada }
+  };
+
   sisDatos.forEach(function(sis) {
     if (!sis[0] || sis[0]==="") return;
     var numSis      = sis[0];
@@ -975,52 +984,78 @@ function verificarYCrearEventos() {
       var diasDesdeBase = Math.floor((hoy - baseConteo) / 86400000);
 
       if (diasDesdeBase >= CFG.diasSinRevolver) {
-        var diasAtraso = diasDesdeBase - CFG.diasSinRevolver;
-        eventos.push({
-          titulo: "🔄 COMPOST: Revolver Sistema " + numSis + " hoy" +
-                  (diasAtraso > 0 ? " (" + diasAtraso + " día(s) de atraso)" : ""),
-          desc: "Han pasado " + diasDesdeBase + " días desde la última revolcada" +
-                (ultimaRev ? " (" + Utilities.formatDate(ultimaRev, CFG.tz, "dd/MM/yyyy") + ")" :
-                             " (inicio: " + Utilities.formatDate(fechaInicio, CFG.tz, "dd/MM/yyyy") + ")") + ".\n" +
-                "Frecuencia recomendada: cada " + CFG.diasSinRevolver + " días.\n" +
-                (mmHoy > 0 ? "Ayer llovió " + mmHoy + " mm — buen momento.\n" : "") +
-                "Acción: revolver hoy y registrar en 'Registro Revolcadas'.",
-          color: CalendarApp.EventColor.ORANGE
+        gruposCompost.revolverUrgente.push({
+          numSis: numSis, diasDesdeBase: diasDesdeBase,
+          diasAtraso: diasDesdeBase - CFG.diasSinRevolver,
+          referencia: ultimaRev
+            ? "última revolcada " + Utilities.formatDate(ultimaRev, CFG.tz, "dd/MM/yyyy")
+            : "inicio " + Utilities.formatDate(fechaInicio, CFG.tz, "dd/MM/yyyy")
         });
       } else if (diasDesdeBase === CFG.diasSinRevolver - 1) {
-        // Aviso previo: mañana toca revolver
-        eventos.push({
-          titulo: "🔄 COMPOST: Mañana toca revolver Sistema " + numSis,
-          desc: "Mañana se cumplen " + CFG.diasSinRevolver + " días desde la última revolcada.\n" +
-                "Preparate para revolver el Sistema " + numSis + " mañana.",
-          color: CalendarApp.EventColor.YELLOW
-        });
+        gruposCompost.revolverAviso.push(numSis);
       }
     }
 
     if (fechaEstanq) {
       var diasEstanq = Math.floor((hoy - fechaEstanq) / 86400000);
       if (diasEstanq >= CFG.diasEstanqueOk) {
-        eventos.push({
-          titulo: "🎉 COMPOST: Sistema " + numSis + " LISTO para cosechar",
-          desc: "El Sistema " + numSis + " lleva " + diasEstanq + " días en estanque.\n" +
-                "Ya cumplió 6 meses. Aspecto esperado: tierra oscura, olor a tierra húmeda.\n" +
-                "Acción: cosechar y preparar para el próximo ciclo.",
-          color: CalendarApp.EventColor.GREEN
-        });
+        gruposCompost.listoCosechar.push({ numSis: numSis, diasEstanq: diasEstanq });
       } else if (diasEstanq >= CFG.diasEstanqueMin) {
-        eventos.push({
-          titulo: "⏳ COMPOST: Sistema " + numSis + " — Revisar maduración (" + diasEstanq + " días)",
-          desc: "El Sistema " + numSis + " lleva " + diasEstanq + " días en estanque (mín: " +
-                CFG.diasEstanqueMin + " días).\n" +
-                "Fecha estimada de cosecha: " +
-                Utilities.formatDate(new Date(fechaEstanq.getTime() + CFG.diasEstanqueOk*86400000), CFG.tz, "dd/MM/yyyy") + ".\n" +
-                "Acción: revisá visualmente color, textura y olor.",
-          color: CalendarApp.EventColor.TEAL
+        gruposCompost.revisarMaduracion.push({
+          numSis: numSis, diasEstanq: diasEstanq,
+          fechaEstimada: new Date(fechaEstanq.getTime() + CFG.diasEstanqueOk*86400000)
         });
       }
     }
   });
+
+  if (gruposCompost.revolverUrgente.length) {
+    eventos.push({
+      titulo: "🔄 COMPOST: Revolver " + gruposCompost.revolverUrgente.length + " sistema(s) hoy",
+      desc: gruposCompost.revolverUrgente.map(function(x) {
+        return "• Sistema " + x.numSis + " — " + x.diasDesdeBase + " días desde la " + x.referencia +
+          (x.diasAtraso > 0 ? " (" + x.diasAtraso + " día(s) de atraso)" : "");
+      }).join("\n") + "\n\n" +
+        "Frecuencia recomendada: cada " + CFG.diasSinRevolver + " días.\n" +
+        (mmHoy > 0 ? "Ayer llovió " + mmHoy + " mm — buen momento.\n" : "") +
+        "Acción: revolver hoy y registrar en 'Registro Revolcadas'.",
+      color: CalendarApp.EventColor.ORANGE
+    });
+  }
+
+  if (gruposCompost.revolverAviso.length) {
+    eventos.push({
+      titulo: "🔄 COMPOST: Mañana toca revolver " + gruposCompost.revolverAviso.length + " sistema(s)",
+      desc: "Mañana se cumplen " + CFG.diasSinRevolver + " días desde la última revolcada de:\n\n" +
+        gruposCompost.revolverAviso.map(function(n) { return "• Sistema " + n; }).join("\n") +
+        "\n\nPreparate para revolverlos mañana.",
+      color: CalendarApp.EventColor.YELLOW
+    });
+  }
+
+  if (gruposCompost.listoCosechar.length) {
+    eventos.push({
+      titulo: "🎉 COMPOST: " + gruposCompost.listoCosechar.length + " sistema(s) LISTO(S) para cosechar",
+      desc: gruposCompost.listoCosechar.map(function(x) {
+        return "• Sistema " + x.numSis + " — " + x.diasEstanq + " días en estanque";
+      }).join("\n") + "\n\n" +
+        "Ya cumplieron 6 meses. Aspecto esperado: tierra oscura, olor a tierra húmeda.\n" +
+        "Acción: cosechar y preparar para el próximo ciclo.",
+      color: CalendarApp.EventColor.GREEN
+    });
+  }
+
+  if (gruposCompost.revisarMaduracion.length) {
+    eventos.push({
+      titulo: "⏳ COMPOST: Revisar maduración — " + gruposCompost.revisarMaduracion.length + " sistema(s)",
+      desc: gruposCompost.revisarMaduracion.map(function(x) {
+        return "• Sistema " + x.numSis + " — " + x.diasEstanq + " días en estanque (mín: " +
+          CFG.diasEstanqueMin + "), cosecha estimada " +
+          Utilities.formatDate(x.fechaEstimada, CFG.tz, "dd/MM/yyyy");
+      }).join("\n") + "\n\nAcción: revisá visualmente color, textura y olor.",
+      color: CalendarApp.EventColor.TEAL
+    });
+  }
 
   // ── ALERTAS DE PLANTAS ──────────────────────────────────────────
   var eventosPlantas = verificarEventosPlantas(cal, diaObjetivo);
@@ -1971,6 +2006,106 @@ function cargarPlantasInterior() {
   });
 
   Logger.log('[OK] ' + especies.length + ' plantas de interior cargadas. Ahora corré actualizarFichaPlantas() y sincronizarPlantasAFirestore().');
+}
+
+// ====================================================================
+//  ALTA PUNTUAL: Potus (ID 12) — la agregaste vos a mano en la hoja
+//  Plantas. El perfil "Potus" ya estaba cargado en la hoja Especies
+//  desde el principio (riego cada 8d verano / 12d invierno, fertilizar
+//  cada 45d, tolera hasta 10°C), así que el riego y las demás alertas
+//  ya deberían calcularse solas — esta función solo completa los
+//  campos que puedan faltar en la fila y deja cargado el riego de HOY,
+//  tanto en la ficha como en 'Registro Plantas' (para que quede en el
+//  historial, igual que con el resto de las plantas). Ejecutar UNA vez
+//  desde el editor; es segura de repetir (no duplica el registro de
+//  riego si ya corrió hoy, y no pisa datos que ya hayas cargado a mano
+//  salvo el "Último riego", que siempre se deja en hoy).
+// ====================================================================
+function altaPotusId12() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var shP = ss.getSheetByName(CFG_PLANTAS.sheetPlantas);
+  var shR = ss.getSheetByName(CFG_PLANTAS.sheetRegistro);
+  if (!shP) { Logger.log('[ERROR] No existe la hoja Plantas'); return; }
+
+  var ID_POTUS = 12;
+  var perfil = perfilEspecie('Potus');
+  var hoy = new Date();
+
+  var datos = shP.getDataRange().getValues();
+  var filaPotus = -1;
+  for (var i = 1; i < datos.length; i++) {
+    if (String(datos[i][0]).trim() === String(ID_POTUS)) { filaPotus = i + 1; break; }
+  }
+
+  if (filaPotus === -1) {
+    // No existía — se agrega igual que el resto de las plantas de interior
+    var fila = [
+      ID_POTUS, 'Potus', '', 'Potus', hoy,
+      'Interior', perfil ? perfil.luz : 'Indirecta baja a media', '',
+      '', '', '', '', '', '', '', '',
+      hoy, '', 'Recién agregada 🌱',
+      'Cargada el ' + Utilities.formatDate(hoy, CFG.tz, 'dd/MM/yyyy') + '. Regada el mismo día.'
+    ];
+    shP.appendRow(fila);
+    filaPotus = shP.getLastRow();
+    [5, 17].forEach(function (col) { shP.getRange(filaPotus, col).setNumberFormat('DD/MM/YYYY'); });
+    shP.getRange(filaPotus, 1, 1, 20)
+      .setFontFamily('Arial').setFontSize(9)
+      .setVerticalAlignment('middle').setHorizontalAlignment('center');
+    shP.getRange(filaPotus, 2).setFontWeight('bold');
+    shP.getRange(filaPotus, 20).setHorizontalAlignment('left');
+    shP.setRowHeight(filaPotus, 22);
+    colorearEstadoPlanta(shP, filaPotus, 'Recién agregada');
+    Logger.log('[OK] Potus agregada como fila nueva (ID ' + ID_POTUS + ')');
+  } else {
+    // Ya la habías agregado vos — completo solo lo que esté vacío, sin
+    // pisar nada que ya hayas cargado a mano (Variedad, Notas, etc.)
+    var filaActual = datos[filaPotus - 1];
+    if (!filaActual[3]) shP.getRange(filaPotus, 4).setValue('Potus');                              // Especie
+    if (!filaActual[5]) shP.getRange(filaPotus, 6).setValue('Interior');                            // Ubicación
+    if (!filaActual[6]) shP.getRange(filaPotus, 7).setValue(perfil ? perfil.luz : 'Indirecta baja a media'); // Exposición
+    if (!filaActual[4]) shP.getRange(filaPotus, 5).setValue(hoy).setNumberFormat('DD/MM/YYYY');     // Fecha adquisición
+    if (!filaActual[18]) shP.getRange(filaPotus, 19).setValue('Recién agregada 🌱');                 // Estado
+    Logger.log('[OK] Potus ya existía (fila ' + filaPotus + ') — completados los campos vacíos');
+  }
+
+  // Riego de hoy — esto se pisa siempre, es el dato que pediste dejar registrado
+  shP.getRange(filaPotus, 17).setValue(hoy).setNumberFormat('DD/MM/YYYY');
+
+  // Lo registro también en 'Registro Plantas' para que quede en el historial
+  // (si ya corriste esta función hoy, no lo duplica)
+  if (shR) {
+    var yaRegistradoHoy = shR.getDataRange().getValues().slice(1).some(function (r) {
+      if (String(r[0]).trim() !== String(ID_POTUS)) return false;
+      if (String(r[3] || '').indexOf('Riego') < 0) return false;
+      var f = r[2] instanceof Date ? r[2] : new Date(r[2]);
+      return !isNaN(f.getTime()) &&
+        Utilities.formatDate(f, CFG.tz, 'yyyy-MM-dd') === Utilities.formatDate(hoy, CFG.tz, 'yyyy-MM-dd');
+    });
+    if (!yaRegistradoHoy) {
+      var filaR = [ID_POTUS, 'Potus', hoy, '💧 Riego', 'Riego al agregar la planta', '', '', '', '', ''];
+      shR.appendRow(filaR);
+      var filaRNum = shR.getLastRow();
+      shR.getRange(filaRNum, 3).setNumberFormat('DD/MM/YYYY');
+      shR.getRange(filaRNum, 1, 1, 10)
+        .setFontFamily('Arial').setFontSize(9)
+        .setVerticalAlignment('middle').setHorizontalAlignment('center');
+      shR.getRange(filaRNum, 5).setHorizontalAlignment('left');
+      shR.getRange(filaRNum, 10).setHorizontalAlignment('left');
+      shR.setRowHeight(filaRNum, 20);
+    }
+  }
+
+  actualizarFichaPlantas();
+
+  if (perfil) {
+    Logger.log('[OK] Potus (ID ' + ID_POTUS + ') lista — perfil encontrado: riego cada ' +
+      perfil.riegoVerano + 'd (verano) / ' + perfil.riegoInvierno + 'd (invierno), fertilizar cada ' +
+      perfil.diasFert + 'd, tolera hasta ' + perfil.tempMin + '°C.');
+  } else {
+    Logger.log('[WARN] No se encontró el perfil "Potus" en la hoja Especies — va a usar los ' +
+      'valores genéricos de cítricos, que no son los correctos para esta planta. Revisá la hoja Especies.');
+  }
 }
 
 // ====================================================================
