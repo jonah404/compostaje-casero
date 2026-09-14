@@ -1420,7 +1420,8 @@ function inicializarHojaEspecies() {
 
   var enc = ['Especie', 'Tipo', 'Riego verano (días)', 'Riego invierno (días)',
     'Fertilizar cada (días)', 'Mes inicio temporada', 'Mes fin temporada',
-    'Temp mín tolerada (°C)', 'Luz', 'Notas'];
+    'Temp mín tolerada (°C)', 'Luz', 'Notas',
+    'Producto fertilizante', 'Dosis sugerida', 'Poda cada (días)'];
   sh.appendRow(enc);
   sh.getRange(1, 1, 1, enc.length)
     .setBackground('#1B5E20').setFontColor('#fff').setFontWeight('bold')
@@ -1428,17 +1429,40 @@ function inicializarHojaEspecies() {
     .setVerticalAlignment('middle').setWrap(true);
   sh.setRowHeight(1, 40);
   sh.setFrozenRows(1);
-  [140, 90, 110, 110, 120, 110, 100, 110, 160, 260].forEach(function (w, i) {
+  [140, 90, 110, 110, 120, 110, 100, 110, 160, 260, 220, 260, 110].forEach(function (w, i) {
     sh.setColumnWidth(i + 1, w);
   });
 
   // Meses: 9=sept ... 4=abril (temporada de crecimiento típica en el hemisferio sur)
+  // Columnas: Especie, Tipo, Riego verano, Riego invierno, Fert cada, Mes ini,
+  // Mes fin, Temp mín, Luz, Notas, Producto fert., Dosis, Poda cada (días)
   var filas = [
-    ['Monstera', 'Interior', 8, 12, 30, 9, 4, 12, 'Indirecta brillante', 'Dejar secar 2-3cm de sustrato entre riegos'],
-    ['Palo de agua', 'Interior', 10, 14, 60, 9, 4, 15, 'Media / indirecta', 'Asumido Dracaena fragrans — sensible al exceso de riego, evitar encharcar'],
-    ['Helecho', 'Interior', 3, 5, 30, 9, 4, 15, 'Sombra / indirecta media', 'Mantener sustrato siempre húmedo, agradece humedad ambiente'],
-    ['Pilea', 'Interior', 7, 10, 30, 9, 4, 10, 'Indirecta brillante', 'Rotar la maceta cada tanto para crecimiento parejo'],
-    ['Potus', 'Interior', 8, 12, 45, 9, 4, 10, 'Indirecta baja a media', 'Muy resistente, tolera olvidos de riego'],
+    ['Monstera', 'Interior', 8, 12, 30, 9, 4, 12, 'Indirecta brillante',
+      'Dejar secar 2-3cm de sustrato entre riegos',
+      'Fertilizante líquido balanceado (ej. 20-20-20)',
+      'Mitad de la dosis del envase, cada 30 días en temporada', 150],
+    ['Palo de agua', 'Interior', 10, 14, 60, 9, 4, 15, 'Media / indirecta',
+      'Asumido Dracaena fragrans — sensible al exceso de riego, evitar encharcar',
+      'Fertilizante líquido para plantas verdes',
+      'Mitad de dosis, cada 60 días en temporada — sensible al exceso', 240],
+    ['Helecho', 'Interior', 3, 5, 30, 9, 4, 15, 'Sombra / indirecta media',
+      'Mantener sustrato siempre húmedo, agradece humedad ambiente',
+      'Fertilizante líquido diluido',
+      '1/4 de la dosis normal, cada 30 días', 240],
+    ['Pilea', 'Interior', 7, 10, 30, 9, 4, 10, 'Indirecta brillante',
+      'Rotar la maceta cada tanto para crecimiento parejo',
+      'Fertilizante líquido balanceado',
+      'Mitad de dosis, cada 30 días en temporada', 200],
+    ['Potus', 'Interior', 8, 12, 45, 9, 4, 10, 'Indirecta baja a media',
+      'Muy resistente, tolera olvidos de riego', '', '', ''],
+    ['Planta cebra', 'Interior', 5, 8, 30, 9, 4, 15, 'Indirecta brillante, sin sol directo',
+      'Sensible a riego irregular: se le caen hojas si se seca de más o si queda encharcada. No tolera corrientes de aire frío.',
+      'Fertilizante líquido para plantas de flor (rico en potasio)',
+      'Mitad de dosis, cada 30 días en temporada', 200],
+    ['Pata de elefante', 'Interior', 20, 35, 60, 9, 4, 7, 'Brillante, tolera sol directo',
+      'Muy tolerante a la sequía — el tronco almacena agua. Mejor pecar de poco riego que de mucho, raíz sensible al encharque.',
+      'Fertilizante para cactus/suculentas o balanceado muy diluido',
+      '1/4 de dosis, cada 60 días — bajo requerimiento', 450],
   ];
   filas.forEach(function (f) {
     sh.appendRow(f);
@@ -1447,8 +1471,72 @@ function inicializarHojaEspecies() {
       .setVerticalAlignment('middle').setHorizontalAlignment('center');
     sh.getRange(fila, 1).setFontWeight('bold').setHorizontalAlignment('left');
     sh.getRange(fila, 10).setHorizontalAlignment('left');
+    sh.getRange(fila, 11).setHorizontalAlignment('left');
   });
   Logger.log('[OK] Hoja Especies creada con ' + filas.length + ' especies');
+}
+
+// ====================================================================
+//  ALTA: perfiles de "Planta cebra" (tipo Aphelandra squarrosa) y
+//  "Pata de elefante" (Beaucarnea recurvata) en la hoja Especies —
+//  hasta ahora no tenían fila propia, así que perfilEspecie() no las
+//  encontraba y usaban por defecto los valores genéricos de cítrico de
+//  exterior (7-14 días sin riego) — y encima, al no tener perfil
+//  "Interior", la lluvia les contaba como riego efectivo, algo que no
+//  corresponde para una planta que vive puertas adentro.
+//  Ejecutar UNA vez; es segura de repetir, no duplica filas si ya
+//  existe una que matchee (usa la misma búsqueda que perfilEspecie()).
+// ====================================================================
+function agregarEspeciesFaltantes() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(CFG_ESPECIES.sheet);
+  if (!sh) { Logger.log('[ERROR] No existe la hoja Especies — ejecutar inicializarHojaEspecies() primero'); return; }
+
+  // Por si las columnas K/L/M (producto fert., dosis, poda) todavía no
+  // tienen encabezado en tu hoja real — no rompe nada si ya lo tienen.
+  ['Producto fertilizante', 'Dosis sugerida', 'Poda cada (días)'].forEach(function (h, i) {
+    var celda = sh.getRange(1, 11 + i);
+    if (!celda.getValue()) {
+      celda.setValue(h).setBackground('#1B5E20').setFontColor('#fff').setFontWeight('bold')
+        .setFontSize(9).setFontFamily('Arial').setHorizontalAlignment('center')
+        .setVerticalAlignment('middle').setWrap(true);
+    }
+  });
+
+  var nuevas = [
+    ['Planta cebra', 'Interior', 5, 8, 30, 9, 4, 15, 'Indirecta brillante, sin sol directo',
+      'Sensible a riego irregular: se le caen hojas si se seca de más o si queda encharcada. No tolera corrientes de aire frío.',
+      'Fertilizante líquido para plantas de flor (rico en potasio)',
+      'Mitad de dosis, cada 30 días en temporada', 200],
+    ['Pata de elefante', 'Interior', 20, 35, 60, 9, 4, 7, 'Brillante, tolera sol directo',
+      'Muy tolerante a la sequía — el tronco almacena agua. Mejor pecar de poco riego que de mucho, raíz sensible al encharque.',
+      'Fertilizante para cactus/suculentas o balanceado muy diluido',
+      '1/4 de dosis, cada 60 días — bajo requerimiento', 450],
+  ];
+
+  var agregadas = 0;
+  nuevas.forEach(function (fila) {
+    if (perfilEspecie(fila[0])) {
+      Logger.log('[SKIP] "' + fila[0] + '" ya matchea con una fila existente en Especies');
+      return;
+    }
+    sh.appendRow(fila);
+    var filaNum = sh.getLastRow();
+    sh.getRange(filaNum, 1, 1, fila.length).setFontFamily('Arial').setFontSize(9)
+      .setVerticalAlignment('middle').setHorizontalAlignment('center');
+    sh.getRange(filaNum, 1).setFontWeight('bold').setHorizontalAlignment('left');
+    sh.getRange(filaNum, 10).setHorizontalAlignment('left');
+    sh.getRange(filaNum, 11).setHorizontalAlignment('left');
+    agregadas++;
+    Logger.log('[OK] Especie agregada: ' + fila[0]);
+  });
+
+  if (agregadas > 0) {
+    actualizarFichaPlantas();
+    Logger.log('[OK] ' + agregadas + ' especie(s) agregada(s) — ficha de plantas recalculada.');
+  } else {
+    Logger.log('[OK] No había nada para agregar — ya matcheaban con filas existentes.');
+  }
 }
 
 function perfilEspecie(especie) {
