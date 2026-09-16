@@ -429,6 +429,7 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
     <button class="sn"     onclick="go('rev')"> <i class="ti ti-history"></i>Revolcadas</button>
     <button class="sn"     onclick="go('cli')"> <i class="ti ti-cloud"></i>Clima</button>
     <button class="sn"     onclick="go('pla')"> <i class="ti ti-leaf"></i>Plantas</button>
+    <button class="sn"     onclick="go('pec')"> <i class="ti ti-fish"></i>Pecera</button>
     <button class="sn"     onclick="go('reg')"> <i class="ti ti-circle-plus"></i>Registrar</button>
   </nav>
   <div class="sb-foot">
@@ -458,6 +459,7 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
       <button class="mt"    onclick="go('rev')"> <i class="ti ti-history"></i>Revolcadas</button>
       <button class="mt"    onclick="go('cli')"> <i class="ti ti-cloud"></i>Clima</button>
       <button class="mt"    onclick="go('pla')"> <i class="ti ti-leaf"></i>Plantas</button>
+      <button class="mt"    onclick="go('pec')"> <i class="ti ti-fish"></i>Pecera</button>
       <button class="mt"    onclick="go('reg')"> <i class="ti ti-circle-plus"></i>Registrar</button>
     </div>
   </div>
@@ -493,6 +495,11 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
     <div class="pg" id="pg-pla">
       <div id="pla-c"></div>
       <button class="add-btn" onclick="addPlanta()"><i class="ti ti-plus"></i> Agregar planta</button>
+    </div>
+
+    <!-- PECERA -->
+    <div class="pg" id="pg-pec">
+      <div id="pec-c"></div>
     </div>
 
     <!-- REGISTRAR -->
@@ -570,6 +577,40 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
             </div>
             <div class="f"><label>Notas</label><textarea id="epno"></textarea></div>
             <button class="btn-g" onclick="savePlanta()">Guardar planta</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row" style="align-items:start;margin-top:20px">
+        <div>
+          <div class="fc">
+            <h3><i class="ti ti-fish"></i>Nuevo evento de pecera</h3>
+            <div class="f"><label>Tipo de evento</label>
+              <select id="kt">
+                <option value="💧 Cambio de agua parcial">💧 Cambio de agua parcial</option>
+                <option value="🧽 Limpieza de filtro/esponja">🧽 Limpieza de filtro/esponja</option>
+                <option value="🧪 Anticloro">🧪 Anticloro</option>
+                <option value="🔵 Azul de metileno">🔵 Azul de metileno</option>
+                <option value="🦠 Bactonic (bacteria)">🦠 Bactonic (bacteria)</option>
+                <option value="🔬 Medición amonio/nitrito/nitrato">🔬 Medición amonio/nitrito/nitrato</option>
+                <option value="📝 Otro">📝 Otro</option>
+              </select>
+            </div>
+            <div class="f"><label>Fecha</label><input type="date" id="kf"></div>
+            <div class="f"><label>Detalle</label><input type="text" id="kd" placeholder="ej: 15% del volumen, ~6L"></div>
+            <div class="f"><label>Resultado / Observación</label><textarea id="kr" placeholder="ej: valores medidos, estado de los peces..."></textarea></div>
+            <button class="btn-g" onclick="saveEventoPecera()">Guardar evento</button>
+          </div>
+        </div>
+        <div>
+          <div class="fc">
+            <h3><i class="ti ti-settings"></i>Datos de la pecera</h3>
+            <div class="form-row" style="margin-bottom:0">
+              <div class="f"><label>Litros</label><input type="number" id="kl"></div>
+              <div class="f"><label>Fecha de armado / última limpieza total</label><input type="date" id="ka"></div>
+            </div>
+            <div class="f"><label>Notas</label><textarea id="kn" placeholder="ej: filtro XINXIU WP-008YF, 800L/h"></textarea></div>
+            <button class="btn-g" onclick="savePecera()">Guardar datos de pecera</button>
           </div>
         </div>
       </div>
@@ -673,14 +714,23 @@ const SEED_REGPLA = [
   {id:'p4',planta:4,fecha:'2026-08-30',tipo:'🌱 Plantación',detalle:'Plantación en tierra directa, sol pleno',producto:'Fertilizante 15-15-15, 50g en fondo de hoyo',resultado:'Planta instalada. Pan de tierra intacto. Relleno con tierra y regado.'},
 ];
 
+const SEED_PEC = { litros:42, fechaArmado:'2026-09-15', notas:'Filtro interno XINXIU WP-008YF, 800L/h. 4 goldfish.' };
+const SEED_REGPEC = [
+  {id:'k1',fecha:'2026-09-15',tipo:'🧪 Anticloro',detalle:'Tras limpieza completa de la pecera',resultado:''},
+  {id:'k2',fecha:'2026-09-15',tipo:'🔵 Azul de metileno',detalle:'Antiséptico puntual post-limpieza — no usar de rutina',resultado:''},
+  {id:'k3',fecha:'2026-09-15',tipo:'🦠 Bactonic (bacteria)',detalle:'Siembra inicial de bacteria nitrificante',resultado:'Coincidió con el azul de metileno — probablemente debilitada, ciclado arranca de nuevo'},
+];
+
 // ════ ESTADO ════
 let S = JSON.parse(localStorage.getItem('compost_v7') || 'null');
 if (!S) {
-  S = { sistemas: SEED_SIS, revolcadas: SEED_REV, clima: SEED_CLI, climaLastFetch: null, plantas: SEED_PLA, registroPlantas: SEED_REGPLA };
+  S = { sistemas: SEED_SIS, revolcadas: SEED_REV, clima: SEED_CLI, climaLastFetch: null, plantas: SEED_PLA, registroPlantas: SEED_REGPLA, pecera: SEED_PEC, registroPecera: SEED_REGPEC };
   localStorage.setItem('compost_v7', JSON.stringify(S));
 }
 if (!S.plantas) S.plantas = SEED_PLA;
 if (!S.registroPlantas) S.registroPlantas = SEED_REGPLA;
+if (!S.pecera) S.pecera = SEED_PEC;
+if (!S.registroPecera) S.registroPecera = SEED_REGPEC;
 const sv = () => localStorage.setItem('compost_v7', JSON.stringify(S));
 const upsertCli = arr => arr.forEach(c => {
   const i = S.clima.findIndex(x => x.fecha === c.fecha);
@@ -753,6 +803,10 @@ const fbLoad = async () => {
     pd.forEach(d => { const x=d.data(); const i=S.plantas.findIndex(p=>p.id===x.id); i>=0?(S.plantas[i]={...S.plantas[i],...x}):S.plantas.push(x); });
     const prd = await getDocs(query(collection(db,'registroPlantas'),orderBy('fecha','desc')));
     if (prd.docs.length) S.registroPlantas = prd.docs.map(d=>({id:d.id,...d.data()}));
+    const kd = await getDocs(collection(db,'pecera'));
+    kd.forEach(d => { if (d.id==='main') S.pecera = {...S.pecera, ...d.data()}; });
+    const krd = await getDocs(query(collection(db,'registroPecera'),orderBy('fecha','desc')));
+    if (krd.docs.length) S.registroPecera = krd.docs.map(d=>({id:d.id,...d.data()}));
     sv();
   } catch(e) {}
 };
@@ -856,6 +910,34 @@ const estPlanta = p => {
   };
 };
 const pLbl = p => p.nombre || `Planta ${p.id}`;
+
+// ════ PECERA ════
+// Fase "ciclado" = primeros CFG_PEC.diasFinCiclado días desde el armado/limpieza
+// total: sin bacteria establecida, cambios de agua más frecuentes y sin tocar
+// el filtro. Después pasa a la fase "establecida", con intervalos más largos.
+const CFG_PEC = { diasCambioAguaCiclado:3, diasCambioAguaEstable:7, diasLimpiezaFiltro:14, diasMinPrimeraLimpieza:25, diasFinCiclado:30, diasBactonic:4 };
+const pecEventos = tipo => S.registroPecera.filter(r => !tipo || r.tipo.includes(tipo)).sort((a,b)=>a.fecha>b.fecha?-1:1);
+const estPecera = () => {
+  const p = S.pecera || {};
+  const diasArmado = p.fechaArmado ? dd(pISO(p.fechaArmado), TODAY) : null;
+  const enCiclado = diasArmado==null || diasArmado < CFG_PEC.diasFinCiclado;
+
+  const ultCambio = pecEventos('Cambio de agua')[0];
+  const diasSinCambio = ultCambio ? dd(pISO(ultCambio.fecha), TODAY) : diasArmado;
+  const limiteCambio = enCiclado ? CFG_PEC.diasCambioAguaCiclado : CFG_PEC.diasCambioAguaEstable;
+  const cambioUrg = diasSinCambio!=null && diasSinCambio >= limiteCambio;
+
+  const ultLimpieza = pecEventos('Limpieza')[0];
+  const diasSinLimpieza = ultLimpieza ? dd(pISO(ultLimpieza.fecha), TODAY) : diasArmado;
+  const puedeLimpiar = !!ultLimpieza || diasArmado==null || diasArmado >= CFG_PEC.diasMinPrimeraLimpieza;
+  const limpiezaUrg = puedeLimpiar && diasSinLimpieza!=null && diasSinLimpieza >= CFG_PEC.diasLimpiezaFiltro;
+
+  const ultBact = pecEventos('Bactonic')[0];
+  const diasSinBact = ultBact ? dd(pISO(ultBact.fecha), TODAY) : diasArmado;
+  const bactRecomendado = enCiclado && (diasSinBact==null || diasSinBact >= CFG_PEC.diasBactonic);
+
+  return { diasArmado, enCiclado, diasSinCambio, limiteCambio, cambioUrg, diasSinLimpieza, limpiezaUrg, puedeLimpiar, diasSinBact, bactRecomendado };
+};
 
 // ════ HEATMAP ════
 // Cada paleta: [{v,r,g,b}, …] igual que el AppScript original
@@ -1121,6 +1203,10 @@ const renderDash = () => {
     if (e.fertUrg) als.push({c:'al-w',t:`${pLbl(p)} — fertilizar`,b: e.diasParaFert<0 ? `${-e.diasParaFert} días de atraso` : 'toca hoy'});
     if (e.plagasUrg) als.push({c:'al-w',t:`${pLbl(p)} — revisar plagas`,b: e.diasParaPlagas<0 ? `${-e.diasParaPlagas} días de atraso` : 'toca hoy'});
   });
+  const ep = estPecera();
+  if (ep.cambioUrg) als.push({c:'al-r',t:'Pecera — cambio de agua',b:`${ep.diasSinCambio} días sin cambio (objetivo cada ${ep.limiteCambio}d)`});
+  if (ep.limpiezaUrg) als.push({c:'al-w',t:'Pecera — limpiar filtro/esponja',b:`${ep.diasSinLimpieza} días sin limpiar`});
+  if (ep.bactRecomendado) als.push({c:'al-w',t:'Pecera — resembrar Bactonic',b:'En ciclado, conviene resembrar cada pocos días'});
   if(!als.length) als.push({c:'al-ok',t:'Todo en orden 👍',b:'Sin alertas pendientes'});
   const ch = cdDia(fISO(TODAY)) || [...S.clima].sort((a,b)=>a.fecha>b.fecha?-1:1)[0];
 
@@ -1134,6 +1220,11 @@ const renderDash = () => {
       ${statTile('--sky','Revolcadas', S.revolcadas.length, 'registradas')}
       ${statTile('--sage-mid','Plantas', S.plantas.length, 'registradas')}
       ${statTile(ax.pctPlantas==null?'--ink3':ax.pctPlantas>=80?'--sage':ax.pctPlantas>=50?'--umber':'--rust', 'Al día', ax.pctPlantas!=null?ax.pctPlantas+'%':'—', `${ax.plantasOk}/${ax.totalPlantas} sin alertas`)}
+    </div>
+    <div class="g3" style="margin-bottom:20px">
+      ${statTile(ep.cambioUrg?'--rust':'--sage', 'Pecera — agua', ep.diasSinCambio!=null?ep.diasSinCambio+'d':'—', `objetivo cada ${ep.limiteCambio}d`)}
+      ${statTile(ep.limpiezaUrg?'--umber':'--sage', 'Pecera — filtro', ep.diasSinLimpieza!=null?ep.diasSinLimpieza+'d':'—', ep.puedeLimpiar?`objetivo cada ${CFG_PEC.diasLimpiezaFiltro}d`:'aún no tocar')}
+      ${statTile('--sky', 'Pecera — fase', ep.enCiclado?'Ciclado':'Establecida', ep.diasArmado!=null?`día ${ep.diasArmado}`:'')}
     </div>
     <div class="dash-grid">
       <div>
@@ -1302,6 +1393,43 @@ const renderRev = () => {
     </table>`;
 };
 window.renderRev = renderRev;
+
+// ════ RENDER PECERA ════
+const renderPec = () => {
+  const p = S.pecera || {};
+  const e = estPecera();
+  const regs = [...S.registroPecera].sort((a,b)=>a.fecha>b.fecha?-1:1);
+
+  const statsHTML = `
+    <div class="g4" style="margin-bottom:16px">
+      <div class="stat"><div class="stat-l">Volumen</div><div class="stat-v">${p.litros||'—'}L</div><div class="stat-s">${e.enCiclado?'🔄 en ciclado':'✅ establecida'}</div></div>
+      <div class="stat"><div class="stat-l">Desde el armado</div><div class="stat-v">${e.diasArmado!=null?e.diasArmado:'—'}</div><div class="stat-s">días</div></div>
+      <div class="stat"><div class="stat-l">Último cambio de agua</div><div class="stat-v" style="color:${e.cambioUrg?'var(--rust)':'var(--sage)'}">${e.diasSinCambio!=null?e.diasSinCambio+'d':'—'}</div><div class="stat-s">objetivo cada ${e.limiteCambio}d</div></div>
+      <div class="stat"><div class="stat-l">Última limpieza filtro</div><div class="stat-v" style="color:${e.limpiezaUrg?'var(--rust)':'var(--sage)'}">${e.diasSinLimpieza!=null?e.diasSinLimpieza+'d':'—'}</div><div class="stat-s">${e.puedeLimpiar?'objetivo cada '+CFG_PEC.diasLimpiezaFiltro+'d':'esperar al día '+CFG_PEC.diasMinPrimeraLimpieza}</div></div>
+    </div>
+    <div class="pills" style="margin-bottom:16px">
+      ${e.cambioUrg?`<span class="badge" style="background:var(--rust-bg);color:var(--rust)">💧 Cambio de agua atrasado</span>`:`<span class="badge bl">💧 Cambio de agua al día</span>`}
+      ${e.limpiezaUrg?`<span class="badge" style="background:var(--umber-bg);color:var(--umber)">🧽 Limpiar filtro/esponja</span>`:''}
+      ${e.bactRecomendado?`<span class="badge" style="background:var(--sky-bg);color:var(--sky)">🦠 Resembrar Bactonic</span>`:''}
+    </div>
+    ${p.notas?`<div style="font-size:12px;color:var(--ink3);font-style:italic;margin-bottom:16px">${p.notas}</div>`:''}`;
+
+  const rows = regs.map(r => `<tr>
+      <td>${fmt(r.fecha)}</td>
+      <td>${r.tipo}</td>
+      <td style="font-size:12px;color:var(--ink3)">${r.detalle||''}</td>
+      <td style="font-size:12px;color:var(--ink3);font-style:italic">${r.resultado||''}</td>
+      <td><button class="del-btn" onclick="delEventoPecera('${r.id}',event)"><i class="ti ti-x"></i></button></td>
+    </tr>`).join('');
+  const tableHTML = regs.length
+    ? `<div class="tbl-wrap"><div class="tbl-scroll"><table class="rtbl">
+        <thead><tr><th>Fecha</th><th>Tipo</th><th>Detalle</th><th>Resultado</th><th></th></tr></thead>
+        <tbody>${rows}</tbody></table></div></div>`
+    : `<div style="font-size:13px;color:var(--ink3);padding:24px;text-align:center">Sin eventos registrados</div>`;
+
+  document.getElementById('pec-c').innerHTML = statsHTML + tableHTML;
+};
+window.renderPec = renderPec;
 
 // ════ RENDER CLIMA ════
 const renderCli = () => {
@@ -1505,6 +1633,45 @@ window.saveEventoPlanta = async () => {
   if(cur==='dash') renderDash(); if(cur==='pla') renderPla();
 };
 
+window.loadPecera = () => {
+  const p = S.pecera || {};
+  document.getElementById('kl').value = p.litros || '';
+  document.getElementById('ka').value = p.fechaArmado || '';
+  document.getElementById('kn').value = p.notas || '';
+};
+window.savePecera = async () => {
+  const p = S.pecera = S.pecera || {};
+  p.litros = +document.getElementById('kl').value || p.litros;
+  p.fechaArmado = document.getElementById('ka').value || p.fechaArmado;
+  p.notas = document.getElementById('kn').value;
+  sv(); await fbSave('pecera', 'main', p); sheetSync('pecera', p);
+  toast('✅ Datos de la pecera guardados');
+  if(cur==='dash') renderDash(); if(cur==='pec') renderPec();
+};
+window.saveEventoPecera = async () => {
+  const f = document.getElementById('kf').value;
+  if(!f){ toast('Completá la fecha'); return; }
+  const r = {
+    id:'kv'+Date.now(), fecha:f,
+    tipo:document.getElementById('kt').value,
+    detalle:document.getElementById('kd').value,
+    resultado:document.getElementById('kr').value,
+  };
+  S.registroPecera.push(r); sv();
+  const fbId = await fbAdd('registroPecera', r); if(fbId){r.id=fbId;sv();}
+  sheetSync('peceraEvento', r);
+  ['kd','kr'].forEach(x=>document.getElementById(x).value='');
+  toast(`✅ Evento de pecera guardado — ${r.tipo}`);
+  if(cur==='dash') renderDash(); if(cur==='pec') renderPec();
+};
+window.delEventoPecera = async (id, e) => {
+  e.stopPropagation();
+  if(!confirm('¿Eliminar este evento de la pecera?')) return;
+  await fbDel('registroPecera', id);
+  S.registroPecera = S.registroPecera.filter(r=>r.id!=id); sv(); renderPec();
+  toast('Evento eliminado');
+};
+
 window.loadSis = () => {
   const id=+document.getElementById('es').value, s=S.sistemas.find(x=>x.id===id); if(!s)return;
   ['en','ei','ef','ee','eno'].forEach((x,i)=>document.getElementById(x).value=[s.nombre,s.inicioC,s.finC,s.inicioE,s.notas][i]||'');
@@ -1545,8 +1712,8 @@ window.delRev = async (id, e) => {
 
 // ════ NAVEGACIÓN ════
 let cur = 'dash';
-const NAVT = ['dash','sist','rev','cli','pla','reg'];
-const TITLES = {dash:'Inicio',sist:'Sistemas',rev:'Revolcadas',cli:'Clima',pla:'Plantas',reg:'Registrar'};
+const NAVT = ['dash','sist','rev','cli','pla','pec','reg'];
+const TITLES = {dash:'Inicio',sist:'Sistemas',rev:'Revolcadas',cli:'Clima',pla:'Plantas',pec:'Pecera',reg:'Registrar'};
 window.go = t => {
   cur = t;
   document.querySelectorAll('.sn').forEach((b,i)=>b.classList.toggle('on',NAVT[i]===t));
@@ -1559,7 +1726,14 @@ window.go = t => {
   if(t==='rev')  renderRev();
   if(t==='cli')  renderCli();
   if(t==='pla')  renderPla();
-  if(t==='reg')  { loadSis(); if(!document.getElementById('rf').value) document.getElementById('rf').value=fISO(TODAY); if(!document.getElementById('pf').value) document.getElementById('pf').value=fISO(TODAY); }
+  if(t==='pec')  renderPec();
+  if(t==='reg')  {
+    loadSis();
+    if(!document.getElementById('rf').value) document.getElementById('rf').value=fISO(TODAY);
+    if(!document.getElementById('pf').value) document.getElementById('pf').value=fISO(TODAY);
+    if(!document.getElementById('kf').value) document.getElementById('kf').value=fISO(TODAY);
+    loadPecera();
+  }
 };
 
 // ════ SYNC ════

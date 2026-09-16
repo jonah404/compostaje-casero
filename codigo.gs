@@ -1061,6 +1061,10 @@ function verificarYCrearEventos() {
   var eventosPlantas = verificarEventosPlantas(cal, diaObjetivo);
   if (eventosPlantas) eventos = eventos.concat(eventosPlantas);
 
+  // ── ALERTAS DE PECERA ────────────────────────────────────────────
+  var eventosPecera = verificarEventosPecera();
+  if (eventosPecera) eventos = eventos.concat(eventosPecera);
+
   if (eventos.length === 0) {
     Logger.log("[OK] Sin eventos para crear hoy");
     return;
@@ -1217,6 +1221,8 @@ function doPost(e) {
     else if (tipo === 'sistema')       guardarSistemaSheet(data);
     else if (tipo === 'planta')        guardarPlantaSheet(data);
     else if (tipo === 'plantaEvento')  guardarEventoPlantaSheet(data);
+    else if (tipo === 'pecera')        guardarPeceraSheet(data);
+    else if (tipo === 'peceraEvento')  guardarEventoPeceraSheet(data);
     return ContentService.createTextOutput(JSON.stringify({ok:true}))
       .setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
@@ -1316,6 +1322,27 @@ function guardarEventoPlantaSheet(d) {
   sh.getRange(fila, 10).setValue(d.resultado || '');         // J: Resultado / Observación
   // G-I (T° día, lluvia, humedad) se dejan vacías — no son críticas y
   // actualizarFichaPlantas() no las requiere para funcionar.
+}
+
+// ── Pecera: actualiza la fila única de datos (fila 2 de la hoja "Pecera") ──
+function guardarPeceraSheet(d) {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG_PECERA.sheetPecera);
+  if (!sh) return;
+  if (sh.getLastRow() < 2) sh.appendRow(['', '', '']);
+  if (d.litros)         sh.getRange(2, 1).setValue(Number(d.litros));            // A: Litros
+  if (d.fechaArmado)    sh.getRange(2, 2).setValue(new Date(d.fechaArmado + 'T12:00:00')).setNumberFormat('DD/MM/YYYY'); // B: Fecha armado
+  if (d.notas != null)  sh.getRange(2, 3).setValue(d.notas);                     // C: Notas
+}
+
+// ── Evento de pecera: se agrega siempre como fila nueva al final ───
+function guardarEventoPeceraSheet(d) {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG_PECERA.sheetRegistro);
+  if (!sh || !d.fecha || !d.tipo) return;
+  var fila = ultimaFilaConDatos_(sh, 1) + 1;                 // ancla en col. A (Fecha), no en getLastRow()
+  sh.getRange(fila, 1).setValue(new Date(d.fecha + 'T12:00:00')).setNumberFormat('DD/MM/YYYY'); // A: Fecha
+  sh.getRange(fila, 2).setValue(d.tipo || '');                // B: Tipo evento
+  sh.getRange(fila, 3).setValue(d.detalle || '');             // C: Detalle
+  sh.getRange(fila, 4).setValue(d.resultado || '');           // D: Resultado / Observación
 }
 
 // ====================================================================
@@ -2374,4 +2401,175 @@ function agregarTriggersSincroTodo() {
     ScriptApp.newTrigger(t.fn).timeBased().atHour(7).nearMinute(t.min).everyDays(1).inTimezone(CFG.tz).create();
     Logger.log('[OK] Trigger creado para ' + t.fn + ' (~07:' + t.min + ')');
   });
+}
+
+// ====================================================================
+//  PECERA — mantenimiento (cambios de agua, limpieza de filtro, dosis
+//  de químicos/bacteria)
+//
+//  CÓMO INSTALARLO:
+//  1. Pegar este bloque al final del script (ya incluido en este archivo).
+//  2. Ejecutar UNA VEZ inicializarHojaPecera() para crear las hojas
+//     "Pecera" (datos: litros, fecha de armado, notas) y
+//     "Registro Pecera" (historial de eventos).
+//  3. verificarEventosPecera() ya está enganchado a verificarYCrearEventos(),
+//     así que corre sola con el trigger diario de las 00:30 — no hace
+//     falta crear un trigger nuevo.
+//
+//  LÓGICA (espejada en la app, index.html → estPecera()):
+//  - Fase "ciclado" = primeros diasFinCiclado días desde la fecha de
+//    armado: sin bacteria establecida todavía. Cambios de agua más
+//    frecuentes, filtro sin tocar, y conviene resembrar Bactonic cada
+//    pocos días. Ojo: Bactonic y azul de metileno el mismo día se pisan
+//    (el metileno mata la bacteria nitrificante) — no combinarlos.
+//  - Fase "establecida" (pasado ese umbral): cambios de agua e intervalo
+//    de limpieza de filtro más espaciados.
+// ====================================================================
+
+var CFG_PECERA = {
+  sheetPecera:            'Pecera',
+  sheetRegistro:          'Registro Pecera',
+  diasCambioAguaCiclado:  3,   // días entre cambios de agua mientras cicla
+  diasCambioAguaEstable:  7,   // días entre cambios de agua ya establecida
+  diasLimpiezaFiltro:     14,  // días entre limpiezas de esponja/filtro
+  diasMinPrimeraLimpieza: 25,  // no tocar el filtro antes de este día desde el armado
+  diasFinCiclado:         30,  // a partir de acá se considera "establecida"
+  diasBactonic:           4,   // cada cuántos días resembrar bacteria mientras cicla
+};
+
+function inicializarHojaPecera() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  var shP = ss.getSheetByName(CFG_PECERA.sheetPecera);
+  if (!shP) {
+    shP = ss.insertSheet(CFG_PECERA.sheetPecera);
+    var encP = ['Litros', 'Fecha de armado / última limpieza total', 'Notas'];
+    shP.appendRow(encP);
+    shP.getRange(1, 1, 1, encP.length)
+      .setBackground('#01579B').setFontColor('#fff').setFontWeight('bold')
+      .setFontSize(9).setFontFamily('Arial').setHorizontalAlignment('center')
+      .setVerticalAlignment('middle').setWrap(true);
+    shP.setRowHeight(1, 34);
+    shP.setFrozenRows(1);
+    [70, 240, 340].forEach(function (w, i) { shP.setColumnWidth(i + 1, w); });
+
+    shP.appendRow([42, new Date('2026-09-15T12:00:00'), 'Filtro interno XINXIU WP-008YF, 800L/h (sobrado para el volumen). 4 goldfish.']);
+    shP.getRange(2, 2).setNumberFormat('DD/MM/YYYY');
+    shP.getRange(2, 1, 1, 3).setFontFamily('Arial').setFontSize(9).setVerticalAlignment('middle').setHorizontalAlignment('center');
+    shP.getRange(2, 3).setHorizontalAlignment('left');
+    shP.setRowHeight(2, 26);
+    Logger.log('[OK] Hoja Pecera creada');
+  } else {
+    Logger.log('[INFO] Hoja Pecera ya existe — no se tocó');
+  }
+
+  var shR = ss.getSheetByName(CFG_PECERA.sheetRegistro);
+  if (!shR) {
+    shR = ss.insertSheet(CFG_PECERA.sheetRegistro);
+    var encR = ['Fecha', 'Tipo evento', 'Detalle', 'Resultado / Observación'];
+    shR.appendRow(encR);
+    shR.getRange(1, 1, 1, encR.length)
+      .setBackground('#01579B').setFontColor('#fff').setFontWeight('bold')
+      .setFontSize(9).setFontFamily('Arial').setHorizontalAlignment('center')
+      .setVerticalAlignment('middle').setWrap(true);
+    shR.setRowHeight(1, 34);
+    shR.setFrozenRows(1);
+    [95, 220, 280, 280].forEach(function (w, i) { shR.setColumnWidth(i + 1, w); });
+
+    [
+      [new Date('2026-09-15T12:00:00'), '🧪 Anticloro', 'Tras limpieza completa de la pecera', ''],
+      [new Date('2026-09-15T12:00:00'), '🔵 Azul de metileno', 'Antiséptico puntual post-limpieza — no usar de rutina', ''],
+      [new Date('2026-09-15T12:00:00'), '🦠 Bactonic (bacteria)', 'Siembra inicial de bacteria nitrificante', 'Coincidió con el azul de metileno — probablemente debilitada, ciclado arranca de nuevo'],
+    ].forEach(function (r) {
+      shR.appendRow(r);
+      var fila = shR.getLastRow();
+      shR.getRange(fila, 1).setNumberFormat('DD/MM/YYYY');
+      shR.getRange(fila, 1, 1, 4).setFontFamily('Arial').setFontSize(9).setVerticalAlignment('middle').setHorizontalAlignment('center');
+      shR.getRange(fila, 3).setHorizontalAlignment('left');
+      shR.getRange(fila, 4).setHorizontalAlignment('left');
+      shR.setRowHeight(fila, 22);
+    });
+    Logger.log('[OK] Hoja Registro Pecera creada con eventos iniciales');
+  } else {
+    Logger.log('[INFO] Hoja Registro Pecera ya existe — no se tocó');
+  }
+}
+
+// Última fecha de un tipo de evento (Cambio de agua / Limpieza / Bactonic / etc.)
+function ultimoEventoPecera_(tipoTexto) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(CFG_PECERA.sheetRegistro);
+  if (!sh || sh.getLastRow() < 2) return null;
+  var datos = sh.getDataRange().getValues().slice(1);
+  var ultima = null;
+  datos.forEach(function (r) {
+    if (!r[0] || !r[1]) return;
+    if (String(r[1]).indexOf(tipoTexto) < 0) return;
+    var f = r[0] instanceof Date ? r[0] : new Date(r[0]);
+    if (isNaN(f.getTime())) return;
+    if (!ultima || f > ultima) ultima = f;
+  });
+  return ultima;
+}
+
+function verificarEventosPecera() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var shP = ss.getSheetByName(CFG_PECERA.sheetPecera);
+  if (!shP || shP.getLastRow() < 2) return [];
+
+  var fila2 = shP.getRange(2, 1, 1, 3).getValues()[0];
+  var litros = Number(fila2[0]) || null;
+  var fechaArmado = fila2[1] ? new Date(fila2[1]) : null;
+
+  var hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  var diasArmado = fechaArmado ? Math.floor((hoy - fechaArmado) / 86400000) : null;
+  var enCiclado = diasArmado === null || diasArmado < CFG_PECERA.diasFinCiclado;
+
+  var eventos = [];
+
+  // ── CAMBIO DE AGUA ───────────────────────────────────────────────
+  var ultCambio = ultimoEventoPecera_('Cambio de agua');
+  var diasSinCambio = ultCambio ? Math.floor((hoy - ultCambio) / 86400000) : diasArmado;
+  var limiteCambio = enCiclado ? CFG_PECERA.diasCambioAguaCiclado : CFG_PECERA.diasCambioAguaEstable;
+  if (diasSinCambio !== null && diasSinCambio >= limiteCambio) {
+    var litrosTxt = litros ? Math.round(litros * 0.15) + '-' + Math.round(litros * 0.2) + 'L aprox (15-20% del volumen)' : '15-20% del volumen';
+    eventos.push({
+      titulo: '🐠 PECERA: cambio de agua' + (diasSinCambio > limiteCambio ? ' (' + (diasSinCambio - limiteCambio) + ' día(s) de atraso)' : ''),
+      desc: 'Van ' + diasSinCambio + ' días sin cambio de agua parcial.\n' +
+        'Objetivo actual: cada ' + limiteCambio + ' días (' + (enCiclado ? 'fase de ciclado, sin bacteria establecida' : 'pecera ya establecida') + ').\n' +
+        'Acción: cambio parcial de ' + litrosTxt + ', con anticloro en el agua nueva antes de agregarla. Registrar en \'Registro Pecera\'.',
+      color: CalendarApp.EventColor.BLUE
+    });
+  }
+
+  // ── LIMPIEZA DE FILTRO/ESPONJA ────────────────────────────────────
+  var ultLimpieza = ultimoEventoPecera_('Limpieza');
+  var diasSinLimpieza = ultLimpieza ? Math.floor((hoy - ultLimpieza) / 86400000) : diasArmado;
+  var puedeLimpiar = !!ultLimpieza || diasArmado === null || diasArmado >= CFG_PECERA.diasMinPrimeraLimpieza;
+  if (puedeLimpiar && diasSinLimpieza !== null && diasSinLimpieza >= CFG_PECERA.diasLimpiezaFiltro) {
+    eventos.push({
+      titulo: '🐠 PECERA: limpiar filtro/esponja',
+      desc: 'Van ' + diasSinLimpieza + ' días sin limpiar la esponja del filtro.\n' +
+        'Enjuagar SOLO con agua de la pecera ya extraída (nunca de la canilla) para no matar la bacteria nitrificante.\n' +
+        'Evitar hacerlo el mismo día que un cambio de agua grande — mejor alternar. Registrar en \'Registro Pecera\'.',
+      color: CalendarApp.EventColor.ORANGE
+    });
+  }
+
+  // ── BACTONIC (solo mientras cicla) ────────────────────────────────
+  if (enCiclado) {
+    var ultBact = ultimoEventoPecera_('Bactonic');
+    var diasSinBact = ultBact ? Math.floor((hoy - ultBact) / 86400000) : diasArmado;
+    if (diasSinBact === null || diasSinBact >= CFG_PECERA.diasBactonic) {
+      eventos.push({
+        titulo: '🐠 PECERA: resembrar Bactonic',
+        desc: 'Pecera todavía en ciclado (día ' + diasArmado + ' desde el armado, sin bacteria establecida).\n' +
+          'Conviene resembrar bacteria nitrificante cada pocos días hasta que se estabilice.\n' +
+          'No combinar el mismo día con azul de metileno — es antibacteriano y mata también la bacteria buena. Registrar en \'Registro Pecera\'.',
+        color: CalendarApp.EventColor.CYAN
+      });
+    }
+  }
+
+  return eventos;
 }
