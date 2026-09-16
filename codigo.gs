@@ -2453,7 +2453,7 @@ function inicializarHojaPecera() {
     shP.setFrozenRows(1);
     [70, 240, 340].forEach(function (w, i) { shP.setColumnWidth(i + 1, w); });
 
-    shP.appendRow([42, new Date('2026-09-15T12:00:00'), 'Filtro interno XINXIU WP-008YF, 800L/h (sobrado para el volumen). 4 goldfish.']);
+    shP.appendRow([42, new Date('2026-09-15T12:00:00'), 'Filtro interno XINXIU WP-008YF, 800L/h (sobrado para el volumen). Esponja + ~2cm de cerámica biológica en la base. 4 goldfish.']);
     shP.getRange(2, 2).setNumberFormat('DD/MM/YYYY');
     shP.getRange(2, 1, 1, 3).setFontFamily('Arial').setFontSize(9).setVerticalAlignment('middle').setHorizontalAlignment('center');
     shP.getRange(2, 3).setHorizontalAlignment('left');
@@ -2548,9 +2548,10 @@ function verificarEventosPecera() {
   var puedeLimpiar = !!ultLimpieza || diasArmado === null || diasArmado >= CFG_PECERA.diasMinPrimeraLimpieza;
   if (puedeLimpiar && diasSinLimpieza !== null && diasSinLimpieza >= CFG_PECERA.diasLimpiezaFiltro) {
     eventos.push({
-      titulo: '🐠 PECERA: limpiar filtro/esponja',
+      titulo: '🐠 PECERA: limpiar esponja del filtro',
       desc: 'Van ' + diasSinLimpieza + ' días sin limpiar la esponja del filtro.\n' +
-        'Enjuagar SOLO con agua de la pecera ya extraída (nunca de la canilla) para no matar la bacteria nitrificante.\n' +
+        'ESPONJA: enjuagar SOLO con agua de la pecera ya extraída (nunca de la canilla) para no matar la bacteria nitrificante.\n' +
+        'CERÁMICA (base del filtro): NO tocar en esta pasada — es el medio biológico principal, tiene mucha más superficie de bacteria que la esponja. Dejarla sin remover salvo que el caudal de agua se note claramente más débil; ahí sí, enjuague suave y rápido con agua de la pecera (nunca fregar ni agua de la canilla).\n' +
         'Evitar hacerlo el mismo día que un cambio de agua grande — mejor alternar. Registrar en \'Registro Pecera\'.',
       color: CalendarApp.EventColor.ORANGE
     });
