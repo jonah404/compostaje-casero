@@ -2424,6 +2424,9 @@ function agregarTriggersSincroTodo() {
 //    (el metileno mata la bacteria nitrificante) — no combinarlos.
 //  - Fase "establecida" (pasado ese umbral): cambios de agua e intervalo
 //    de limpieza de filtro más espaciados.
+//  - Alimentación: no es un recordatorio diario (sería ruido en el
+//    calendario) sino una red de seguridad — solo avisa si pasaron
+//    diasSinAlimentar días sin un evento "Alimentación" cargado.
 // ====================================================================
 
 var CFG_PECERA = {
@@ -2435,6 +2438,7 @@ var CFG_PECERA = {
   diasMinPrimeraLimpieza: 25,  // no tocar el filtro antes de este día desde el armado
   diasFinCiclado:         30,  // a partir de acá se considera "establecida"
   diasBactonic:           4,   // cada cuántos días resembrar bacteria mientras cicla
+  diasSinAlimentar:       2,   // si no se registra alimentación en más de esto, avisa
 };
 
 function inicializarHojaPecera() {
@@ -2566,10 +2570,24 @@ function verificarEventosPecera() {
         titulo: '🐠 PECERA: resembrar Bactonic',
         desc: 'Pecera todavía en ciclado (día ' + diasArmado + ' desde el armado, sin bacteria establecida).\n' +
           'Conviene resembrar bacteria nitrificante cada pocos días hasta que se estabilice.\n' +
+          'Dosis: según el envase de tu Bactonic (todavía no tengo la concentración exacta del producto cargada acá).\n' +
           'No combinar el mismo día con azul de metileno — es antibacteriano y mata también la bacteria buena. Registrar en \'Registro Pecera\'.',
         color: CalendarApp.EventColor.CYAN
       });
     }
+  }
+
+  // ── ALIMENTACIÓN ───────────────────────────────────────────────────
+  var ultAliment = ultimoEventoPecera_('Alimentaci');
+  var diasSinAlimentar = ultAliment ? Math.floor((hoy - ultAliment) / 86400000) : diasArmado;
+  if (diasSinAlimentar !== null && diasSinAlimentar >= CFG_PECERA.diasSinAlimentar) {
+    eventos.push({
+      titulo: '🐠 PECERA: sin registrar alimentación hace ' + diasSinAlimentar + ' día(s)',
+      desc: 'No hay un evento de alimentación cargado en \'Registro Pecera\' en los últimos ' + diasSinAlimentar + ' días.\n' +
+        'Cantidad orientativa: lo que coman en 2-3 minutos, 1-2 veces por día — retirar el excedente para no ensuciar el agua (los goldfish sobrealimentados es la causa más común de mala calidad de agua).\n' +
+        'Si ya les diste de comer y solo faltó registrarlo, cargalo en \'Registro Pecera\' para que esta alerta no se repita.',
+      color: CalendarApp.EventColor.YELLOW
+    });
   }
 
   return eventos;
