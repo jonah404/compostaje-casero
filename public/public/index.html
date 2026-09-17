@@ -1211,66 +1211,6 @@ const renderDash = () => {
   const ch = cdDia(fISO(TODAY)) || [...S.clima].sort((a,b)=>a.fecha>b.fecha?-1:1)[0];
 
   document.getElementById('dash-c').innerHTML = `
-    <div class="g3" style="margin-bottom:10px">
-      ${statTile('--sage','Activos', activos, `de ${S.sistemas.length} sistemas`)}
-      ${statTile('--umber','En carga', enc, 'residuos')}
-      ${statTile('--moss','Listos', lst, 'para usar')}
-    </div>
-    <div class="g3" style="margin-bottom:20px">
-      ${statTile('--sky','Revolcadas', S.revolcadas.length, 'registradas')}
-      ${statTile('--sage-mid','Plantas', S.plantas.length, 'registradas')}
-      ${statTile(ax.pctPlantas==null?'--ink3':ax.pctPlantas>=80?'--sage':ax.pctPlantas>=50?'--umber':'--rust', 'Al día', ax.pctPlantas!=null?ax.pctPlantas+'%':'—', `${ax.plantasOk}/${ax.totalPlantas} sin alertas`)}
-    </div>
-    <div class="g3" style="margin-bottom:20px">
-      ${statTile(ep.cambioUrg?'--rust':'--sage', 'Pecera — agua', ep.diasSinCambio!=null?ep.diasSinCambio+'d':'—', `objetivo cada ${ep.limiteCambio}d`)}
-      ${statTile(ep.limpiezaUrg?'--umber':'--sage', 'Pecera — filtro', ep.diasSinLimpieza!=null?ep.diasSinLimpieza+'d':'—', ep.puedeLimpiar?`objetivo cada ${CFG_PEC.diasLimpiezaFiltro}d`:'aún no tocar')}
-      ${statTile('--sky', 'Pecera — fase', ep.enCiclado?'Ciclado':'Establecida', ep.diasArmado!=null?`día ${ep.diasArmado}`:'')}
-    </div>
-    <div class="dash-grid">
-      <div>
-        <div class="sh">Clima reciente <span class="sh-sub">${ch?fmt(ch.fecha):''}</span></div>
-        ${ch?`<div class="clhero">
-          <div class="clh-row">
-            <div><div class="clh-temp">${n1(ch.temp)}°</div><div class="clh-sub">${ch.lluvia==='si'?'☔ Llovió':'Sin lluvia'}${+ch.mm>0?' — '+n1(ch.mm)+' mm':''}</div></div>
-            <div class="clh-right"><div class="clh-hum">${n0(ch.hum)}<span>%</span></div><div class="clh-mini">humedad relativa</div></div>
-          </div>
-          <div class="clg">
-            <div class="cli"><div class="cli-l">Máx</div><div class="cli-v">${n1(ch.tmax)}<span class="cli-u">°C</span></div></div>
-            <div class="cli"><div class="cli-l">Mín</div><div class="cli-v">${n1(ch.tmin)}<span class="cli-u">°C</span></div></div>
-            <div class="cli"><div class="cli-l">Viento</div><div class="cli-v">${n1(ch.viento)}<span class="cli-u"> km/h</span></div></div>
-            <div class="cli"><div class="cli-l">Evapo</div><div class="cli-v">${n1(ch.evapo)}<span class="cli-u"> mm</span></div></div>
-          </div>
-        </div>`:`<div class="card" style="font-size:13px;color:var(--ink3)">Sin datos. Pulsá Sincronizar.</div>`}
-        <div class="sh">Condición <span class="sh-sub">últimos 7 días</span></div>
-        <div class="cond">
-          <div class="cond-hdr">
-            <span class="cond-t">Índice de condición</span>
-            <span class="cond-s" style="color:${an.ic}">${an.idx}/100</span>
-          </div>
-          <div class="cond-bar"><div class="cond-f" style="width:${an.idx}%;background:${an.ic}"></div></div>
-          <div style="font-size:13px;color:${an.ic};font-weight:700;margin-bottom:10px">${an.il2}</div>
-          <div class="pills">
-            <span class="pill" style="background:${an.cr?'var(--sage-bg)':'var(--umber-bg)'};color:${an.cr?'var(--sage)':'var(--umber)'}">🔄 ${an.cr?'Conviene revolver':'Esperar para revolver'}</span>
-            <span class="pill" style="background:${an.nr?'var(--umber-bg)':'var(--sage-bg)'};color:${an.nr?'var(--umber)':'var(--sage)'}">💧 ${an.nr?'Necesita riego':'Riego OK'}</span>
-            ${an.df?`<span class="pill" style="background:var(--sky-bg);color:var(--sky)">❄️ ${an.df}d de frío</span>`:''}
-          </div>
-          <div class="sep"></div>
-          <div class="g2">
-            <div style="font-size:12px;color:var(--ink3)">Lluvia 7d<br><b style="font-family:var(--serif);font-size:20px;color:var(--ink)">${n1(an.ll7)}</b> mm</div>
-            <div style="font-size:12px;color:var(--ink3)">Lluvia 30d<br><b style="font-family:var(--serif);font-size:20px;color:var(--ink)">${n1(an.ll30)}</b> mm</div>
-            <div style="font-size:12px;color:var(--ink3)">Temp prom<br><b style="font-family:var(--serif);font-size:20px;color:var(--ink)">${n1(an.tp7)}</b> °C</div>
-            <div style="font-size:12px;color:var(--ink3)">Sin lluvia<br><b style="font-family:var(--serif);font-size:20px;color:var(--ink)">${an.sl}</b> días</div>
-          </div>
-        </div>
-      </div>
-      <div>
-        <div class="sh">Alertas</div>
-        ${als.map(a=>`<div class="al ${a.c}"><div class="al-t">${a.t}</div>${a.b?`<div class="al-b">${a.b}</div>`:''}</div>`).join('')}
-        <div class="sh">Sistemas activos</div>
-        ${S.sistemas.filter(s=>s.inicioC).map(s=>sysHTML(s)).join('')||'<div style="font-size:13px;color:var(--ink3)">Sin sistemas activos.</div>'}
-        ${S.plantas.length?`<div class="sh">Plantas</div>${S.plantas.map(p=>plantHTML(p)).join('')}`:''}
-      </div>
-    </div>
     <div class="sh">Análisis <span class="sh-sub">con los datos acumulados hasta ahora</span></div>
     <div class="dash-grid">
       <div class="card">
@@ -1282,6 +1222,20 @@ const renderDash = () => {
           <div style="font-size:12px;color:var(--ink3)">Sin lluvia<br><b style="font-family:var(--serif);font-size:20px;color:var(--ink)">${an.sl}</b> días</div>
           <div style="font-size:12px;color:var(--ink3)">Registros<br><b style="font-family:var(--serif);font-size:20px;color:var(--ink)">${S.clima.length}</b> días</div>
         </div>
+        <div class="sep"></div>
+        <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:10px">Clima reciente <span class="sh-sub">${ch?fmt(ch.fecha):''}</span></div>
+        ${ch?`<div>
+          <div class="clh-row">
+            <div><div class="clh-temp">${n1(ch.temp)}°</div><div class="clh-sub">${ch.lluvia==='si'?'☔ Llovió':'Sin lluvia'}${+ch.mm>0?' — '+n1(ch.mm)+' mm':''}</div></div>
+            <div class="clh-right"><div class="clh-hum">${n0(ch.hum)}<span>%</span></div><div class="clh-mini">humedad relativa</div></div>
+          </div>
+          <div class="clg">
+            <div class="cli"><div class="cli-l">Máx</div><div class="cli-v">${n1(ch.tmax)}<span class="cli-u">°C</span></div></div>
+            <div class="cli"><div class="cli-l">Mín</div><div class="cli-v">${n1(ch.tmin)}<span class="cli-u">°C</span></div></div>
+            <div class="cli"><div class="cli-l">Viento</div><div class="cli-v">${n1(ch.viento)}<span class="cli-u"> km/h</span></div></div>
+            <div class="cli"><div class="cli-l">Evapo</div><div class="cli-v">${n1(ch.evapo)}<span class="cli-u"> mm</span></div></div>
+          </div>
+        </div>`:`<div style="font-size:13px;color:var(--ink3)">Sin datos. Pulsá Sincronizar.</div>`}
       </div>
       <div>
         <div class="card">
@@ -1327,6 +1281,55 @@ const renderDash = () => {
           })), revBarMax
         ):`<div style="font-size:13px;color:var(--ink3)">Sin sistemas activos.</div>`}
       </div>
+    </div>
+
+    <div class="sh">Alertas</div>
+    ${als.map(a=>`<div class="al ${a.c}"><div class="al-t">${a.t}</div>${a.b?`<div class="al-b">${a.b}</div>`:''}</div>`).join('')}
+
+    <div class="dash-grid">
+      <div>
+        <div class="sh">Condición <span class="sh-sub">últimos 7 días</span></div>
+        <div class="cond">
+          <div class="cond-hdr">
+            <span class="cond-t">Índice de condición</span>
+            <span class="cond-s" style="color:${an.ic}">${an.idx}/100</span>
+          </div>
+          <div class="cond-bar"><div class="cond-f" style="width:${an.idx}%;background:${an.ic}"></div></div>
+          <div style="font-size:13px;color:${an.ic};font-weight:700;margin-bottom:10px">${an.il2}</div>
+          <div class="pills">
+            <span class="pill" style="background:${an.cr?'var(--sage-bg)':'var(--umber-bg)'};color:${an.cr?'var(--sage)':'var(--umber)'}">🔄 ${an.cr?'Conviene revolver':'Esperar para revolver'}</span>
+            <span class="pill" style="background:${an.nr?'var(--umber-bg)':'var(--sage-bg)'};color:${an.nr?'var(--umber)':'var(--sage)'}">💧 ${an.nr?'Necesita riego':'Riego OK'}</span>
+            ${an.df?`<span class="pill" style="background:var(--sky-bg);color:var(--sky)">❄️ ${an.df}d de frío</span>`:''}
+          </div>
+          <div class="sep"></div>
+          <div class="g2">
+            <div style="font-size:12px;color:var(--ink3)">Lluvia 7d<br><b style="font-family:var(--serif);font-size:20px;color:var(--ink)">${n1(an.ll7)}</b> mm</div>
+            <div style="font-size:12px;color:var(--ink3)">Lluvia 30d<br><b style="font-family:var(--serif);font-size:20px;color:var(--ink)">${n1(an.ll30)}</b> mm</div>
+            <div style="font-size:12px;color:var(--ink3)">Temp prom<br><b style="font-family:var(--serif);font-size:20px;color:var(--ink)">${n1(an.tp7)}</b> °C</div>
+            <div style="font-size:12px;color:var(--ink3)">Sin lluvia<br><b style="font-family:var(--serif);font-size:20px;color:var(--ink)">${an.sl}</b> días</div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="sh">Sistemas activos</div>
+        ${S.sistemas.filter(s=>s.inicioC).map(s=>sysHTML(s)).join('')||'<div style="font-size:13px;color:var(--ink3)">Sin sistemas activos.</div>'}
+      </div>
+    </div>
+
+    <div class="g3" style="margin-top:24px;margin-bottom:10px">
+      ${statTile('--sage','Activos', activos, `de ${S.sistemas.length} sistemas`)}
+      ${statTile('--umber','En carga', enc, 'residuos')}
+      ${statTile('--moss','Listos', lst, 'para usar')}
+    </div>
+    <div class="g3" style="margin-bottom:20px">
+      ${statTile('--sky','Revolcadas', S.revolcadas.length, 'registradas')}
+      ${statTile('--sage-mid','Plantas', S.plantas.length, 'registradas')}
+      ${statTile(ax.pctPlantas==null?'--ink3':ax.pctPlantas>=80?'--sage':ax.pctPlantas>=50?'--umber':'--rust', 'Al día', ax.pctPlantas!=null?ax.pctPlantas+'%':'—', `${ax.plantasOk}/${ax.totalPlantas} sin alertas`)}
+    </div>
+    <div class="g3">
+      ${statTile(ep.cambioUrg?'--rust':'--sage', 'Pecera — agua', ep.diasSinCambio!=null?ep.diasSinCambio+'d':'—', `objetivo cada ${ep.limiteCambio}d`)}
+      ${statTile(ep.limpiezaUrg?'--umber':'--sage', 'Pecera — filtro', ep.diasSinLimpieza!=null?ep.diasSinLimpieza+'d':'—', ep.puedeLimpiar?`objetivo cada ${CFG_PEC.diasLimpiezaFiltro}d`:'aún no tocar')}
+      ${statTile('--sky', 'Pecera — fase', ep.enCiclado?'Ciclado':'Establecida', ep.diasArmado!=null?`día ${ep.diasArmado}`:'')}
     </div>`;
 };
 
