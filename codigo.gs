@@ -2566,11 +2566,12 @@ function verificarEventosPecera() {
     var ultBact = ultimoEventoPecera_('Bactonic');
     var diasSinBact = ultBact ? Math.floor((hoy - ultBact) / 86400000) : diasArmado;
     if (diasSinBact === null || diasSinBact >= CFG_PECERA.diasBactonic) {
+      var dosisBact = '~5ml cada 10L de agua' + (litros ? ' → unos ' + Math.round(litros / 10 * 5) + 'ml para tus ' + litros + 'L' : '');
       eventos.push({
         titulo: '🐠 PECERA: resembrar Bactonic',
         desc: 'Pecera todavía en ciclado (día ' + diasArmado + ' desde el armado, sin bacteria establecida).\n' +
           'Conviene resembrar bacteria nitrificante cada pocos días hasta que se estabilice.\n' +
-          'Dosis: según el envase de tu Bactonic (todavía no tengo la concentración exacta del producto cargada acá).\n' +
+          'Dosis orientativa (genérica para bacteria nitrificante líquida, NO específica de tu producto — confirmá contra el envase si podés): ' + dosisBact + '.\n' +
           'No combinar el mismo día con azul de metileno — es antibacteriano y mata también la bacteria buena. Registrar en \'Registro Pecera\'.',
         color: CalendarApp.EventColor.CYAN
       });
