@@ -587,7 +587,6 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
             <h3><i class="ti ti-fish"></i>Nuevo evento de pecera</h3>
             <div class="f"><label>Tipo de evento</label>
               <select id="kt">
-                <option value="🍽️ Alimentación">🍽️ Alimentación</option>
                 <option value="💧 Cambio de agua parcial">💧 Cambio de agua parcial</option>
                 <option value="🧽 Limpieza de filtro/esponja">🧽 Limpieza de filtro/esponja</option>
                 <option value="🧪 Anticloro">🧪 Anticloro</option>
@@ -916,7 +915,7 @@ const pLbl = p => p.nombre || `Planta ${p.id}`;
 // Fase "ciclado" = primeros CFG_PEC.diasFinCiclado días desde el armado/limpieza
 // total: sin bacteria establecida, cambios de agua más frecuentes y sin tocar
 // el filtro. Después pasa a la fase "establecida", con intervalos más largos.
-const CFG_PEC = { diasCambioAguaCiclado:3, diasCambioAguaEstable:7, diasLimpiezaFiltro:14, diasMinPrimeraLimpieza:25, diasFinCiclado:30, diasBactonic:4, diasSinAlimentar:2 };
+const CFG_PEC = { diasCambioAguaCiclado:3, diasCambioAguaEstable:7, diasLimpiezaFiltro:14, diasMinPrimeraLimpieza:25, diasFinCiclado:30, diasBactonic:4 };
 const pecEventos = tipo => S.registroPecera.filter(r => !tipo || r.tipo.includes(tipo)).sort((a,b)=>a.fecha>b.fecha?-1:1);
 const estPecera = () => {
   const p = S.pecera || {};
@@ -937,13 +936,7 @@ const estPecera = () => {
   const diasSinBact = ultBact ? dd(pISO(ultBact.fecha), TODAY) : diasArmado;
   const bactRecomendado = enCiclado && (diasSinBact==null || diasSinBact >= CFG_PEC.diasBactonic);
 
-  // No es un recordatorio diario (sería ruido) — solo avisa si se pasó de
-  // diasSinAlimentar días sin un evento "Alimentación" cargado.
-  const ultAliment = pecEventos('Alimentaci')[0];
-  const diasSinAlimentar = ultAliment ? dd(pISO(ultAliment.fecha), TODAY) : diasArmado;
-  const alimentarUrg = diasSinAlimentar!=null && diasSinAlimentar >= CFG_PEC.diasSinAlimentar;
-
-  return { diasArmado, enCiclado, diasSinCambio, limiteCambio, cambioUrg, diasSinLimpieza, limpiezaUrg, puedeLimpiar, diasSinBact, bactRecomendado, diasSinAlimentar, alimentarUrg };
+  return { diasArmado, enCiclado, diasSinCambio, limiteCambio, cambioUrg, diasSinLimpieza, limpiezaUrg, puedeLimpiar, diasSinBact, bactRecomendado };
 };
 
 // ════ HEATMAP ════
@@ -1214,7 +1207,6 @@ const renderDash = () => {
   if (ep.cambioUrg) als.push({c:'al-r',t:'Pecera — cambio de agua',b:`${ep.diasSinCambio} días sin cambio (objetivo cada ${ep.limiteCambio}d)`});
   if (ep.limpiezaUrg) als.push({c:'al-w',t:'Pecera — limpiar filtro/esponja',b:`${ep.diasSinLimpieza} días sin limpiar`});
   if (ep.bactRecomendado) als.push({c:'al-w',t:'Pecera — resembrar Bactonic',b:'En ciclado, conviene resembrar cada pocos días'});
-  if (ep.alimentarUrg) als.push({c:'al-w',t:'Pecera — sin registrar alimentación',b:`${ep.diasSinAlimentar} día(s) sin cargar un evento de alimentación`});
   if(!als.length) als.push({c:'al-ok',t:'Todo en orden 👍',b:'Sin alertas pendientes'});
   const ch = cdDia(fISO(TODAY)) || [...S.clima].sort((a,b)=>a.fecha>b.fecha?-1:1)[0];
 
@@ -1419,7 +1411,6 @@ const renderPec = () => {
       ${e.cambioUrg?`<span class="badge" style="background:var(--rust-bg);color:var(--rust)">💧 Cambio de agua atrasado</span>`:`<span class="badge bl">💧 Cambio de agua al día</span>`}
       ${e.limpiezaUrg?`<span class="badge" style="background:var(--umber-bg);color:var(--umber)">🧽 Limpiar filtro/esponja</span>`:''}
       ${e.bactRecomendado?`<span class="badge" style="background:var(--sky-bg);color:var(--sky)">🦠 Resembrar Bactonic</span>`:''}
-      ${e.alimentarUrg?`<span class="badge" style="background:var(--umber-bg);color:var(--umber)">🍽️ Sin registrar alimentación (${e.diasSinAlimentar}d)</span>`:`<span class="badge bl">🍽️ Alimentación al día</span>`}
     </div>
     ${p.notas?`<div style="font-size:12px;color:var(--ink3);font-style:italic;margin-bottom:16px">${p.notas}</div>`:''}
     <div class="fc" style="margin-bottom:16px">
