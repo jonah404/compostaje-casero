@@ -854,6 +854,30 @@ const sLbl = s => s.nombre ? `#${s.id} — ${s.nombre}` : `Sistema ${s.id}`;
 // ════ PLANTAS — cálculos ════
 const UMBRAL_LLUVIA_MM = 8;
 const CFG_PLA = { diasSinRiegoVerano:7, diasSinRiegoInvierno:14, diasFert:60, diasPlagas:30, diasPoda:365, mesesVerano:[11,12,1,2,3] };
+// Mismos perfiles que la hoja "Especies" del Apps Script (codigo.gs →
+// inicializarHojaEspecies/agregarEspeciesFaltantes) — sin esto, el dashboard
+// calculaba riego/fertilización/poda con los valores genéricos de cítrico de
+// exterior para TODAS las plantas, incluidas las de interior con perfil
+// propio (ej. Pata de elefante tolera 35 días sin agua en invierno acá vs.
+// los 14 genéricos, así que el dashboard la marcaba "urgente" cuando el
+// calendario — que sí usa el perfil — correctamente no generaba ninguna
+// alerta). Si en algún momento se edita la hoja Especies, actualizar acá
+// también para que sigan coincidiendo.
+const ESPECIES = [
+  { especie:'Monstera',          tipo:'Interior', riegoVerano:8,  riegoInvierno:12, diasFert:30, fertMesIni:9, fertMesFin:4, tempMin:12, podaDias:150 },
+  { especie:'Palo de agua',      tipo:'Interior', riegoVerano:10, riegoInvierno:14, diasFert:60, fertMesIni:9, fertMesFin:4, tempMin:15, podaDias:240 },
+  { especie:'Helecho',           tipo:'Interior', riegoVerano:3,  riegoInvierno:5,  diasFert:30, fertMesIni:9, fertMesFin:4, tempMin:15, podaDias:240 },
+  { especie:'Pilea',             tipo:'Interior', riegoVerano:7,  riegoInvierno:10, diasFert:30, fertMesIni:9, fertMesFin:4, tempMin:10, podaDias:200 },
+  { especie:'Potus',             tipo:'Interior', riegoVerano:8,  riegoInvierno:12, diasFert:45, fertMesIni:9, fertMesFin:4, tempMin:10, podaDias:null },
+  { especie:'Planta cebra',      tipo:'Interior', riegoVerano:5,  riegoInvierno:8,  diasFert:30, fertMesIni:9, fertMesFin:4, tempMin:15, podaDias:200 },
+  { especie:'Pata de elefante',  tipo:'Interior', riegoVerano:20, riegoInvierno:35, diasFert:60, fertMesIni:9, fertMesFin:4, tempMin:7,  podaDias:450 },
+];
+const perfilEspecie = especie => {
+  const buscado = String(especie||'').toLowerCase().trim();
+  if (!buscado) return null;
+  return ESPECIES.find(e => { const n=e.especie.toLowerCase(); return buscado.includes(n) || n.includes(buscado); }) || null;
+};
+const mesEnTemporada = (mes, ini, fin) => !ini || !fin ? true : (ini<=fin ? (mes>=ini && mes<=fin) : (mes>=ini || mes<=fin));
 const regEventos = (pid, tipo) => S.registroPlantas.filter(r => r.planta===pid && (!tipo || r.tipo.includes(tipo))).sort((a,b)=>a.fecha>b.fecha?-1:1);
 const ultimoEvento = (pid, tipo) => regEventos(pid, tipo)[0] || null;
 // aguaEfectiva/proxCalc combinan lo que ya calculó el trigger diario del Sheet
@@ -868,6 +892,10 @@ const aguaEfectiva = p => {
     const fSheet = pISO(p.ultimoRiego);
     if (fSheet && (!fRiego || fSheet > fRiego)) fRiego = fSheet;
   }
+  // Las plantas de interior no cuentan la lluvia como riego (no les llueve
+  // encima) — igual que calcularUltimaAguaEfectiva() en Apps Script.
+  const perfil = perfilEspecie(p.especie || p.nombre);
+  if (perfil && perfil.tipo === 'Interior') return fRiego ? { fecha: fRiego, tipo:'riego', mm:null } : null;
   let lluvia = null, mmLluvia = 0;
   [...S.clima].sort((a,b)=>a.fecha>b.fecha?-1:1).forEach(c => {
     if (lluvia) return;
@@ -894,19 +922,21 @@ const proxCalc = (p, tipoEvento, ultimaKey, proximaKey, intervaloDias) => {
 const estPlanta = p => {
   const hoy = TODAY, mes = hoy.getMonth()+1;
   const esVerano = CFG_PLA.mesesVerano.includes(mes);
-  const limite = esVerano ? CFG_PLA.diasSinRiegoVerano : CFG_PLA.diasSinRiegoInvierno;
+  const perfil = perfilEspecie(p.especie || p.nombre);
+  const limite = perfil ? (esVerano ? perfil.riegoVerano : perfil.riegoInvierno) : (esVerano ? CFG_PLA.diasSinRiegoVerano : CFG_PLA.diasSinRiegoInvierno);
   const agua = aguaEfectiva(p);
   const diasSinAgua = agua ? dd(agua.fecha, hoy) : null;
-  const fert   = proxCalc(p, 'Fertiliz', 'ultimaFert',   'proximaFert',   CFG_PLA.diasFert);
+  const fueraDeTemporadaFert = perfil && !mesEnTemporada(mes, perfil.fertMesIni, perfil.fertMesFin);
+  const fert   = proxCalc(p, 'Fertiliz', 'ultimaFert',   'proximaFert',   perfil ? perfil.diasFert : CFG_PLA.diasFert);
   const plagas = proxCalc(p, 'plagas',   'ultimaPlagas', 'proximaPlagas', CFG_PLA.diasPlagas);
-  const poda   = proxCalc(p, 'Poda',     'ultimaPoda',   'proximaPoda',   CFG_PLA.diasPoda);
+  const poda   = proxCalc(p, 'Poda',     'ultimaPoda',   'proximaPoda',   (perfil && perfil.podaDias) ? perfil.podaDias : CFG_PLA.diasPoda);
   return {
     diasSinAgua, limite, agua,
     riegoUrg: diasSinAgua!=null && diasSinAgua>=limite,
     riegoProx: diasSinAgua!=null && diasSinAgua>=limite*0.7 && diasSinAgua<limite,
-    proximaFert: fert.proxima, diasParaFert: fert.dias, fertUrg: fert.dias!=null && fert.dias<=0,
+    proximaFert: fert.proxima, diasParaFert: fert.dias, fertUrg: !fueraDeTemporadaFert && fert.dias!=null && fert.dias<=0,
     proximaPlagas: plagas.proxima, diasParaPlagas: plagas.dias, plagasUrg: plagas.dias!=null && plagas.dias<=0,
-    proximaPoda: poda.proxima, diasParaPoda: poda.dias, podaProx: poda.dias!=null && poda.dias<=30,
+    proximaPoda: poda.proxima, diasParaPoda: poda.dias, podaProx: poda.dias!=null && poda.dias<=30 && poda.dias>=0,
   };
 };
 const pLbl = p => p.nombre || `Planta ${p.id}`;
@@ -1259,6 +1289,8 @@ const renderDash = () => {
             <div class="ring-tile-s">${ax.totalPlantas} plantas</div>
           </div>
         </div>
+        <div class="sh" style="margin-top:20px">Alertas</div>
+        ${als.map(a=>`<div class="al ${a.c}"><div class="al-t">${a.t}</div>${a.b?`<div class="al-b">${a.b}</div>`:''}</div>`).join('')}
       </div>
     </div>
     <div class="dash-grid" style="margin-top:10px">
@@ -1282,9 +1314,6 @@ const renderDash = () => {
         ):`<div style="font-size:13px;color:var(--ink3)">Sin sistemas activos.</div>`}
       </div>
     </div>
-
-    <div class="sh">Alertas</div>
-    ${als.map(a=>`<div class="al ${a.c}"><div class="al-t">${a.t}</div>${a.b?`<div class="al-b">${a.b}</div>`:''}</div>`).join('')}
 
     <div class="dash-grid">
       <div>
