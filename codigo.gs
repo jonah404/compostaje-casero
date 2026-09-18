@@ -977,9 +977,15 @@ function verificarYCrearEventos() {
     var numSis      = sis[0];
     var fechaInicio = sis[1] ? new Date(sis[1]) : null;
     var fechaEstanq = sis[5] ? new Date(sis[5]) : null;
+    // Mismo ajuste que en verificarEventosPecera(): las fechas se guardan a
+    // las 12:00 pero "hoy" es medianoche — sin normalizar, el conteo de días
+    // queda medio día corto y el aviso de revolver se atrasa un día entero.
+    if (fechaInicio) fechaInicio.setHours(0, 0, 0, 0);
+    if (fechaEstanq) fechaEstanq.setHours(0, 0, 0, 0);
 
     if (fechaInicio) {
       var ultimaRev     = obtenerUltimaRevolcada(numSis);
+      if (ultimaRev) ultimaRev.setHours(0, 0, 0, 0);
       var baseConteo    = ultimaRev || fechaInicio;
       var diasDesdeBase = Math.floor((hoy - baseConteo) / 86400000);
 
@@ -2520,6 +2526,13 @@ function verificarEventosPecera() {
   var fila2 = shP.getRange(2, 1, 1, 3).getValues()[0];
   var litros = Number(fila2[0]) || null;
   var fechaArmado = fila2[1] ? new Date(fila2[1]) : null;
+  // Las fechas se guardan a las 12:00 (para evitar líos de zona horaria) pero
+  // "hoy" es medianoche — sin normalizar acá, cualquier resta quedaba media
+  // jornada corta (ej. 2026-09-15 12:00 → 2026-09-18 00:00 son 2 días y medio,
+  // Math.floor da 2 en vez de 3) y el aviso de cambio de agua nunca llegaba a
+  // cumplir el umbral. Mismo ajuste que ya se hace en calcularUltimaAguaEfectiva
+  // para las plantas.
+  if (fechaArmado) fechaArmado.setHours(0, 0, 0, 0);
 
   var hoy = new Date(); hoy.setHours(0, 0, 0, 0);
   var diasArmado = fechaArmado ? Math.floor((hoy - fechaArmado) / 86400000) : null;
@@ -2529,6 +2542,7 @@ function verificarEventosPecera() {
 
   // ── CAMBIO DE AGUA ───────────────────────────────────────────────
   var ultCambio = ultimoEventoPecera_('Cambio de agua');
+  if (ultCambio) ultCambio.setHours(0, 0, 0, 0);
   var diasSinCambio = ultCambio ? Math.floor((hoy - ultCambio) / 86400000) : diasArmado;
   var limiteCambio = enCiclado ? CFG_PECERA.diasCambioAguaCiclado : CFG_PECERA.diasCambioAguaEstable;
   if (diasSinCambio !== null && diasSinCambio >= limiteCambio) {
@@ -2544,6 +2558,7 @@ function verificarEventosPecera() {
 
   // ── LIMPIEZA DE FILTRO/ESPONJA ────────────────────────────────────
   var ultLimpieza = ultimoEventoPecera_('Limpieza');
+  if (ultLimpieza) ultLimpieza.setHours(0, 0, 0, 0);
   var diasSinLimpieza = ultLimpieza ? Math.floor((hoy - ultLimpieza) / 86400000) : diasArmado;
   var puedeLimpiar = !!ultLimpieza || diasArmado === null || diasArmado >= CFG_PECERA.diasMinPrimeraLimpieza;
   if (puedeLimpiar && diasSinLimpieza !== null && diasSinLimpieza >= CFG_PECERA.diasLimpiezaFiltro) {
@@ -2560,6 +2575,7 @@ function verificarEventosPecera() {
   // ── BACTONIC (solo mientras cicla) ────────────────────────────────
   if (enCiclado) {
     var ultBact = ultimoEventoPecera_('Bactonic');
+    if (ultBact) ultBact.setHours(0, 0, 0, 0);
     var diasSinBact = ultBact ? Math.floor((hoy - ultBact) / 86400000) : diasArmado;
     if (diasSinBact === null || diasSinBact >= CFG_PECERA.diasBactonic) {
       var dosisBact = '~5ml cada 10L de agua' + (litros ? ' → unos ' + Math.round(litros / 10 * 5) + 'ml para tus ' + litros + 'L' : '');
@@ -2596,7 +2612,8 @@ function diagnosticarPecera() {
   Logger.log('3) Fila 2 cruda (Litros, Fecha armado, Notas): ' + JSON.stringify(fila2));
   var litros = Number(fila2[0]) || null;
   var fechaArmado = fila2[1] ? new Date(fila2[1]) : null;
-  Logger.log('4) litros=' + litros + ' | fechaArmado=' + fechaArmado);
+  if (fechaArmado) fechaArmado.setHours(0, 0, 0, 0);
+  Logger.log('4) litros=' + litros + ' | fechaArmado (normalizada a medianoche)=' + fechaArmado);
 
   var hoy = new Date(); hoy.setHours(0, 0, 0, 0);
   var diasArmado = fechaArmado ? Math.floor((hoy - fechaArmado) / 86400000) : null;
@@ -2604,6 +2621,7 @@ function diagnosticarPecera() {
   Logger.log('5) hoy=' + hoy + ' | diasArmado=' + diasArmado + ' | enCiclado=' + enCiclado);
 
   var ultCambio = ultimoEventoPecera_('Cambio de agua');
+  if (ultCambio) ultCambio.setHours(0, 0, 0, 0);
   var diasSinCambio = ultCambio ? Math.floor((hoy - ultCambio) / 86400000) : diasArmado;
   var limiteCambio = enCiclado ? CFG_PECERA.diasCambioAguaCiclado : CFG_PECERA.diasCambioAguaEstable;
   Logger.log('6) ultCambio=' + ultCambio + ' | diasSinCambio=' + diasSinCambio + ' | limiteCambio=' + limiteCambio);

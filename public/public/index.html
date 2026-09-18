@@ -824,7 +824,11 @@ const sheetSync = (tipo, data) => {
 };
 
 // ════ UTILS ════
-const TODAY = new Date();
+// A medianoche local: si quedara con la hora real, los "días sin agua/cambio/
+// etc" cambiarían según a qué hora del día se abre la app (Math.round podía
+// redondear para arriba a la tardecita), y además dejaba de coincidir con el
+// servidor, que siempre calcula "hoy" a medianoche.
+const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0);
 const fISO  = d => d instanceof Date ? d.toISOString().split('T')[0] : (d||'');
 const pISO  = s => s ? new Date(s+'T00:00:00') : null;
 const fmt   = s => { if(!s) return '—'; const d=pISO(s); return d.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'}); };
