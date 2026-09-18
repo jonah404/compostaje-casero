@@ -1182,9 +1182,6 @@ const statTile = (colorVar, label, value, sub) => `
 
 // ════ RENDER DASHBOARD ════
 const renderDash = () => {
-  const activos = S.sistemas.filter(s=>s.inicioC).length;
-  const enc     = S.sistemas.filter(s=>est(s).fase==='c').length;
-  const lst     = S.sistemas.filter(s=>est(s).fase==='l').length;
   const an      = analisis();
   const ax      = analisisExtra();
   const nCarga = S.sistemas.filter(s=>s.inicioC && est(s).fase==='c').length;
@@ -1345,17 +1342,7 @@ const renderDash = () => {
       </div>
     </div>
 
-    <div class="g3" style="margin-top:24px;margin-bottom:10px">
-      ${statTile('--sage','Activos', activos, `de ${S.sistemas.length} sistemas`)}
-      ${statTile('--umber','En carga', enc, 'residuos')}
-      ${statTile('--moss','Listos', lst, 'para usar')}
-    </div>
-    <div class="g3" style="margin-bottom:20px">
-      ${statTile('--sky','Revolcadas', S.revolcadas.length, 'registradas')}
-      ${statTile('--sage-mid','Plantas', S.plantas.length, 'registradas')}
-      ${statTile(ax.pctPlantas==null?'--ink3':ax.pctPlantas>=80?'--sage':ax.pctPlantas>=50?'--umber':'--rust', 'Al día', ax.pctPlantas!=null?ax.pctPlantas+'%':'—', `${ax.plantasOk}/${ax.totalPlantas} sin alertas`)}
-    </div>
-    <div class="g3">
+    <div class="g3" style="margin-top:24px">
       ${statTile(ep.cambioUrg?'--rust':'--sage', 'Pecera — agua', ep.diasSinCambio!=null?ep.diasSinCambio+'d':'—', `objetivo cada ${ep.limiteCambio}d`)}
       ${statTile(ep.limpiezaUrg?'--umber':'--sage', 'Pecera — filtro', ep.diasSinLimpieza!=null?ep.diasSinLimpieza+'d':'—', ep.puedeLimpiar?`objetivo cada ${CFG_PEC.diasLimpiezaFiltro}d`:'aún no tocar')}
       ${statTile('--sky', 'Pecera — fase', ep.enCiclado?'Ciclado':'Establecida', ep.diasArmado!=null?`día ${ep.diasArmado}`:'')}
