@@ -2576,3 +2576,48 @@ function verificarEventosPecera() {
 
   return eventos;
 }
+
+// ====================================================================
+//  DIAGNÓSTICO PECERA — ejecutar esta función sola (no verificarYCrearEventos)
+//  y mirar el registro de ejecución (▶ Ejecutar, después Ver → Registros de
+//  ejecución, o Ctrl+Enter). Muestra paso a paso qué está leyendo y por qué
+//  decide crear o no cada evento, para encontrar dónde se corta.
+// ====================================================================
+function diagnosticarPecera() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var shP = ss.getSheetByName(CFG_PECERA.sheetPecera);
+  Logger.log('1) Hoja "' + CFG_PECERA.sheetPecera + '" encontrada: ' + !!shP);
+  if (!shP) { Logger.log('[CORTA ACÁ] No existe la hoja — ejecutar inicializarHojaPecera().'); return; }
+
+  Logger.log('2) getLastRow(): ' + shP.getLastRow());
+  if (shP.getLastRow() < 2) { Logger.log('[CORTA ACÁ] getLastRow() < 2 — la fila 2 está vacía, verificarEventosPecera() devuelve [] de entrada.'); return; }
+
+  var fila2 = shP.getRange(2, 1, 1, 3).getValues()[0];
+  Logger.log('3) Fila 2 cruda (Litros, Fecha armado, Notas): ' + JSON.stringify(fila2));
+  var litros = Number(fila2[0]) || null;
+  var fechaArmado = fila2[1] ? new Date(fila2[1]) : null;
+  Logger.log('4) litros=' + litros + ' | fechaArmado=' + fechaArmado);
+
+  var hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  var diasArmado = fechaArmado ? Math.floor((hoy - fechaArmado) / 86400000) : null;
+  var enCiclado = diasArmado === null || diasArmado < CFG_PECERA.diasFinCiclado;
+  Logger.log('5) hoy=' + hoy + ' | diasArmado=' + diasArmado + ' | enCiclado=' + enCiclado);
+
+  var ultCambio = ultimoEventoPecera_('Cambio de agua');
+  var diasSinCambio = ultCambio ? Math.floor((hoy - ultCambio) / 86400000) : diasArmado;
+  var limiteCambio = enCiclado ? CFG_PECERA.diasCambioAguaCiclado : CFG_PECERA.diasCambioAguaEstable;
+  Logger.log('6) ultCambio=' + ultCambio + ' | diasSinCambio=' + diasSinCambio + ' | limiteCambio=' + limiteCambio);
+  Logger.log('7) ¿Debería crear el evento de cambio de agua? ' + (diasSinCambio !== null && diasSinCambio >= limiteCambio));
+
+  var eventosPecera = verificarEventosPecera();
+  Logger.log('8) verificarEventosPecera() devolvió ' + eventosPecera.length + ' evento(s): ' +
+    JSON.stringify(eventosPecera.map(function (e) { return e.titulo; })));
+
+  var cal = CalendarApp.getCalendarById(CFG.calendarId);
+  Logger.log('9) Calendario encontrado: ' + !!cal);
+  if (cal) {
+    var fin = new Date(hoy); fin.setHours(23, 59, 59, 999);
+    var existentes = cal.getEvents(hoy, fin).map(function (e) { return e.getTitle(); });
+    Logger.log('10) Eventos que YA existen hoy en el calendario: ' + JSON.stringify(existentes));
+  }
+}
