@@ -2425,9 +2425,8 @@ function agregarTriggersSincroTodo() {
 //  LÓGICA (espejada en la app, index.html → estPecera()):
 //  - Fase "ciclado" = primeros diasFinCiclado días desde la fecha de
 //    armado: sin bacteria establecida todavía. Cambios de agua más
-//    frecuentes, filtro sin tocar, y conviene resembrar Bactonic cada
-//    pocos días. Ojo: Bactonic y azul de metileno el mismo día se pisan
-//    (el metileno mata la bacteria nitrificante) — no combinarlos.
+//    frecuentes y filtro sin tocar (la bacteria nitrificante se
+//    establece sola, no se resiembra).
 //  - Fase "establecida" (pasado ese umbral): cambios de agua e intervalo
 //    de limpieza de filtro más espaciados.
 // ====================================================================
@@ -2440,7 +2439,6 @@ var CFG_PECERA = {
   diasLimpiezaFiltro:     14,  // días entre limpiezas de esponja/filtro
   diasMinPrimeraLimpieza: 25,  // no tocar el filtro antes de este día desde el armado
   diasFinCiclado:         30,  // a partir de acá se considera "establecida"
-  diasBactonic:           4,   // cada cuántos días resembrar bacteria mientras cicla
 };
 
 function inicializarHojaPecera() {
@@ -2485,7 +2483,6 @@ function inicializarHojaPecera() {
     [
       [new Date('2026-09-15T12:00:00'), '🧪 Anticloro', 'Tras limpieza completa de la pecera', ''],
       [new Date('2026-09-15T12:00:00'), '🔵 Azul de metileno', 'Antiséptico puntual post-limpieza — no usar de rutina', ''],
-      [new Date('2026-09-15T12:00:00'), '🦠 Bactonic (bacteria)', 'Siembra inicial de bacteria nitrificante', 'Coincidió con el azul de metileno — probablemente debilitada, ciclado arranca de nuevo'],
     ].forEach(function (r) {
       shR.appendRow(r);
       var fila = shR.getLastRow();
@@ -2501,7 +2498,7 @@ function inicializarHojaPecera() {
   }
 }
 
-// Última fecha de un tipo de evento (Cambio de agua / Limpieza / Bactonic / etc.)
+// Última fecha de un tipo de evento (Cambio de agua / Limpieza / etc.)
 function ultimoEventoPecera_(tipoTexto) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(CFG_PECERA.sheetRegistro);
@@ -2570,24 +2567,6 @@ function verificarEventosPecera() {
         'Evitar hacerlo el mismo día que un cambio de agua grande — mejor alternar. Registrar en \'Registro Pecera\'.',
       color: CalendarApp.EventColor.ORANGE
     });
-  }
-
-  // ── BACTONIC (solo mientras cicla) ────────────────────────────────
-  if (enCiclado) {
-    var ultBact = ultimoEventoPecera_('Bactonic');
-    if (ultBact) ultBact.setHours(0, 0, 0, 0);
-    var diasSinBact = ultBact ? Math.floor((hoy - ultBact) / 86400000) : diasArmado;
-    if (diasSinBact === null || diasSinBact >= CFG_PECERA.diasBactonic) {
-      var dosisBact = '~5ml cada 10L de agua' + (litros ? ' → unos ' + Math.round(litros / 10 * 5) + 'ml para tus ' + litros + 'L' : '');
-      eventos.push({
-        titulo: '🐠 PECERA: resembrar Bactonic',
-        desc: 'Pecera todavía en ciclado (día ' + diasArmado + ' desde el armado, sin bacteria establecida).\n' +
-          'Conviene resembrar bacteria nitrificante cada pocos días hasta que se estabilice.\n' +
-          'Dosis orientativa (genérica para bacteria nitrificante líquida, NO específica de tu producto — confirmá contra el envase si podés): ' + dosisBact + '.\n' +
-          'No combinar el mismo día con azul de metileno — es antibacteriano y mata también la bacteria buena. Registrar en \'Registro Pecera\'.',
-        color: CalendarApp.EventColor.CYAN
-      });
-    }
   }
 
   return eventos;

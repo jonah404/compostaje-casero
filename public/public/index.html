@@ -591,7 +591,6 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
                 <option value="🧽 Limpieza de filtro/esponja">🧽 Limpieza de filtro/esponja</option>
                 <option value="🧪 Anticloro">🧪 Anticloro</option>
                 <option value="🔵 Azul de metileno">🔵 Azul de metileno</option>
-                <option value="🦠 Bactonic (bacteria)">🦠 Bactonic (bacteria)</option>
                 <option value="🔬 Medición amonio/nitrito/nitrato">🔬 Medición amonio/nitrito/nitrato</option>
                 <option value="📝 Otro">📝 Otro</option>
               </select>
@@ -718,7 +717,6 @@ const SEED_PEC = { litros:42, fechaArmado:'2026-09-15', notas:'Filtro interno XI
 const SEED_REGPEC = [
   {id:'k1',fecha:'2026-09-15',tipo:'🧪 Anticloro',detalle:'Tras limpieza completa de la pecera',resultado:''},
   {id:'k2',fecha:'2026-09-15',tipo:'🔵 Azul de metileno',detalle:'Antiséptico puntual post-limpieza — no usar de rutina',resultado:''},
-  {id:'k3',fecha:'2026-09-15',tipo:'🦠 Bactonic (bacteria)',detalle:'Siembra inicial de bacteria nitrificante',resultado:'Coincidió con el azul de metileno — probablemente debilitada, ciclado arranca de nuevo'},
 ];
 
 // ════ ESTADO ════
@@ -947,9 +945,10 @@ const pLbl = p => p.nombre || `Planta ${p.id}`;
 
 // ════ PECERA ════
 // Fase "ciclado" = primeros CFG_PEC.diasFinCiclado días desde el armado/limpieza
-// total: sin bacteria establecida, cambios de agua más frecuentes y sin tocar
-// el filtro. Después pasa a la fase "establecida", con intervalos más largos.
-const CFG_PEC = { diasCambioAguaCiclado:3, diasCambioAguaEstable:7, diasLimpiezaFiltro:14, diasMinPrimeraLimpieza:25, diasFinCiclado:30, diasBactonic:4 };
+// total: la bacteria nitrificante todavía no está establecida (se forma sola,
+// no se registra), cambios de agua más frecuentes y sin tocar el filtro.
+// Después pasa a la fase "establecida", con intervalos más largos.
+const CFG_PEC = { diasCambioAguaCiclado:3, diasCambioAguaEstable:7, diasLimpiezaFiltro:14, diasMinPrimeraLimpieza:25, diasFinCiclado:30 };
 const pecEventos = tipo => S.registroPecera.filter(r => !tipo || r.tipo.includes(tipo)).sort((a,b)=>a.fecha>b.fecha?-1:1);
 const estPecera = () => {
   const p = S.pecera || {};
@@ -966,11 +965,7 @@ const estPecera = () => {
   const puedeLimpiar = !!ultLimpieza || diasArmado==null || diasArmado >= CFG_PEC.diasMinPrimeraLimpieza;
   const limpiezaUrg = puedeLimpiar && diasSinLimpieza!=null && diasSinLimpieza >= CFG_PEC.diasLimpiezaFiltro;
 
-  const ultBact = pecEventos('Bactonic')[0];
-  const diasSinBact = ultBact ? dd(pISO(ultBact.fecha), TODAY) : diasArmado;
-  const bactRecomendado = enCiclado && (diasSinBact==null || diasSinBact >= CFG_PEC.diasBactonic);
-
-  return { diasArmado, enCiclado, diasSinCambio, limiteCambio, cambioUrg, diasSinLimpieza, limpiezaUrg, puedeLimpiar, diasSinBact, bactRecomendado };
+  return { diasArmado, enCiclado, diasSinCambio, limiteCambio, cambioUrg, diasSinLimpieza, limpiezaUrg, puedeLimpiar };
 };
 
 // ════ HEATMAP ════
@@ -1237,7 +1232,6 @@ const renderDash = () => {
   const ep = estPecera();
   if (ep.cambioUrg) als.push({c:'al-r',t:'Pecera — cambio de agua',b:`${ep.diasSinCambio} días sin cambio (objetivo cada ${ep.limiteCambio}d)`});
   if (ep.limpiezaUrg) als.push({c:'al-w',t:'Pecera — limpiar filtro/esponja',b:`${ep.diasSinLimpieza} días sin limpiar`});
-  if (ep.bactRecomendado) als.push({c:'al-w',t:'Pecera — resembrar Bactonic',b:'En ciclado, conviene resembrar cada pocos días'});
   if(!als.length) als.push({c:'al-ok',t:'Todo en orden 👍',b:'Sin alertas pendientes'});
   const ch = cdDia(fISO(TODAY)) || [...S.clima].sort((a,b)=>a.fecha>b.fecha?-1:1)[0];
 
@@ -1433,15 +1427,13 @@ const renderPec = () => {
     <div class="pills" style="margin-bottom:16px">
       ${e.cambioUrg?`<span class="badge" style="background:var(--rust-bg);color:var(--rust)">💧 Cambio de agua atrasado</span>`:`<span class="badge bl">💧 Cambio de agua al día</span>`}
       ${e.limpiezaUrg?`<span class="badge" style="background:var(--umber-bg);color:var(--umber)">🧽 Limpiar filtro/esponja</span>`:''}
-      ${e.bactRecomendado?`<span class="badge" style="background:var(--sky-bg);color:var(--sky)">🦠 Resembrar Bactonic</span>`:''}
     </div>
     ${p.notas?`<div style="font-size:12px;color:var(--ink3);font-style:italic;margin-bottom:16px">${p.notas}</div>`:''}
     <div class="fc" style="margin-bottom:16px">
       <h3><i class="ti ti-flask"></i>Guía de dosis</h3>
       <div style="font-size:12px;color:var(--ink3);line-height:1.7">
         <b>🧪 Anticloro:</b> la dosis que ya tenés establecida para tu producto — se agrega al agua nueva antes de cada cambio.<br>
-        <b>🔵 Azul de metileno:</b> uso puntual/preventivo, no de rutina — ~1 gota cada 2L de agua tratada. Para pez enfermo en pecera hospital: 1ml cada 10L (~5 gotas/L), renovar cada 48h por 4-6 días. Retirar el carbón activado del filtro mientras se usa (lo neutraliza) y no combinar el mismo día con Bactonic. <i>Referencia general — confirmá contra la etiqueta de tu producto, las concentraciones varían entre marcas.</i><br>
-        <b>🦠 Bactonic:</b> ~5ml cada 10L de agua${p.litros?` → unos ${Math.round(p.litros/10*5)}ml para tus ${p.litros}L`:''}, día por medio mientras cicla. <i>Dosis genérica para bacteria nitrificante líquida, no específica de tu producto — confirmá contra el envase si podés.</i>
+        <b>🔵 Azul de metileno:</b> uso puntual/preventivo, no de rutina — ~1 gota cada 2L de agua tratada. Para pez enfermo en pecera hospital: 1ml cada 10L (~5 gotas/L), renovar cada 48h por 4-6 días. Retirar el carbón activado del filtro mientras se usa (lo neutraliza). <i>Referencia general — confirmá contra la etiqueta de tu producto, las concentraciones varían entre marcas.</i><br>
       </div>
     </div>`;
 
