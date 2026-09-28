@@ -1853,7 +1853,7 @@ window.clearSis = async () => {
   sv(); await fbSave('sistemas',id,s); toast(`Sistema ${id} reseteado`);
 };
 window.addSis = async () => {
-  const nid = Math.max(...S.sistemas.map(s=>s.id)) + 1;
+  const nid = Math.max(0, ...S.sistemas.map(s=>s.id), ...S.revolcadas.map(r=>r.sistema)) + 1;
   const s = {id:nid, nombre:'', inicioC:'', finC:'', inicioE:'', notas:''};
   S.sistemas.push(s); sv(); await fbSave('sistemas',nid,s);
   poblarSels(); renderSist();

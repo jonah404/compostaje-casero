@@ -1906,7 +1906,7 @@ function verificarEventosPlantas(cal, manana) {
     riegoProximo:  [], // { nombre, diasRestantes }
     fertilizarUrgente: [], // { nombre, diasAtraso, detalle }
     fertilizarPronto:  [], // { nombre, fecha, detalle }
-    plagas: [],        // nombre
+    plagas: [],        // { nombre, ficha }
     podaExterior: [],  // { nombre, dias }
     limpiezaInterior: [], // { nombre, dias }
   };
