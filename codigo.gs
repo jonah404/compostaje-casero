@@ -1982,7 +1982,7 @@ function verificarEventosPlantas(cal, manana) {
     if (proxPlagas) {
       proxPlagas.setHours(0, 0, 0, 0);
       var diasParaPlagas = Math.floor((proxPlagas - hoy) / 86400000);
-      if (diasParaPlagas <= 0) grupos.plagas.push(nombre);
+      if (diasParaPlagas <= 0) grupos.plagas.push({ nombre: nombre, ficha: fichaFito(nombre) });
     }
 
     // ── PODA ────────────────────────────────────────────────────────
@@ -2075,13 +2075,28 @@ function verificarEventosPlantas(cal, manana) {
   }
 
   if (grupos.plagas.length) {
+    var conFicha = grupos.plagas.filter(function (x) { return x.ficha; });
+    var sinFicha = grupos.plagas.filter(function (x) { return !x.ficha; });
+    var partes = ['Revisión de plagas y enfermedades:'];
+    if (conFicha.length) {
+      partes.push('');
+      partes.push('🌳 Frutales/cítricos:');
+      conFicha.forEach(function (x) { partes.push('• ' + x.nombre + ' — ' + x.ficha.monitoreo); });
+    }
+    if (sinFicha.length) {
+      partes.push('');
+      partes.push('🪴 Otras plantas:');
+      sinFicha.forEach(function (x) { partes.push('• ' + x.nombre); });
+      partes.push('');
+      partes.push('Qué revisar: hojas (manchas, decoloración), envés (cochinillas, pulgones, ácaros), tallos.');
+      partes.push('');
+      partes.push(CHULETA_PLAGAS);
+    }
+    partes.push('');
+    partes.push('Acción: registrar hallazgos en \'Registro Plantas\'.');
     eventos.push({
       titulo: '🐛 REVISIÓN PLAGAS: ' + grupos.plagas.length + ' planta(s)',
-      desc: 'Revisión mensual de plagas y enfermedades:\n\n' +
-        grupos.plagas.map(function (n) { return '• ' + n; }).join('\n') + '\n\n' +
-        'Qué revisar: hojas (manchas, decoloración), envés (cochinillas, pulgones, ácaros), tallos.\n\n' +
-        CHULETA_PLAGAS + '\n\n' +
-        'Acción: registrar hallazgos en \'Registro Plantas\'.',
+      desc: partes.join('\n'),
       color: CalendarApp.EventColor.YELLOW
     });
   }
