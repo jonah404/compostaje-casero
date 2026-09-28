@@ -853,12 +853,23 @@ Abrir `https://compostaje-casero.web.app` en el navegador (Firebase Hosting sirv
 
 - [ ] **Step 3: Limpiar los sistemas fantasma**
 
-Desde la pantalla "Sistemas" de la app en producción, usar el nuevo botón de eliminar (Task 5) para borrar los sistemas 4, 5, 6, 7, 8, 9 y 10 (los que muestran "Sin datos"). Confirmar que después de recargar la página siguen sin aparecer — si reaparece alguno, no se guardó el fix de `delSis` correctamente o ese sistema en particular tiene un documento en Firestore con un id distinto al que muestra la tarjeta (revisar consola de Firebase).
+Desde la pantalla "Sistemas" de la app en producción, usar el nuevo botón de eliminar (Task 5) para borrar los sistemas 4, 5, 6, 7, 8, 9 y 10 (los que muestran "Sin datos"). Confirmar que después de recargar la página siguen sin aparecer.
+
+**Si reaparece alguno** (hallazgo de la revisión final del branch): la causa más probable ya no es solo "no se guardó el fix" — `sincronizarSistemasAFirestore()` en `codigo.gs` sincroniza en sentido Sheet→Firestore y, si hay un trigger diario instalado (`agregarTriggersSincroTodo()`), **recrea en Firestore cualquier fila numérica que siga existiendo en la hoja "Sistemas"**, aunque esté vacía. Diagnóstico en ese caso:
+1. Abrir la hoja de cálculo real y revisar la pestaña "Sistemas" — ¿quedan filas 4-10 con un número en la columna A, aunque el resto esté vacío? Si sí, borrar esas filas completas (no solo el contenido).
+2. Revisar en el editor de Apps Script (Triggers, ícono de reloj) si hay un trigger diario apuntando a `sincronizarSistemasAFirestore` o a una función que la llame. Si no hace falta ese backfill continuo, desactivarlo.
+3. Si ninguna de las dos cosas aplica (no hay filas fantasma en la Sheet ni trigger activo), el origen más probable es que esos sistemas se hayan creado directo desde el botón "Agregar sistema" de la app en algún momento de prueba (escribe directo a Firestore, sin pasar por la Sheet) — en ese caso `delSis` los borra definitivamente y no deberían reaparecer.
 
 - [ ] **Step 4: Pegar los cambios de `codigo.gs` en el proyecto de Apps Script real**
 
 Este repo no tiene forma de desplegar Apps Script directamente — copiar el contenido actualizado de `codigo.gs` al editor de Apps Script vinculado a la hoja de cálculo real (Extensiones → Apps Script), guardar, y confirmar que no marca errores de sintaxis. No hace falta reconfigurar triggers (las funciones modificadas ya estaban enganchadas a `verificarYCrearEventos()` / `actualizarFichaPlantas()`, que corren con los triggers diarios existentes).
 
-- [ ] **Step 5: Avisar al usuario**
+- [ ] **Step 5: Recalcular las fechas de revisión ya existentes para los 4 frutales**
 
-Confirmar por chat que: deploy hecho, sistemas fantasma eliminados (o instrucciones si algo no se pudo borrar), y que el archivo `codigo.gs` está listo para pegar en el editor de Apps Script real (con el paso exacto: Extensiones → Apps Script → pegar → Guardar).
+Hallazgo de la revisión final del branch: la "Próxima revisión de plagas" de Mandarina/Limonero/Ciruela/Durazno, si ya tenían una fecha calculada con el intervalo genérico de 30 días (columna P de la hoja "Plantas"), **no se recalcula sola** — `actualizarProximoEvento_()` solo mueve esa fecha cuando aparece un evento nuevo o la celda está vacía, por diseño (mismo mecanismo que ya usan riego/fertilización). Sin este paso, el durazno podría quedarse con un recordatorio de octubre en vez de cada 3 días como corresponde en su fase 🔴🔴 actual.
+
+Una vez pegado el `codigo.gs` actualizado (Step 4): en la hoja "Plantas", borrar el contenido de la columna P ("Próxima revisión plagas") solo para las filas de Mandarina Criolla, Limonero 4 Estaciones, Ciruela Reina Claudia y Durazno amarillo. Después, ejecutar `actualizarFichaPlantas()` una vez desde el editor de Apps Script — va a recalcular esas 4 fechas usando el intervalo dinámico correcto para el mes actual.
+
+- [ ] **Step 6: Avisar al usuario**
+
+Confirmar por chat que: deploy hecho, sistemas fantasma eliminados (o instrucciones de diagnóstico si alguno no se pudo borrar de forma definitiva), que el archivo `codigo.gs` está listo para pegar en el editor de Apps Script real (con el paso exacto: Extensiones → Apps Script → pegar → Guardar), y que las fechas de revisión de los 4 frutales fueron recalculadas (Step 5).
