@@ -176,11 +176,11 @@ Ubicar en `public/public/index.html` (dentro de `const estPlanta = p => { ... }`
 Reemplazar por:
 
 ```js
-  const fichaFitoP = fichaFito(p.especie || p.nombre);
+  const fichaFitoP = fichaFito(p.nombre);
   const plagas = proxCalc(p, 'plagas', 'ultimaPlagas', 'proximaPlagas', fichaFitoP ? diasVigilancia(fichaFitoP, mes) : CFG_PLA.diasPlagas);
 ```
 
-(`mes` ya está definido más arriba en la misma función, línea 925: `const hoy = TODAY, mes = hoy.getMonth()+1;` — no hace falta redeclararlo.)
+(`mes` ya está definido más arriba en la misma función, línea 925: `const hoy = TODAY, mes = hoy.getMonth()+1;` — no hace falta redeclararlo. **Importante:** se busca por `p.nombre`, no por `p.especie` — el campo `especie` de estas 4 plantas guarda el binomio latino ("Citrus reticulata", "Prunus pérsica", etc.), que nunca matchea con las claves `match` de `FITOSANITARIO` ('mandarina', 'durazno', ...). `p.nombre` sí contiene esas palabras ("Mandarina Criolla", "Durazno amarillo").)
 
 - [ ] **Step 2: Verificar en el navegador**
 
@@ -324,7 +324,7 @@ Agregar justo después:
 const renderFito = () => {
   const mes = TODAY.getMonth()+1;
   const cards = S.plantas.map(p => {
-    const ficha = fichaFito(p.especie || p.nombre);
+    const ficha = fichaFito(p.nombre); // por nombre, no por especie (ver nota en Task 2)
     if (!ficha) return '';
     const nivel = nivelVigilancia(ficha, mes);
     const rows = ficha.problemas.map(pr => `<tr>
@@ -450,7 +450,7 @@ window.actualizarProblemaSel = () => {
   const pid = +document.getElementById('pv').value;
   const tipo = document.getElementById('pt').value;
   const p = S.plantas.find(x=>x.id===pid);
-  const ficha = p ? fichaFito(p.especie || p.nombre) : null;
+  const ficha = p ? fichaFito(p.nombre) : null; // por nombre, no por especie (ver nota en Task 2)
   if (tipo !== '🐛 Revisión plagas' || !ficha) {
     wrap.style.display = 'none';
     document.getElementById('pb').innerHTML = '';
@@ -463,7 +463,7 @@ window.actualizarProblemaSel = () => {
 window.aplicarProblema = () => {
   const pid = +document.getElementById('pv').value;
   const p = S.plantas.find(x=>x.id===pid);
-  const ficha = p ? fichaFito(p.especie || p.nombre) : null;
+  const ficha = p ? fichaFito(p.nombre) : null; // por nombre, no por especie (ver nota en Task 2)
   const idx = document.getElementById('pb').value;
   if (!ficha || idx==='') return;
   const pr = ficha.problemas[+idx];
@@ -705,12 +705,12 @@ Reemplazar por:
 ```js
     actualizarProximoEvento_(shP, fila, idPlanta, 'Fertiliz', 11, 12, perfil ? perfil.diasFert : CFG_PLANTAS.diasFertilizante);
     actualizarProximoEvento_(shP, fila, idPlanta, 'Poda', 13, 14, perfil && perfil.podaDias ? perfil.podaDias : CFG_PLANTAS.diasPoda);
-    var fichaFitoP = fichaFito(especie);
+    var fichaFitoP = fichaFito(datos[i][1]);
     var intervaloPlagas = fichaFitoP ? diasVigilancia(fichaFitoP, mes) : CFG_PLANTAS.diasRevisionPlagas;
     actualizarProximoEvento_(shP, fila, idPlanta, 'plagas', 15, 16, intervaloPlagas);
 ```
 
-(`especie` y `mes` ya están definidos más arriba en el mismo bucle `for` de `actualizarFichaPlantas()` — líneas 1780 y 1790.)
+(`mes` ya está definido más arriba en el mismo bucle `for` de `actualizarFichaPlantas()` — línea 1780. **Importante:** `fichaFito` se busca por `datos[i][1]` (columna B, nombre de la planta), NO por la variable `especie` (línea 1790: `var especie = datos[i][3] || datos[i][1] || '';`) — la columna D (especie) de estas 4 plantas guarda el binomio latino ("Citrus reticulata", "Prunus pérsica", etc.), que nunca matchea con las claves `match` de `FITOSANITARIO` ('mandarina', 'durazno', ...). La columna B (nombre) sí contiene esas palabras.)
 
 - [ ] **Step 3: Verificar en el editor de Apps Script**
 
@@ -756,9 +756,11 @@ Reemplazar por:
     if (proxPlagas) {
       proxPlagas.setHours(0, 0, 0, 0);
       var diasParaPlagas = Math.floor((proxPlagas - hoy) / 86400000);
-      if (diasParaPlagas <= 0) grupos.plagas.push({ nombre: nombre, ficha: fichaFito(especie) });
+      if (diasParaPlagas <= 0) grupos.plagas.push({ nombre: nombre, ficha: fichaFito(nombre) });
     }
 ```
+
+(**Importante:** se busca por `nombre` (= `p[1]`), no por `especie` (línea 1874: `var especie = p[3] || nombre;`) — mismo motivo que en Task 6: la columna D de estas 4 plantas guarda el binomio latino, que no matchea con `FITOSANITARIO`.)
 
 - [ ] **Step 2: Construir la descripción separando frutales/cítricos de otras plantas**
 
