@@ -1164,7 +1164,10 @@ const sysHTML = s => {
   return `<div class="sysc" onclick="openSis(${s.id})">
     <div class="sysc-top">
       <span class="sysc-name">${sLbl(s)}</span>
-      <span class="badge ${e.cls}">${e.label}${e.d?' · '+e.d+'d':''}</span>
+      <span style="display:flex;align-items:center;gap:6px">
+        <span class="badge ${e.cls}">${e.label}${e.d?' · '+e.d+'d':''}</span>
+        <button class="del-btn" onclick="delSis(${s.id},event)" title="Eliminar sistema"><i class="ti ti-trash"></i></button>
+      </span>
     </div>
     ${mp.length?`<div class="sysc-meta">${mp.join('&nbsp;&nbsp;·&nbsp;&nbsp;')}</div>`:''}
     ${pp?`<div class="prog"><div class="pf ${pc}" style="width:${pp}%"></div></div><div class="prog-lb"><span>${e.d} días</span><span>meta 180 días</span></div>`:''}
@@ -1859,6 +1862,15 @@ window.addSis = async () => {
   document.getElementById('es').value = nid;
   loadSis();
   toast(`Sistema ${nid} agregado — completá sus datos`);
+};
+window.delSis = async (id, e) => {
+  e.stopPropagation();
+  if(!confirm(`¿Eliminar Sistema ${id}? Esta acción no se puede deshacer.`)) return;
+  await fbDel('sistemas', id);
+  S.sistemas = S.sistemas.filter(s=>s.id!=id); sv();
+  poblarSels(); renderSist();
+  if(cur==='dash') renderDash();
+  toast(`Sistema ${id} eliminado`);
 };
 window.delRev = async (id, e) => {
   e.stopPropagation();
