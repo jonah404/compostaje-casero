@@ -1604,6 +1604,47 @@ function mesEnTemporada_(mes, inicio, fin) {
   return mes >= inicio || mes <= fin; // rango que cruza fin de año (ej: 9 a 4)
 }
 
+// ====================================================================
+//  FITOSANITARIO — mismo criterio de vigilancia por mes que index.html
+//  (ver FITOSANITARIO ahí para la tabla completa de problemas/producto/
+//  dosis — acá solo hace falta el texto de monitoreo para el calendario).
+// ====================================================================
+var NIVEL_DIAS_FITO = { '🟢':14, '🟠':7, '🔴':5, '🔴🔴':3 };
+
+var FITOSANITARIO = [
+  { match:'mandarina', monitoreo:'Revisar 5-10 hojas nuevas por semana, envés, brotes tiernos y hormigas.',
+    calendarioVigilancia: {9:'🟢',10:'🟠',11:'🟠',12:'🟠',1:'🟠',2:'🟢',3:'🟢',4:'🟢'} },
+  { match:'limon', monitoreo:'Una revisión semanal, atención a hojas nuevas (puede brotar sin tener fruta).',
+    calendarioVigilancia: {9:'🟢',10:'🟠',11:'🟠',12:'🟠',1:'🟠',2:'🟠',3:'🟠',4:'🟠'} },
+  { match:'durazno', monitoreo:'2 controles semanales: hojas nuevas, frutos, puntas de ramas, lesiones, frutos caidos. Retirar de inmediato los frutos caidos enfermos.',
+    calendarioVigilancia: {9:'🔴🔴',10:'🔴🔴',11:'🔴',12:'🔴',1:'🔴',2:'🟠',3:'🟢',4:'🟢'} },
+  { match:'ciruela', monitoreo:'1 revision semanal, enfocada en brotes nuevos y pulgones.',
+    calendarioVigilancia: {9:'🟠',10:'🔴',11:'🔴',12:'🔴',1:'🔴',2:'🟠',3:'🟢',4:'🟢'} },
+];
+
+function fichaFito(nombreOEspecie) {
+  var buscado = String(nombreOEspecie || '').toLowerCase();
+  for (var i = 0; i < FITOSANITARIO.length; i++) {
+    if (buscado.indexOf(FITOSANITARIO[i].match) >= 0) return FITOSANITARIO[i];
+  }
+  return null;
+}
+function diasVigilancia(ficha, mes) {
+  var nivel = (ficha && ficha.calendarioVigilancia[mes]) || '🟢';
+  return NIVEL_DIAS_FITO[nivel];
+}
+
+// Diagnóstico manual — ejecutar desde el editor de Apps Script (▶) y mirar
+// Ver → Registros de ejecución. No se llama desde ningún trigger.
+function testFitosanitario() {
+  var mesActual = new Date().getMonth() + 1;
+  ['Mandarina Criolla','Limonero 4 Estaciones','Ciruela Reina Claudia','Durazno amarillo'].forEach(function (n) {
+    var f = fichaFito(n);
+    Logger.log(n + ' | mes ' + mesActual + ' | nivel ' + (f ? f.calendarioVigilancia[mesActual] : '(sin ficha)') +
+      ' | intervalo ' + (f ? diasVigilancia(f, mesActual) : CFG_PLANTAS.diasRevisionPlagas) + ' dias');
+  });
+}
+
 // Devuelve la fecha del evento más reciente de un tipo (Fertiliz/Poda/plagas)
 // para una planta, buscando en Registro Plantas.
 function obtenerUltimoEventoPlanta_(idPlanta, tipoTexto) {
@@ -1817,7 +1858,9 @@ function actualizarFichaPlantas() {
 
     actualizarProximoEvento_(shP, fila, idPlanta, 'Fertiliz', 11, 12, perfil ? perfil.diasFert : CFG_PLANTAS.diasFertilizante);
     actualizarProximoEvento_(shP, fila, idPlanta, 'Poda', 13, 14, perfil && perfil.podaDias ? perfil.podaDias : CFG_PLANTAS.diasPoda);
-    actualizarProximoEvento_(shP, fila, idPlanta, 'plagas', 15, 16, CFG_PLANTAS.diasRevisionPlagas);
+    var fichaFitoP = fichaFito(datos[i][1]);
+    var intervaloPlagas = fichaFitoP ? diasVigilancia(fichaFitoP, mes) : CFG_PLANTAS.diasRevisionPlagas;
+    actualizarProximoEvento_(shP, fila, idPlanta, 'plagas', 15, 16, intervaloPlagas);
   }
 
   Logger.log('[OK] Ficha de plantas actualizada — ' + (datos.length - 1) + ' plantas');
