@@ -1023,7 +1023,8 @@ const estPlanta = p => {
   const diasSinAgua = agua ? dd(agua.fecha, hoy) : null;
   const fueraDeTemporadaFert = perfil && !mesEnTemporada(mes, perfil.fertMesIni, perfil.fertMesFin);
   const fert   = proxCalc(p, 'Fertiliz', 'ultimaFert',   'proximaFert',   perfil ? perfil.diasFert : CFG_PLA.diasFert);
-  const plagas = proxCalc(p, 'plagas',   'ultimaPlagas', 'proximaPlagas', CFG_PLA.diasPlagas);
+  const fichaFitoP = fichaFito(p.nombre);
+  const plagas = proxCalc(p, 'plagas', 'ultimaPlagas', 'proximaPlagas', fichaFitoP ? diasVigilancia(fichaFitoP, mes) : CFG_PLA.diasPlagas);
   const poda   = proxCalc(p, 'Poda',     'ultimaPoda',   'proximaPoda',   (perfil && perfil.podaDias) ? perfil.podaDias : CFG_PLA.diasPoda);
   return {
     diasSinAgua, limite, agua,
