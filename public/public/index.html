@@ -430,6 +430,7 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
     <button class="sn"     onclick="go('cli')"> <i class="ti ti-cloud"></i>Clima</button>
     <button class="sn"     onclick="go('pla')"> <i class="ti ti-leaf"></i>Plantas</button>
     <button class="sn"     onclick="go('pec')"> <i class="ti ti-fish"></i>Pecera</button>
+    <button class="sn"     onclick="go('fito')"><i class="ti ti-bug"></i>Fitosanitario</button>
     <button class="sn"     onclick="go('reg')"> <i class="ti ti-circle-plus"></i>Registrar</button>
   </nav>
   <div class="sb-foot">
@@ -460,6 +461,7 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
       <button class="mt"    onclick="go('cli')"> <i class="ti ti-cloud"></i>Clima</button>
       <button class="mt"    onclick="go('pla')"> <i class="ti ti-leaf"></i>Plantas</button>
       <button class="mt"    onclick="go('pec')"> <i class="ti ti-fish"></i>Pecera</button>
+      <button class="mt"    onclick="go('fito')"><i class="ti ti-bug"></i>Fitosanitario</button>
       <button class="mt"    onclick="go('reg')"> <i class="ti ti-circle-plus"></i>Registrar</button>
     </div>
   </div>
@@ -500,6 +502,11 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
     <!-- PECERA -->
     <div class="pg" id="pg-pec">
       <div id="pec-c"></div>
+    </div>
+
+    <!-- FITOSANITARIO -->
+    <div class="pg" id="pg-fito">
+      <div id="fito-c"></div>
     </div>
 
     <!-- REGISTRAR -->
@@ -1548,6 +1555,36 @@ const renderPec = () => {
 };
 window.renderPec = renderPec;
 
+// ════ RENDER FITOSANITARIO ════
+const renderFito = () => {
+  const mes = TODAY.getMonth()+1;
+  const cards = S.plantas.map(p => {
+    const ficha = fichaFito(p.nombre); // por nombre, no por especie (ver nota en Task 2)
+    if (!ficha) return '';
+    const nivel = nivelVigilancia(ficha, mes);
+    const rows = ficha.problemas.map(pr => `<tr>
+        <td>${pr.nombre}</td>
+        <td style="font-size:12px;color:var(--ink3)">${pr.sintoma}</td>
+        <td style="font-size:12px"><b>${pr.producto}</b><br><span style="color:var(--ink3)">${pr.dosis}</span></td>
+      </tr>`).join('');
+    return `<div class="fc" style="margin-bottom:16px">
+      <h3><i class="ti ti-bug"></i>${pLbl(p)}
+        <span class="badge" style="background:var(--sky-bg);color:var(--sky);margin-left:8px">${nivel} ${NIVEL_LABEL[nivel]}</span>
+      </h3>
+      <div style="font-size:12px;color:var(--ink3);margin-bottom:10px"><b>Momento crítico:</b> ${ficha.momentoCritico}</div>
+      <div style="font-size:12px;color:var(--ink3);margin-bottom:14px"><b>Qué monitorear:</b> ${ficha.monitoreo}</div>
+      <div class="tbl-wrap"><div class="tbl-scroll"><table class="rtbl">
+        <thead><tr><th>Problema</th><th>Qué vas a ver</th><th>Producto / Dosis</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div></div>
+      <div style="font-size:11px;color:var(--ink3);font-style:italic;margin-top:10px">Referencia general — confirmá contra la etiqueta de tu producto, las concentraciones varían entre marcas. Para plagas persistentes o graves, conviene un diagnóstico específico antes de tratar.</div>
+      <button class="btn-o" style="margin-top:12px" onclick="openPla(${p.id})">Ver planta</button>
+    </div>`;
+  }).filter(Boolean).join('');
+  document.getElementById('fito-c').innerHTML = cards || `<div style="font-size:13px;color:var(--ink3);padding:24px;text-align:center">Sin fichas fitosanitarias cargadas</div>`;
+};
+window.renderFito = renderFito;
+
 // ════ RENDER CLIMA ════
 const renderCli = () => {
   const an = analisis();
@@ -1829,8 +1866,8 @@ window.delRev = async (id, e) => {
 
 // ════ NAVEGACIÓN ════
 let cur = 'dash';
-const NAVT = ['dash','sist','rev','cli','pla','pec','reg'];
-const TITLES = {dash:'Inicio',sist:'Sistemas',rev:'Revolcadas',cli:'Clima',pla:'Plantas',pec:'Pecera',reg:'Registrar'};
+const NAVT = ['dash','sist','rev','cli','pla','pec','fito','reg'];
+const TITLES = {dash:'Inicio',sist:'Sistemas',rev:'Revolcadas',cli:'Clima',pla:'Plantas',pec:'Pecera',fito:'Fitosanitario',reg:'Registrar'};
 window.go = t => {
   cur = t;
   document.querySelectorAll('.sn').forEach((b,i)=>b.classList.toggle('on',NAVT[i]===t));
@@ -1844,6 +1881,7 @@ window.go = t => {
   if(t==='cli')  renderCli();
   if(t==='pla')  renderPla();
   if(t==='pec')  renderPec();
+  if(t==='fito') renderFito();
   if(t==='reg')  {
     loadSis();
     if(!document.getElementById('rf').value) document.getElementById('rf').value=fISO(TODAY);
