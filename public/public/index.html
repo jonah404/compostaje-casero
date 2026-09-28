@@ -547,9 +547,9 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
         <div>
           <div class="fc">
             <h3><i class="ti ti-leaf"></i>Nueva actividad de planta</h3>
-            <div class="f"><label>Planta</label><select id="pv"></select></div>
+            <div class="f"><label>Planta</label><select id="pv" onchange="actualizarProblemaSel()"></select></div>
             <div class="f"><label>Tipo de evento</label>
-              <select id="pt">
+              <select id="pt" onchange="actualizarProblemaSel()">
                 <option value="💧 Riego">💧 Riego</option>
                 <option value="🌿 Fertilización">🌿 Fertilización</option>
                 <option value="✂️ Poda">✂️ Poda</option>
@@ -557,6 +557,10 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
                 <option value="🍂 Cosecha">🍂 Cosecha</option>
                 <option value="📝 Observación">📝 Observación</option>
               </select>
+            </div>
+            <div class="f" id="pb-wrap" style="display:none">
+              <label>Problema detectado</label>
+              <select id="pb" onchange="aplicarProblema()"></select>
             </div>
             <div class="f"><label>Fecha</label><input type="date" id="pf"></div>
             <div class="f"><label>Detalle</label><input type="text" id="pd" placeholder="ej: riego profundo, 15L"></div>
@@ -1713,7 +1717,7 @@ window.openPla = id => {
       </tr>`).join('')}</tbody>
     </table></div>`:`<div style="font-size:13px;color:var(--ink3)">Sin eventos registrados</div>`}
     <div style="height:14px"></div>
-    <button class="btn-g" onclick="closeMod();go('reg');document.getElementById('pv').value=${id}">Registrar evento</button>
+    <button class="btn-g" onclick="closeMod();go('reg');document.getElementById('pv').value=${id};actualizarProblemaSel()">Registrar evento</button>
     <div style="height:7px"></div>
     <button class="btn-o" onclick="closeMod();go('reg');document.getElementById('epv').value=${id};loadPlanta()">Editar planta</button>`;
   document.getElementById('mwrap').classList.add('on');
@@ -1888,6 +1892,7 @@ window.go = t => {
     if(!document.getElementById('pf').value) document.getElementById('pf').value=fISO(TODAY);
     if(!document.getElementById('kf').value) document.getElementById('kf').value=fISO(TODAY);
     loadPecera();
+    actualizarProblemaSel();
   }
 };
 
@@ -1923,6 +1928,31 @@ const poblarSels = () => {
   document.getElementById('hf').innerHTML = '<option value="todos">Todos los sistemas</option>'+opts;
   const poptsPla = S.plantas.map(p=>`<option value="${p.id}">${pLbl(p)}</option>`).join('');
   ['pv','epv'].forEach(id=>{const el=document.getElementById(id);const c=el.value;el.innerHTML=poptsPla;if(c)el.value=c;});
+  actualizarProblemaSel();
+};
+window.actualizarProblemaSel = () => {
+  const wrap = document.getElementById('pb-wrap');
+  const pid = +document.getElementById('pv').value;
+  const tipo = document.getElementById('pt').value;
+  const p = S.plantas.find(x=>x.id===pid);
+  const ficha = p ? fichaFito(p.nombre) : null; // por nombre, no por especie (ver nota en Task 2)
+  if (tipo !== '🐛 Revisión plagas' || !ficha) {
+    wrap.style.display = 'none';
+    document.getElementById('pb').innerHTML = '';
+    return;
+  }
+  wrap.style.display = '';
+  document.getElementById('pb').innerHTML = '<option value="">Ninguno / solo monitoreo</option>' +
+    ficha.problemas.map((pr,i)=>`<option value="${i}">${pr.nombre}</option>`).join('');
+};
+window.aplicarProblema = () => {
+  const pid = +document.getElementById('pv').value;
+  const p = S.plantas.find(x=>x.id===pid);
+  const ficha = p ? fichaFito(p.nombre) : null; // por nombre, no por especie (ver nota en Task 2)
+  const idx = document.getElementById('pb').value;
+  if (!ficha || idx==='') return;
+  const pr = ficha.problemas[+idx];
+  document.getElementById('pp').value = `${pr.producto} — ${pr.dosis}`;
 };
 
 const init = async () => {
