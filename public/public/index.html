@@ -1637,9 +1637,45 @@ const renderHoy = () => {
 };
 window.renderHoy = renderHoy;
 
-// Se completa en la Tarea 5.
-window.tareaTap = id => { const t = TAREAS.get(id); if (t) toast(`${t.titulo} (pendiente de conectar)`); };
-window.deshacerTarea = () => {};
+// ── Marcar como hecho ────────────────────────────────────────────────
+// El guardado real se demora DEMORA_DESHACER ms: si se toca "Deshacer" antes,
+// nunca se escribe nada. No se escribe-y-luego-borra porque la sincronización
+// diaria del Sheet puede resucitar documentos borrados de Firestore.
+const DEMORA_DESHACER = 5000;
+const ejecutarTarea = t => {
+  const hoy = fISO(TODAY);
+  if (t.tipo === 'revolcada')   return registrarRevolcada(t.ref, hoy);
+  if (t.tipo === 'riego')       return registrarEventoPlanta(t.ref, hoy, TIPO_EVT.riego);
+  if (t.tipo === 'cambio-agua') return registrarEventoPecera(hoy, '💧 Cambio de agua parcial');
+};
+const marcarHecha = t => {
+  if (diferidos.has(t.id)) return;
+  const commit = async () => {
+    const d = diferidos.get(t.id); if (!d) return;
+    clearTimeout(d.timer); diferidos.delete(t.id);
+    await ejecutarTarea(t);
+    toast(`✅ Registrado — ${t.titulo}`);
+    refresh();
+  };
+  diferidos.set(t.id, { timer: setTimeout(commit, DEMORA_DESHACER), commit });
+  renderHoy();
+};
+window.deshacerTarea = id => {
+  const d = diferidos.get(id); if (!d) return;
+  clearTimeout(d.timer); diferidos.delete(id);
+  renderHoy();
+};
+// Si la app se cierra o pasa a segundo plano dentro de la demora, se guarda ya.
+const vaciarDiferidos = () => [...diferidos.values()].forEach(d => d.commit());
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') vaciarDiferidos(); });
+window.addEventListener('pagehide', vaciarDiferidos);
+
+window.tareaTap = id => {
+  const t = TAREAS.get(id); if (!t) return;
+  if (t.modo === 'uno') { marcarHecha(t); return; }
+  if (t.tipo === 'filtro') openRegistro('fc-pecEvt', { tipo:'🧽 Limpieza de filtro/esponja' });
+  else openRegistro('fc-plaEvt', { planta:t.ref, tipo:TIPO_EVT[t.tipo] });
+};
 
 // ════ RENDER SISTEMAS ════
 const renderSist = () => {
@@ -1915,13 +1951,32 @@ window.onMClick = e => { if(e.target===document.getElementById('mwrap')) closeMo
 window.closeMod = () => document.getElementById('mwrap').classList.remove('on');
 
 // ════ ACCIONES ════
+// Escritura compartida entre los formularios y los toques de "Hoy".
+const registrarRevolcada = async (sistema, fecha, obs = '') => {
+  const r = { id:Date.now().toString(), sistema, fecha, obs };
+  S.revolcadas.push(r); sv();
+  const fbId = await fbAdd('revolcadas', r); if (fbId) { r.id = fbId; sv(); }
+  sheetSync('revolcada', r);
+  return r;
+};
+const registrarEventoPlanta = async (planta, fecha, tipo, detalle = '', producto = '', resultado = '') => {
+  const r = { id:'ev'+Date.now(), planta, fecha, tipo, detalle, producto, resultado };
+  S.registroPlantas.push(r); sv();
+  const fbId = await fbAdd('registroPlantas', r); if (fbId) { r.id = fbId; sv(); }
+  sheetSync('plantaEvento', r);
+  return r;
+};
+const registrarEventoPecera = async (fecha, tipo, detalle = '', resultado = '') => {
+  const r = { id:'kv'+Date.now(), fecha, tipo, detalle, resultado };
+  S.registroPecera.push(r); sv();
+  const fbId = await fbAdd('registroPecera', r); if (fbId) { r.id = fbId; sv(); }
+  sheetSync('peceraEvento', r);
+  return r;
+};
 window.saveRev = async () => {
   const f=document.getElementById('rf').value, si=+document.getElementById('rs').value;
   if(!f){ toast('Completá la fecha'); return; }
-  const r = {id:Date.now().toString(), sistema:si, fecha:f, obs:document.getElementById('ro').value};
-  S.revolcadas.push(r); sv();
-  const fbId = await fbAdd('revolcadas', r); if(fbId){r.id=fbId;sv();}
-  sheetSync('revolcada', r);
+  await registrarRevolcada(si, f, document.getElementById('ro').value);
   document.getElementById('ro').value = '';
   closeRegistro();
   toast(`✅ Revolcada guardada — Sistema ${si}`);
@@ -1965,16 +2020,7 @@ window.addPlanta = async () => {
 window.saveEventoPlanta = async () => {
   const pid=+document.getElementById('pv').value, f=document.getElementById('pf').value;
   if(!f){ toast('Completá la fecha'); return; }
-  const r = {
-    id:'ev'+Date.now(), planta:pid, fecha:f,
-    tipo:document.getElementById('pt').value,
-    detalle:document.getElementById('pd').value,
-    producto:document.getElementById('pp').value,
-    resultado:document.getElementById('pr').value,
-  };
-  S.registroPlantas.push(r); sv();
-  const fbId = await fbAdd('registroPlantas', r); if(fbId){r.id=fbId;sv();}
-  sheetSync('plantaEvento', r);
+  await registrarEventoPlanta(pid, f, document.getElementById('pt').value, document.getElementById('pd').value, document.getElementById('pp').value, document.getElementById('pr').value);
   ['pd','pp','pr'].forEach(x=>document.getElementById(x).value='');
   closeRegistro();
   toast(`✅ Evento guardado — ${pLbl(S.plantas.find(p=>p.id===pid))}`);
@@ -2000,18 +2046,11 @@ window.savePecera = async () => {
 window.saveEventoPecera = async () => {
   const f = document.getElementById('kf').value;
   if(!f){ toast('Completá la fecha'); return; }
-  const r = {
-    id:'kv'+Date.now(), fecha:f,
-    tipo:document.getElementById('kt').value,
-    detalle:document.getElementById('kd').value,
-    resultado:document.getElementById('kr').value,
-  };
-  S.registroPecera.push(r); sv();
-  const fbId = await fbAdd('registroPecera', r); if(fbId){r.id=fbId;sv();}
-  sheetSync('peceraEvento', r);
+  const tipo = document.getElementById('kt').value;
+  await registrarEventoPecera(f, tipo, document.getElementById('kd').value, document.getElementById('kr').value);
   ['kd','kr'].forEach(x=>document.getElementById(x).value='');
   closeRegistro();
-  toast(`✅ Evento de pecera guardado — ${r.tipo}`);
+  toast(`✅ Evento de pecera guardado — ${tipo}`);
   refresh();
 };
 window.delEventoPecera = async (id, e) => {
