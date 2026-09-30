@@ -894,18 +894,21 @@ const fbLoad = async () => {
   try {
     const sd = await getDocs(collection(db,'sistemas'));
     sd.forEach(d => { const x=d.data(); const i=S.sistemas.findIndex(s=>s.id===x.id); i>=0?(S.sistemas[i]={...S.sistemas[i],...x}):S.sistemas.push(x); });
+    // En revolcadas/registroPlantas/registroPecera el id del DOCUMENTO va después del
+    // spread: el `id` guardado adentro es el local (Date.now / 'ev…' / 'kv…') y, si
+    // ganaba, fbDel apuntaba a un documento inexistente y borrar no borraba nada.
     const rd = await getDocs(query(collection(db,'revolcadas'),orderBy('fecha','desc')));
-    if (rd.docs.length) S.revolcadas = conservarLocales(S.revolcadas, rd.docs.map(d=>({id:d.id,...d.data()})), ID_LOCAL_REV, r => r.sistema+'|'+r.fecha);
+    if (rd.docs.length) S.revolcadas = conservarLocales(S.revolcadas, rd.docs.map(d=>({...d.data(),id:d.id})), ID_LOCAL_REV, r => r.sistema+'|'+r.fecha);
     const cd = await getDocs(query(collection(db,'clima'),orderBy('fecha','desc'),limit(CLIMA_DIAS_FIRESTORE)));
     if (cd.docs.length) { upsertCli(cd.docs.map(d=>({id:d.id,...d.data()}))); climaCursor = cd.docs[cd.docs.length-1].data().fecha; }
     const pd = await getDocs(collection(db,'plantas'));
     pd.forEach(d => { const x=d.data(); const i=S.plantas.findIndex(p=>p.id===x.id); i>=0?(S.plantas[i]={...S.plantas[i],...x}):S.plantas.push(x); });
     const prd = await getDocs(query(collection(db,'registroPlantas'),orderBy('fecha','desc')));
-    if (prd.docs.length) S.registroPlantas = conservarLocales(S.registroPlantas, prd.docs.map(d=>({id:d.id,...d.data()})), ID_LOCAL_PLA, r => r.planta+'|'+r.fecha+'|'+r.tipo);
+    if (prd.docs.length) S.registroPlantas = conservarLocales(S.registroPlantas, prd.docs.map(d=>({...d.data(),id:d.id})), ID_LOCAL_PLA, r => r.planta+'|'+r.fecha+'|'+r.tipo);
     const kd = await getDocs(collection(db,'pecera'));
     kd.forEach(d => { if (d.id==='main') S.pecera = {...S.pecera, ...d.data()}; });
     const krd = await getDocs(query(collection(db,'registroPecera'),orderBy('fecha','desc')));
-    if (krd.docs.length) S.registroPecera = conservarLocales(S.registroPecera, krd.docs.map(d=>({id:d.id,...d.data()})), ID_LOCAL_PEC, r => r.fecha+'|'+r.tipo);
+    if (krd.docs.length) S.registroPecera = conservarLocales(S.registroPecera, krd.docs.map(d=>({...d.data(),id:d.id})), ID_LOCAL_PEC, r => r.fecha+'|'+r.tipo);
     sv();
   } catch(e) {}
 };
