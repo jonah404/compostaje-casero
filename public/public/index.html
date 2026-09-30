@@ -1428,10 +1428,39 @@ const ringSVG = (pct, color, size=76, thickness=8) => {
 // Mismos criterios que el evento "Tareas de hoy" del calendario (codigo.gs).
 const ETQ      = { riego:'regar', fert:'fertilizar', plagas:'revisar plagas', poda:'poda', revolcada:'revolver' };
 const TIPO_EVT = { riego:'💧 Riego', fert:'🌿 Fertilización', plagas:'🐛 Revisión plagas', poda:'✂️ Poda' };
-const AREAS_HOY = [ {id:'compost', t:'🌱 Compost'}, {id:'plantas', t:'🪴 Plantas'}, {id:'pecera', t:'🐠 Pecera'} ];
+const AREAS_HOY = [ {id:'compost', t:'🌱 Compost'}, {id:'plantas', t:'🪴 Plantas'}, {id:'huerta', t:'🥬 Huerta'}, {id:'pecera', t:'🐠 Pecera'} ];
 const TEMP_CALOR = 38, TEMP_HELADA = 2, TEMP_HELADA_SEVERA = -2;
 const diferidos = new Map();   // id de tarea → { timer, commit } (ver "marcar hecho")
 let TAREAS = new Map();
+
+// Tareas de los cultivos activos. El riego va agrupado en una sola tarea.
+const armarTareasHuerta = () => {
+  const hoy = [], prox = [];
+  const act = cultivosActivos().map(p => ({ p, e: estPlanta(p), fase: faseCultivo(p, TODAY) }));
+  const urg = act.filter(x => x.e.riegoUrg), pron = act.filter(x => x.e.riegoProx);
+  const riego = (lista, atraso) => ({
+    id:'riego-huerta', area:'huerta', tipo:'riego-huerta', ref:null, refs:lista.map(x => x.p.id), modo:'uno',
+    titulo:`Regar la huerta · ${lista.length}`, detalle:lista.map(x => pLbl(x.p)).join(', '), atraso
+  });
+  if (urg.length) hoy.push(riego(urg, Math.max(...urg.map(x => x.e.diasSinAgua - x.e.limite))));
+  else if (pron.length) prox.push(riego(pron, 0));
+  act.forEach(({ p, e, fase }) => {
+    const base = (tipo, modo, verbo) => ({ id:`${tipo}-${p.id}`, area:'huerta', tipo, ref:p.id, titulo:`${pLbl(p)} · ${verbo}`, modo });
+    if (fase === 'por-trasplantar') hoy.push({ ...base('trasplante','uno','trasplantar'), detalle:`día ${diaDeCultivo(p, TODAY)} desde la siembra`, atraso:0 });
+    [ { tipo:'fert', dias:e.diasParaFert, verbo:'fertilizar' }, { tipo:'plagas', dias:e.diasParaPlagas, verbo:'revisar plagas' } ].forEach(c => {
+      if (c.dias == null) return;
+      if (c.dias <= 0) hoy.push({ ...base(c.tipo,'form',c.verbo), detalle: c.dias < 0 ? `${-c.dias} días de atraso` : 'toca hoy', atraso:-c.dias });
+      else if (c.dias <= 3) prox.push({ ...base(c.tipo,'form',c.verbo), detalle:`en ${c.dias} d`, atraso:-c.dias });
+    });
+    if (p.ciclo !== 'perenne' && (fase === 'cosecha' || fase === 'cosecha-proxima')) {
+      const ult = ultimoEvento(p.id, 'Cosecha');
+      const silenciada = ult && dd(pISO(ult.fecha), TODAY) < 3;   // cosechas parciales
+      if (fase === 'cosecha' && !silenciada) hoy.push({ ...base('cosecha','form','cosechar'), detalle:`día ${diaDeCultivo(p, TODAY)} de ${numero(p.diasACosecha)}`, atraso:0 });
+      else if (fase === 'cosecha-proxima') prox.push({ ...base('cosecha','form','cosechar'), detalle:`en ${diasParaCosecha(p, TODAY)} d`, atraso:0 });
+    }
+  });
+  return { hoy, prox };
+};
 
 const armarTareasHoy = () => {
   const hoy = [], prox = [];
@@ -1457,6 +1486,7 @@ const armarTareasHoy = () => {
       prox.push({ ...base('poda','form'), detalle: e.diasParaPoda === 0 ? 'toca hoy' : `en ${e.diasParaPoda} d`, atraso: -e.diasParaPoda });
     }
   });
+  const th = armarTareasHuerta(); hoy.push(...th.hoy); prox.push(...th.prox);
   const ep = estPecera();
   const pec = (tipo, titulo, modo) => ({ id:`pec-${tipo}`, area:'pecera', tipo, ref:null, titulo, modo });
   if (ep.cambioUrg) hoy.push({ ...pec('cambio-agua','Cambio de agua','uno'), detalle:`${ep.diasSinCambio} días sin cambio (objetivo cada ${ep.limiteCambio} d)`, atraso: ep.diasSinCambio - ep.limiteCambio });
@@ -1472,7 +1502,7 @@ const hechasHoy = () => {
     const s = S.sistemas.find(x => x.id === r.sistema);
     out.push({ titulo:`${s ? sLbl(s) : 'Sistema '+r.sistema} · revolcada` });
   });
-  S.registroPlantas.filter(r => r.fecha === hoyISO && /Riego|Fertiliz|plagas|Poda/.test(r.tipo)).forEach(r => {
+  S.registroPlantas.filter(r => r.fecha === hoyISO && /Riego|Fertiliz|plagas|Poda|Trasplante|Cosecha/.test(r.tipo)).forEach(r => {
     const p = S.plantas.find(x => x.id === r.planta);
     out.push({ titulo:`${p ? pLbl(p) : 'Planta'} · ${r.tipo.replace(/^\S+\s/, '')}` });
   });
@@ -1516,7 +1546,7 @@ const renderHoy = () => {
   const hechas = hechasHoy();
   const urg   = urgentesHoy();
   const ch    = cdDia(fISO(TODAY)) || [...S.clima].sort((a,b) => a.fecha > b.fecha ? -1 : 1)[0];
-  const nC = pend.filter(t => t.area === 'compost').length, nP = pend.filter(t => t.area === 'plantas').length;
+  const nC = pend.filter(t => t.area === 'compost').length, nP = pend.filter(t => t.area === 'plantas').length, nH = pend.filter(t => t.area === 'huerta').length;
   const seccion = a => {
     const l = hoy.filter(t => t.area === a.id).sort((x,y) => y.atraso - x.atraso);
     return l.length ? `<div class="tk-grp">${a.t}</div>${l.map(t => filaTarea(t, diferidos.has(t.id))).join('')}` : '';
@@ -1527,6 +1557,7 @@ const renderHoy = () => {
       <button class="chip" onclick="go('cli')">${ch ? `🌡 ${n1(ch.temp)}${n1(ch.temp) !== '—' ? '°' : ''}${+ch.mm > 0 ? ` · ☔ ${n1(ch.mm)} mm` : ''}` : '🌡 —'}</button>
       <button class="chip" onclick="go('comp')">🌱 Compost · ${nC}</button>
       <button class="chip" onclick="go('pla')">🪴 Plantas · ${nP}</button>
+      <button class="chip" onclick="go('hue')">🥬 Huerta · ${nH}</button>
     </div>
     ${urg.map(a => `<div class="al ${a.c}"><div class="al-t">${a.t}</div>${a.b ? `<div class="al-b">${a.b}</div>` : ''}</div>`).join('')}
     <div class="sh">Tareas de hoy <span class="sh-sub">${pend.length}</span></div>
@@ -1547,7 +1578,18 @@ const ejecutarTarea = t => {
   const hoy = fISO(TODAY);
   if (t.tipo === 'revolcada')   return registrarRevolcada(t.ref, hoy);
   if (t.tipo === 'riego')       return registrarEventoPlanta(t.ref, hoy, TIPO_EVT.riego);
+  if (t.tipo === 'riego-huerta') return Promise.all(t.refs.map(id => registrarEventoPlanta(id, hoy, TIPO_EVT.riego)));
+  if (t.tipo === 'trasplante')   return trasplantarCultivo(t.ref);
   if (t.tipo === 'cambio-agua') return registrarEventoPecera(hoy, '💧 Cambio de agua parcial');
+};
+// Trasplante: guarda la fecha en el cultivo y deja el evento en el historial.
+const trasplantarCultivo = async id => {
+  const p = S.plantas.find(x => x.id === id); if (!p) return;
+  p.fechaTrasplante = fISO(TODAY);
+  sv(); sheetSync('planta', p);
+  const guardado = fbSave('plantas', id, p);
+  await registrarEventoPlanta(id, fISO(TODAY), '🌱 Trasplante');
+  await guardado;
 };
 const marcarHecha = t => {
   if (diferidos.has(t.id)) return;
@@ -1583,6 +1625,7 @@ window.addEventListener('pagehide', vaciarDiferidos);
 window.tareaTap = id => {
   const t = TAREAS.get(id); if (!t) return;
   if (t.modo === 'uno') { marcarHecha(t); return; }
+  if (t.tipo === 'cosecha') { cerrarCultivo(t.ref, 'cosechado'); return; }
   if (t.tipo === 'filtro') openRegistro('fc-pecEvt', { tipo:'🧽 Limpieza de filtro/esponja' });
   else openRegistro('fc-plaEvt', { planta:t.ref, tipo:TIPO_EVT[t.tipo] });
 };
@@ -2173,10 +2216,13 @@ const registrarLocal = async (lista, col, tipoSheet, datos) => {
   const fbId = await fbAdd(col, datos); if (fbId) { r.id = fbId; delete r._pend; sv(); }
   return r;
 };
+// Varios eventos en el mismo milisegundo (riego agrupado) no deben compartir id local.
+let seqId = 0;
+const idLocal = pref => pref + Date.now() + String(++seqId % 1000).padStart(3, '0');
 const registrarRevolcada = (sistema, fecha, obs = '') =>
   registrarLocal(S.revolcadas, 'revolcadas', 'revolcada', { id:Date.now().toString(), sistema, fecha, obs });
 const registrarEventoPlanta = (planta, fecha, tipo, detalle = '', producto = '', resultado = '') =>
-  registrarLocal(S.registroPlantas, 'registroPlantas', 'plantaEvento', { id:'ev'+Date.now(), planta, fecha, tipo, detalle, producto, resultado });
+  registrarLocal(S.registroPlantas, 'registroPlantas', 'plantaEvento', { id:idLocal('ev'), planta, fecha, tipo, detalle, producto, resultado });
 const registrarEventoPecera = (fecha, tipo, detalle = '', resultado = '') =>
   registrarLocal(S.registroPecera, 'registroPecera', 'peceraEvento', { id:'kv'+Date.now(), fecha, tipo, detalle, resultado });
 window.saveRev = async () => {
