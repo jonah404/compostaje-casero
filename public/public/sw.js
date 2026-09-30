@@ -1,7 +1,12 @@
-const CACHE = 'compost-tracker-v2';
+// Los módulos JS same-origin (p. ej. huerta-catalogo.js) van network-first: la caché
+// es solo respaldo sin conexión, así que un deploy no deja a index.html con un módulo viejo.
+// El resto de los archivos del shell (manifest, íconos, etc.) siguen cache-first:
+// si cambian, hay que subir esta versión.
+const CACHE = 'compost-tracker-v3';
 const APP_SHELL = [
   '/',
   '/index.html',
+  '/huerta-catalogo.js',
   '/manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
@@ -48,6 +53,17 @@ self.addEventListener('fetch', event => {
         caches.open(CACHE).then(cache => cache.put('/index.html', res.clone()));
         return res;
       }).catch(() => caches.match('/index.html'))
+    );
+    return;
+  }
+
+  if (url.pathname.endsWith('.js')) {
+    event.respondWith(
+      fetch(req).then(res => {
+        const copia = res.clone();
+        caches.open(CACHE).then(c => c.put(req, copia));
+        return res;
+      }).catch(() => caches.match(req))
     );
     return;
   }

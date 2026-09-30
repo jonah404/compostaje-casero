@@ -448,6 +448,9 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
 @keyframes shim { to { background-position: -200% 0; } }
 .fold { margin-top: 12px; }
 .fold summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-size: 13px; font-weight: 700; color: var(--ink2); }
+/* HUERTA */
+span.chip { display: inline-flex; align-items: center; cursor: default; }
+.al-t + .al-b { margin-top: 2px; }
 </style>
 </head>
 <body>
@@ -534,13 +537,7 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
     </div>
 
     <!-- HUERTA -->
-    <div class="pg" id="pg-hue">
-      <div class="card" style="text-align:center;padding:40px 20px">
-        <div style="font-size:40px">🥬</div>
-        <div style="font-family:var(--serif);font-size:20px;margin:8px 0">Huerta</div>
-        <div style="font-size:13px;color:var(--ink3)">Próximamente: hortalizas y aromáticas con su seguimiento.</div>
-      </div>
-    </div>
+    <div class="pg" id="pg-hue"><div id="hue-c"></div></div>
 
     <!-- CLIMA -->
     <div class="pg" id="pg-cli">
@@ -558,6 +555,7 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
       <div id="reg-menu">
         <div class="reg-grp">Registrar</div>
         <div class="reg-grid">
+          <button class="reg-item" data-ctx="hue"  onclick="openRegistro('fc-huertaCultivo')"><span>🥬</span>Agregar cultivo</button>
           <button class="reg-item" data-ctx="pla"  onclick="openRegistro('fc-plaEvt',{tipo:'💧 Riego'})"><span>💧</span>Regar</button>
           <button class="reg-item" data-ctx="pla"  onclick="openRegistro('fc-plaEvt',{tipo:'🌿 Fertilización'})"><span>🌿</span>Fertilizar</button>
           <button class="reg-item" data-ctx="pla"  onclick="openRegistro('fc-plaEvt',{tipo:'🐛 Revisión plagas'})"><span>🐛</span>Plagas</button>
@@ -687,6 +685,39 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
           </div>
         </div>
       </div>
+
+      <div class="form-row" style="align-items:start;margin-top:20px">
+        <div>
+          <div class="fc" id="fc-huertaCultivo">
+            <h3><i class="ti ti-plant-2"></i><span id="hc-titulo">Agregar cultivo</span></h3>
+            <input type="hidden" id="hc-id">
+            <div class="f"><label>Cultivo</label><select id="hc-cultivo" onchange="cambiarCultivoSel()"></select></div>
+            <div class="f" id="hc-nombre-wrap" style="display:none"><label>Nombre del cultivo</label><input type="text" id="hc-nombre" placeholder="ej: Kale"></div>
+            <div id="hc-aviso" style="display:none"></div>
+            <div class="form-row" style="margin-bottom:0">
+              <div class="f"><label>Fecha de siembra</label><input type="date" id="hc-fechaP"></div>
+              <div class="f"><label>Fecha de trasplante (opcional)</label><input type="date" id="hc-fechaT"></div>
+            </div>
+            <div class="f"><label>Ubicación (cantero)</label><input type="text" id="hc-ubic" placeholder="ej: Cantero 2"></div>
+            <div class="reg-grp">Perfil del cultivo</div>
+            <div class="form-row" style="margin-bottom:0">
+              <div class="f"><label>Ciclo</label><select id="hc-ciclo"><option value="anual">Anual</option><option value="perenne">Perenne</option></select></div>
+              <div class="f"><label>Fertilizar cada (días)</label><input type="number" min="1" id="hc-fert"></div>
+            </div>
+            <div class="form-row" style="margin-bottom:0">
+              <div class="f"><label>Riego en verano (días)</label><input type="number" min="1" id="hc-rv"></div>
+              <div class="f"><label>Riego en invierno (días)</label><input type="number" min="1" id="hc-ri"></div>
+            </div>
+            <div class="form-row" style="margin-bottom:0">
+              <div class="f"><label>Revisar plagas cada (días)</label><input type="number" min="1" id="hc-plagas"></div>
+              <div class="f"><label>Días a trasplante</label><input type="number" min="1" id="hc-dt"></div>
+            </div>
+            <div class="f"><label>Días a cosecha</label><input type="number" min="1" id="hc-dc"><div class="fhint">Contados desde la siembra. Vacío en perennes.</div></div>
+            <div class="f"><label>Notas</label><textarea id="hc-notas"></textarea></div>
+            <button class="btn-g" onclick="guardarCultivo()">Guardar cultivo</button>
+          </div>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -717,6 +748,11 @@ import {
   setDoc, getDocs, addDoc, deleteDoc,
   query, orderBy, limit, startAfter, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import {
+  CATALOGO_HUERTA, perfilDeCultivo, perfilDeCatalogo, fichaDeCatalogo, enEpocaDeSiembra,
+  faseCultivo, diaDeCultivo, progresoCosecha, diasParaCosecha, fechaCosechaEstimada,
+  estaCerrado, numero
+} from './huerta-catalogo.js';
 
 // ════ FIREBASE CONFIG ════
 const firebaseConfig = {
@@ -1094,7 +1130,7 @@ const aguaEfectiva = p => {
   }
   // Las plantas de interior no cuentan la lluvia como riego (no les llueve
   // encima) — igual que calcularUltimaAguaEfectiva() en Apps Script.
-  const perfil = perfilEspecie(p.especie || p.nombre);
+  const perfil = perfilDePlanta(p);
   if (perfil && perfil.tipo === 'Interior') return fRiego ? { fecha: fRiego, tipo:'riego', mm:null } : null;
   let lluvia = null, mmLluvia = 0;
   [...S.clima].sort((a,b)=>a.fecha>b.fecha?-1:1).forEach(c => {
@@ -1122,15 +1158,18 @@ const proxCalc = (p, tipoEvento, ultimaKey, proximaKey, intervaloDias) => {
 const estPlanta = p => {
   const hoy = TODAY, mes = hoy.getMonth()+1;
   const esVerano = CFG_PLA.mesesVerano.includes(mes);
-  const perfil = perfilEspecie(p.especie || p.nombre);
+  const perfil = perfilDePlanta(p);
   const limite = perfil ? (esVerano ? perfil.riegoVerano : perfil.riegoInvierno) : (esVerano ? CFG_PLA.diasSinRiegoVerano : CFG_PLA.diasSinRiegoInvierno);
   const agua = aguaEfectiva(p);
   const diasSinAgua = agua ? dd(agua.fecha, hoy) : null;
   const fueraDeTemporadaFert = perfil && !mesEnTemporada(mes, perfil.fertMesIni, perfil.fertMesFin);
   const fert   = proxCalc(p, 'Fertiliz', 'ultimaFert',   'proximaFert',   perfil ? perfil.diasFert : CFG_PLA.diasFert);
-  const fichaFitoP = fichaFito(p.nombre);
-  const plagas = proxCalc(p, 'plagas', 'ultimaPlagas', 'proximaPlagas', fichaFitoP ? diasVigilancia(fichaFitoP, mes) : CFG_PLA.diasPlagas);
-  const poda   = proxCalc(p, 'Poda',     'ultimaPoda',   'proximaPoda',   (perfil && perfil.podaDias) ? perfil.podaDias : CFG_PLA.diasPoda);
+  const fichaFitoP = esCultivo(p) ? null : fichaFito(p.nombre);
+  // Cultivos: intervalo fijo de su foto (el calendario del servidor usa el mismo número).
+  const intervaloPlagas = esCultivo(p) ? perfil.diasPlagas : (fichaFitoP ? diasVigilancia(fichaFitoP, mes) : CFG_PLA.diasPlagas);
+  const plagas = proxCalc(p, 'plagas', 'ultimaPlagas', 'proximaPlagas', intervaloPlagas);
+  const poda   = esCultivo(p) ? { proxima:null, dias:null }
+                              : proxCalc(p, 'Poda', 'ultimaPoda', 'proximaPoda', (perfil && perfil.podaDias) ? perfil.podaDias : CFG_PLA.diasPoda);
   return {
     diasSinAgua, limite, agua,
     riegoUrg: diasSinAgua!=null && diasSinAgua>=limite,
@@ -1141,6 +1180,16 @@ const estPlanta = p => {
   };
 };
 const pLbl = p => p.nombre || `Planta ${p.id}`;
+// ════ HUERTA — modelo ════
+// Un cultivo es una planta con categoria === 'huerta' (ver spec de la huerta).
+const esCultivo = p => p.categoria === 'huerta';
+const plantasComunes  = () => S.plantas.filter(p => !esCultivo(p));
+const cultivos        = () => S.plantas.filter(esCultivo);
+const cultivosActivos = () => cultivos().filter(p => !estaCerrado(p));
+// Perfil de riego/fertilización de CUALQUIER planta: los cultivos usan su foto.
+const perfilDePlanta = p => esCultivo(p) ? perfilDeCultivo(p) : perfilEspecie(p.especie || p.nombre);
+// Ficha fitosanitaria: los cultivos por clave de catálogo, el resto por nombre.
+const fichaFitoDe = p => esCultivo(p) ? fichaDeCatalogo(p.cultivo) : fichaFito(p.nombre);
 
 // ════ PECERA ════
 // Fase "ciclado" = primeros CFG_PEC.diasFinCiclado días desde el armado/limpieza
@@ -1284,9 +1333,10 @@ const analisisExtra = () => {
   });
   const pctRevolcadas = totalPares ? Math.round(enTiempo/totalPares*100) : null;
 
-  const totalPlantas = S.plantas.length;
+  const comunes = plantasComunes();
+  const totalPlantas = comunes.length;
   let plantasOk = 0;
-  S.plantas.forEach(p=>{ const e=estPlanta(p); if(!e.riegoUrg && !e.fertUrg && !e.plagasUrg) plantasOk++; });
+  comunes.forEach(p=>{ const e=estPlanta(p); if(!e.riegoUrg && !e.fertUrg && !e.plagasUrg) plantasOk++; });
   const pctPlantas = totalPlantas ? Math.round(plantasOk/totalPlantas*100) : null;
 
   return { pctRevolcadas, totalPares, pctPlantas, plantasOk, totalPlantas };
@@ -1378,10 +1428,39 @@ const ringSVG = (pct, color, size=76, thickness=8) => {
 // Mismos criterios que el evento "Tareas de hoy" del calendario (codigo.gs).
 const ETQ      = { riego:'regar', fert:'fertilizar', plagas:'revisar plagas', poda:'poda', revolcada:'revolver' };
 const TIPO_EVT = { riego:'💧 Riego', fert:'🌿 Fertilización', plagas:'🐛 Revisión plagas', poda:'✂️ Poda' };
-const AREAS_HOY = [ {id:'compost', t:'🌱 Compost'}, {id:'plantas', t:'🪴 Plantas'}, {id:'pecera', t:'🐠 Pecera'} ];
+const AREAS_HOY = [ {id:'compost', t:'🌱 Compost'}, {id:'plantas', t:'🪴 Plantas'}, {id:'huerta', t:'🥬 Huerta'}, {id:'pecera', t:'🐠 Pecera'} ];
 const TEMP_CALOR = 38, TEMP_HELADA = 2, TEMP_HELADA_SEVERA = -2;
 const diferidos = new Map();   // id de tarea → { timer, commit } (ver "marcar hecho")
 let TAREAS = new Map();
+
+// Tareas de los cultivos activos. El riego va agrupado en una sola tarea.
+const armarTareasHuerta = () => {
+  const hoy = [], prox = [];
+  const act = cultivosActivos().map(p => ({ p, e: estPlanta(p), fase: faseCultivo(p, TODAY) }));
+  const urg = act.filter(x => x.e.riegoUrg), pron = act.filter(x => x.e.riegoProx);
+  const riego = (lista, atraso) => ({
+    id:'riego-huerta', area:'huerta', tipo:'riego-huerta', ref:null, refs:lista.map(x => x.p.id), modo:'uno',
+    titulo:`Regar la huerta · ${lista.length}`, detalle:lista.map(x => pLbl(x.p)).join(', '), atraso
+  });
+  if (urg.length) hoy.push(riego(urg, Math.max(...urg.map(x => x.e.diasSinAgua - x.e.limite))));
+  else if (pron.length) prox.push(riego(pron, 0));
+  act.forEach(({ p, e, fase }) => {
+    const base = (tipo, modo, verbo) => ({ id:`${tipo}-${p.id}`, area:'huerta', tipo, ref:p.id, titulo:`${pLbl(p)} · ${verbo}`, modo });
+    if (fase === 'por-trasplantar') hoy.push({ ...base('trasplante','uno','trasplantar'), detalle:`día ${diaDeCultivo(p, TODAY)} desde la siembra`, atraso:0 });
+    [ { tipo:'fert', dias:e.diasParaFert, verbo:'fertilizar' }, { tipo:'plagas', dias:e.diasParaPlagas, verbo:'revisar plagas' } ].forEach(c => {
+      if (c.dias == null) return;
+      if (c.dias <= 0) hoy.push({ ...base(c.tipo,'form',c.verbo), detalle: c.dias < 0 ? `${-c.dias} días de atraso` : 'toca hoy', atraso:-c.dias });
+      else if (c.dias <= 3) prox.push({ ...base(c.tipo,'form',c.verbo), detalle:`en ${c.dias} d`, atraso:-c.dias });
+    });
+    if (p.ciclo !== 'perenne' && (fase === 'cosecha' || fase === 'cosecha-proxima')) {
+      const ult = ultimoEvento(p.id, 'Cosecha');
+      const silenciada = ult && dd(pISO(ult.fecha), TODAY) < 3;   // cosechas parciales
+      if (fase === 'cosecha' && !silenciada) hoy.push({ ...base('cosecha','form','cosechar'), detalle:`día ${diaDeCultivo(p, TODAY)} de ${numero(p.diasACosecha)}`, atraso:0 });
+      else if (fase === 'cosecha-proxima') prox.push({ ...base('cosecha','form','cosechar'), detalle:`en ${diasParaCosecha(p, TODAY)} d`, atraso:0 });
+    }
+  });
+  return { hoy, prox };
+};
 
 const armarTareasHoy = () => {
   const hoy = [], prox = [];
@@ -1392,7 +1471,7 @@ const armarTareasHoy = () => {
     if (d <= 0) hoy.push({ ...base, detalle: d < 0 ? `atrasado ${-d} d` : 'toca hoy', atraso: -d });
     else if (d <= 3) prox.push({ ...base, detalle:`en ${d} d`, atraso: -d });
   });
-  S.plantas.forEach(p => {
+  plantasComunes().forEach(p => {
     const e = estPlanta(p);
     const base = (tipo, modo) => ({ id:`${tipo}-${p.id}`, area:'plantas', tipo, ref:p.id, titulo:`${pLbl(p)} · ${ETQ[tipo]}`, modo });
     if (e.riegoUrg) hoy.push({ ...base('riego','uno'), detalle:`${e.diasSinAgua} días sin agua (límite ${e.limite})`, atraso: e.diasSinAgua - e.limite });
@@ -1407,6 +1486,7 @@ const armarTareasHoy = () => {
       prox.push({ ...base('poda','form'), detalle: e.diasParaPoda === 0 ? 'toca hoy' : `en ${e.diasParaPoda} d`, atraso: -e.diasParaPoda });
     }
   });
+  const th = armarTareasHuerta(); hoy.push(...th.hoy); prox.push(...th.prox);
   const ep = estPecera();
   const pec = (tipo, titulo, modo) => ({ id:`pec-${tipo}`, area:'pecera', tipo, ref:null, titulo, modo });
   if (ep.cambioUrg) hoy.push({ ...pec('cambio-agua','Cambio de agua','uno'), detalle:`${ep.diasSinCambio} días sin cambio (objetivo cada ${ep.limiteCambio} d)`, atraso: ep.diasSinCambio - ep.limiteCambio });
@@ -1415,7 +1495,6 @@ const armarTareasHoy = () => {
   return { hoy, prox };
 };
 window.armarTareasHoy = armarTareasHoy;
-
 // Lo ya registrado hoy (de los mismos tipos que generan tareas).
 const hechasHoy = () => {
   const hoyISO = fISO(TODAY), out = [];
@@ -1423,7 +1502,7 @@ const hechasHoy = () => {
     const s = S.sistemas.find(x => x.id === r.sistema);
     out.push({ titulo:`${s ? sLbl(s) : 'Sistema '+r.sistema} · revolcada` });
   });
-  S.registroPlantas.filter(r => r.fecha === hoyISO && /Riego|Fertiliz|plagas|Poda/.test(r.tipo)).forEach(r => {
+  S.registroPlantas.filter(r => r.fecha === hoyISO && /Riego|Fertiliz|plagas|Poda|Trasplante|Cosecha/.test(r.tipo)).forEach(r => {
     const p = S.plantas.find(x => x.id === r.planta);
     out.push({ titulo:`${p ? pLbl(p) : 'Planta'} · ${r.tipo.replace(/^\S+\s/, '')}` });
   });
@@ -1436,15 +1515,16 @@ const hechasHoy = () => {
 // Urgentes: helada, frío en interior, calor extremo, compost listo (mismos umbrales que codigo.gs).
 const urgentesHoy = () => {
   const out = [];
+  const vivas = S.plantas.filter(p => !estaCerrado(p));
   const ult = [...S.clima].sort((a,b) => a.fecha > b.fecha ? -1 : 1)[0];
-  const esInt = p => { const pf = perfilEspecie(p.especie || p.nombre); return !!(pf && pf.tipo === 'Interior'); };
+  const esInt = p => { const pf = perfilDePlanta(p); return !!(pf && pf.tipo === 'Interior'); };
   if (ult && ult.tmin != null && ult.tmin !== '') {
     const tmin = +ult.tmin;
-    if (S.plantas.some(p => !esInt(p)) && tmin <= TEMP_HELADA) {
+    if (vivas.some(p => !esInt(p)) && tmin <= TEMP_HELADA) {
       const sev = tmin <= TEMP_HELADA_SEVERA;
       out.push({ c: sev ? 'al-r' : 'al-w', t: (sev ? '🧊 Helada severa' : '❄️ Helada') + ' — proteger plantas de exterior', b:`Mínima registrada: ${n1(tmin)}°C` });
     }
-    const frias = S.plantas.filter(p => { const pf = esInt(p) && perfilEspecie(p.especie || p.nombre); return pf && pf.tempMin != null && tmin <= pf.tempMin + 2; });
+    const frias = vivas.filter(p => { const pf = esInt(p) && perfilDePlanta(p); return pf && pf.tempMin != null && tmin <= pf.tempMin + 2; });
     if (frias.length) out.push({ c:'al-w', t:'🥶 Frío — alejar de la ventana', b: frias.map(pLbl).join(', ') });
   }
   if (ult && ult.tmax != null && ult.tmax !== '' && +ult.tmax >= TEMP_CALOR) out.push({ c:'al-r', t:'🔥 Calor extremo — revisar humedad del compost', b:`Máxima registrada: ${n1(ult.tmax)}°C` });
@@ -1466,7 +1546,7 @@ const renderHoy = () => {
   const hechas = hechasHoy();
   const urg   = urgentesHoy();
   const ch    = cdDia(fISO(TODAY)) || [...S.clima].sort((a,b) => a.fecha > b.fecha ? -1 : 1)[0];
-  const nC = pend.filter(t => t.area === 'compost').length, nP = pend.filter(t => t.area === 'plantas').length;
+  const nC = pend.filter(t => t.area === 'compost').length, nP = pend.filter(t => t.area === 'plantas').length, nH = pend.filter(t => t.area === 'huerta').length;
   const seccion = a => {
     const l = hoy.filter(t => t.area === a.id).sort((x,y) => y.atraso - x.atraso);
     return l.length ? `<div class="tk-grp">${a.t}</div>${l.map(t => filaTarea(t, diferidos.has(t.id))).join('')}` : '';
@@ -1477,6 +1557,7 @@ const renderHoy = () => {
       <button class="chip" onclick="go('cli')">${ch ? `🌡 ${n1(ch.temp)}${n1(ch.temp) !== '—' ? '°' : ''}${+ch.mm > 0 ? ` · ☔ ${n1(ch.mm)} mm` : ''}` : '🌡 —'}</button>
       <button class="chip" onclick="go('comp')">🌱 Compost · ${nC}</button>
       <button class="chip" onclick="go('pla')">🪴 Plantas · ${nP}</button>
+      <button class="chip" onclick="go('hue')">🥬 Huerta · ${nH}</button>
     </div>
     ${urg.map(a => `<div class="al ${a.c}"><div class="al-t">${a.t}</div>${a.b ? `<div class="al-b">${a.b}</div>` : ''}</div>`).join('')}
     <div class="sh">Tareas de hoy <span class="sh-sub">${pend.length}</span></div>
@@ -1497,7 +1578,18 @@ const ejecutarTarea = t => {
   const hoy = fISO(TODAY);
   if (t.tipo === 'revolcada')   return registrarRevolcada(t.ref, hoy);
   if (t.tipo === 'riego')       return registrarEventoPlanta(t.ref, hoy, TIPO_EVT.riego);
+  if (t.tipo === 'riego-huerta') return Promise.all(t.refs.map(id => registrarEventoPlanta(id, hoy, TIPO_EVT.riego)));
+  if (t.tipo === 'trasplante')   return trasplantarCultivo(t.ref);
   if (t.tipo === 'cambio-agua') return registrarEventoPecera(hoy, '💧 Cambio de agua parcial');
+};
+// Trasplante: guarda la fecha en el cultivo y deja el evento en el historial.
+const trasplantarCultivo = async id => {
+  const p = S.plantas.find(x => x.id === id); if (!p) return;
+  p.fechaTrasplante = fISO(TODAY);
+  sv(); sheetSync('planta', p);
+  const guardado = fbSave('plantas', id, p);
+  await registrarEventoPlanta(id, fISO(TODAY), '🌱 Trasplante');
+  await guardado;
 };
 const marcarHecha = t => {
   if (diferidos.has(t.id)) return;
@@ -1533,6 +1625,7 @@ window.addEventListener('pagehide', vaciarDiferidos);
 window.tareaTap = id => {
   const t = TAREAS.get(id); if (!t) return;
   if (t.modo === 'uno') { marcarHecha(t); return; }
+  if (t.tipo === 'cosecha') { cerrarCultivo(t.ref, 'cosechado'); return; }
   if (t.tipo === 'filtro') openRegistro('fc-pecEvt', { tipo:'🧽 Limpieza de filtro/esponja' });
   else openRegistro('fc-plaEvt', { planta:t.ref, tipo:TIPO_EVT[t.tipo] });
 };
@@ -1618,13 +1711,14 @@ const plantHTML = p => {
   </div>`;
 };
 const renderPla = () => {
-  document.getElementById('pla-c').innerHTML = S.plantas.map(p=>plantHTML(p)).join('') || '<div style="font-size:13px;color:var(--ink3)">Sin plantas registradas.</div>';
+  document.getElementById('pla-c').innerHTML = plantasComunes().map(p=>plantHTML(p)).join('') || '<div style="font-size:13px;color:var(--ink3)">Sin plantas registradas.</div>';
 };
 
 // ════ RESUMEN DE PLANTAS (antes en Inicio) ════
 const renderPlaResumen = () => {
   const ax = analisisExtra();
-  const ests = S.plantas.map(estPlanta);
+  const comunes = plantasComunes();
+  const ests = comunes.map(estPlanta);
   const nUrg = ests.filter(e => e.riegoUrg).length;
   const nProx = ests.filter(e => e.riegoProx).length;
   const nOk = ests.length - nUrg - nProx;
@@ -1632,7 +1726,7 @@ const renderPlaResumen = () => {
     {value:nOk, color:'var(--chart-1)'}, {value:nProx, color:'var(--chart-3)'}, {value:nUrg, color:'var(--chart-4)'},
   ], 112, 15, 'plantas');
   const legend = [ {n:'Al día', v:nOk, c:'var(--chart-1)'}, {n:'Riego pronto', v:nProx, c:'var(--chart-3)'}, {n:'Regar ahora', v:nUrg, c:'var(--chart-4)'} ];
-  document.getElementById('pla-resumen').innerHTML = S.plantas.length ? `
+  document.getElementById('pla-resumen').innerHTML = comunes.length ? `
     <div class="card">
       <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:10px">Riego de plantas</div>
       <div class="donut-wrap">
@@ -1650,6 +1744,197 @@ const renderPlaResumen = () => {
       </div>
     </div>
     <div class="sh">Plantas</div>` : '';
+};
+
+// ════ HUERTA — pantalla, formulario y ficha ════
+const GRUPOS_HUERTA = ['Hojas y crucíferas', 'Frutos', 'Raíces y bulbos', 'Aromáticas y perennes'];
+const MESES_CORTO = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const FASES_UI = {
+  'semillero':       { t:'🌱 Semillero',       cls:'bs' },
+  'por-trasplantar': { t:'🪴 Por trasplantar', cls:'bq' },
+  'crecimiento':     { t:'🌿 En crecimiento',  cls:'bc' },
+  'cosecha-proxima': { t:'🧺 Cosecha próxima', cls:'bq' },
+  'cosecha':         { t:'🧺 En cosecha',      cls:'bl' },
+};
+const RANGO_FASE = { 'cosecha':0, 'por-trasplantar':1, 'cosecha-proxima':2, 'semillero':3, 'crecimiento':4 };
+
+// La acción más cercana de un cultivo, en texto corto.
+const proximaAccionCultivo = p => {
+  const e = estPlanta(p), fase = faseCultivo(p, TODAY), c = [];
+  if (e.diasSinAgua != null) { const r = e.limite - e.diasSinAgua; c.push({ d: r, t: r <= 0 ? '💧 regar hoy' : `💧 riego en ${r} d` }); }
+  if (fase === 'por-trasplantar') c.push({ d: -1, t: '🪴 trasplantar' });
+  if (e.diasParaFert != null) c.push({ d: e.diasParaFert, t: e.diasParaFert <= 0 ? '🌿 fertilizar' : `🌿 fertilizar en ${e.diasParaFert} d` });
+  if (e.diasParaPlagas != null) c.push({ d: e.diasParaPlagas, t: e.diasParaPlagas <= 0 ? '🐛 revisar plagas' : `🐛 plagas en ${e.diasParaPlagas} d` });
+  const dc = diasParaCosecha(p, TODAY);
+  if (dc != null) c.push({ d: dc, t: dc <= 0 ? '🧺 cosechar' : `🧺 cosecha en ${dc} d` });
+  c.sort((a, b) => a.d - b.d);
+  return c[0] ? c[0].t : '';
+};
+
+const cultivoHTML = p => {
+  const fase = faseCultivo(p, TODAY), f = FASES_UI[fase] || FASES_UI.crecimiento;
+  const d = diaDeCultivo(p, TODAY), dc = numero(p.diasACosecha), prog = progresoCosecha(p, TODAY);
+  const barra = prog == null ? '' : `<div class="prog"><div class="pf ${fase==='cosecha'?'pfg':fase==='cosecha-proxima'?'pfa':'pfb'}" style="width:${Math.round(prog*100)}%"></div></div><div class="prog-lb"><span>día ${d}</span><span>de ${dc}</span></div>`;
+  const meta = [p.ubicacion, p.ciclo === 'perenne' ? 'perenne' : ''].filter(Boolean).join(' · ');
+  return `<div class="sysc" onclick="openPla(${p.id})">
+    <div class="sysc-top"><span class="sysc-name">${pLbl(p)}</span><span class="badge ${f.cls}">${f.t}</span></div>
+    ${meta ? `<div class="sysc-meta">${meta}</div>` : ''}
+    ${barra}
+    <div class="sysc-meta" style="margin-top:6px">${proximaAccionCultivo(p)}</div>
+  </div>`;
+};
+
+const renderHue = () => {
+  const act = cultivosActivos().sort((a, b) =>
+    (RANGO_FASE[faseCultivo(a, TODAY)] ?? 9) - (RANGO_FASE[faseCultivo(b, TODAY)] ?? 9) || (+estPlanta(b).riegoUrg - +estPlanta(a).riegoUrg));
+  const cerr = cultivos().filter(estaCerrado).sort((a, b) => String(b.fechaCierre).localeCompare(String(a.fechaCierre)));
+  const nCos = act.filter(p => ['cosecha', 'cosecha-proxima'].includes(faseCultivo(p, TODAY))).length;
+  document.getElementById('hue-c').innerHTML = `
+    <div class="chips">
+      <span class="chip">🌱 Cultivos activos · ${act.length}</span>
+      <span class="chip">🧺 Para cosechar · ${nCos}</span>
+    </div>
+    ${act.map(cultivoHTML).join('') || '<div style="font-size:13px;color:var(--ink3);margin-bottom:10px">Todavía no cargaste cultivos.</div>'}
+    <button class="add-btn" onclick="openRegistro('fc-huertaCultivo')"><i class="ti ti-plus"></i> Agregar cultivo</button>
+    ${cerr.length ? `<details class="fold"><summary>Historial · ${cerr.length}</summary>${cerr.map(p => `<div class="sysc" onclick="openPla(${p.id})">
+      <div class="sysc-top"><span class="sysc-name">${pLbl(p)}</span><span class="badge bv">${p.estadoCultivo === 'cosechado' ? '🧺 Cosechado' : 'Terminado'}</span></div>
+      <div class="sysc-meta">${[p.ubicacion, 'sembrado ' + fmt(p.fechaP), 'cerrado ' + fmt(p.fechaCierre)].filter(Boolean).join(' · ')}</div></div>`).join('')}</details>` : ''}`;
+};
+
+// ── Formulario de cultivo (nuevo / editar) ─────────────────────────────
+const poblarCultivosSel = () => {
+  document.getElementById('hc-cultivo').innerHTML = '<option value="">— Elegí un cultivo —</option>' +
+    GRUPOS_HUERTA.map(g => `<optgroup label="${g}">${CATALOGO_HUERTA.filter(c => c.grupo === g).map(c => `<option value="${c.clave}">${c.nombre}</option>`).join('')}</optgroup>`).join('') +
+    '<option value="manual">Otro (ficha manual)</option>';
+};
+window.cambiarCultivoSel = () => {
+  const clave = document.getElementById('hc-cultivo').value;
+  const aviso = document.getElementById('hc-aviso');
+  const set = (id, v) => { document.getElementById(id).value = v == null ? '' : v; };
+  document.getElementById('hc-nombre-wrap').style.display = clave === 'manual' ? '' : 'none';
+  aviso.style.display = 'none';
+  if (!clave) return;
+  if (clave === 'manual') { ['hc-rv','hc-ri','hc-fert','hc-dt','hc-dc'].forEach(id => set(id, '')); set('hc-plagas', 7); set('hc-ciclo', 'anual'); return; }
+  const pf = perfilDeCatalogo(clave);
+  set('hc-ciclo', pf.ciclo); set('hc-rv', pf.riegoVerano); set('hc-ri', pf.riegoInvierno); set('hc-fert', pf.diasFert);
+  set('hc-plagas', pf.diasPlagas); set('hc-dt', pf.diasATrasplante); set('hc-dc', pf.diasACosecha);
+  if (!enEpocaDeSiembra(clave, TODAY.getMonth() + 1)) {
+    aviso.style.display = '';
+    aviso.innerHTML = `<div class="al al-w"><div class="al-t">Fuera de época de siembra</div><div class="al-b">Época recomendada: ${pf.mesesSiembra.map(m => MESES_CORTO[m - 1]).join(', ')}. Podés guardarlo igual.</div></div>`;
+  }
+};
+const prepararCultivo = id => {
+  poblarCultivosSel();
+  const p = id ? S.plantas.find(x => x.id === id) : null;
+  const set = (k, v) => { document.getElementById(k).value = v == null ? '' : v; };
+  document.getElementById('hc-titulo').textContent = p ? 'Editar cultivo' : 'Agregar cultivo';
+  set('hc-id', p ? p.id : '');
+  const sel = document.getElementById('hc-cultivo');
+  sel.value = p ? (p.cultivo || 'manual') : '';
+  sel.disabled = !!p;
+  document.getElementById('hc-aviso').style.display = 'none';
+  document.getElementById('hc-nombre-wrap').style.display = (p && p.cultivo === 'manual') ? '' : 'none';
+  set('hc-nombre', p && p.cultivo === 'manual' ? p.nombre : '');
+  set('hc-fechaP', p ? p.fechaP : fISO(TODAY));
+  set('hc-fechaT', p ? p.fechaTrasplante : '');
+  set('hc-ubic', p ? p.ubicacion : '');
+  set('hc-ciclo', p ? p.ciclo : 'anual');
+  set('hc-rv', p ? p.riegoVerano : ''); set('hc-ri', p ? p.riegoInvierno : '');
+  set('hc-fert', p ? p.diasFert : ''); set('hc-plagas', p ? p.diasPlagas : '');
+  set('hc-dt', p ? p.diasATrasplante : ''); set('hc-dc', p ? p.diasACosecha : '');
+  set('hc-notas', p ? p.notas : '');
+};
+let guardandoCultivo = false;   // evita que un doble toque cree el cultivo dos veces
+window.guardarCultivo = async () => {
+  if (guardandoCultivo) return;
+  const v = id => document.getElementById(id).value;
+  const num = id => { const x = parseFloat(v(id)); return isNaN(x) ? null : x; };
+  const id = v('hc-id') ? +v('hc-id') : null;
+  const clave = v('hc-cultivo');
+  if (!clave) { toast('Elegí un cultivo'); return; }
+  const cat = clave === 'manual' ? null : perfilDeCatalogo(clave);
+  const nombre = cat ? cat.nombre : v('hc-nombre').trim();
+  if (!nombre) { toast('Poné un nombre al cultivo'); return; }
+  if (!v('hc-fechaP')) { toast('Completá la fecha de siembra'); return; }
+  const rv = num('hc-rv'), ri = num('hc-ri'), fert = num('hc-fert'), plagas = num('hc-plagas');
+  if (!(rv > 0 && ri > 0 && fert > 0 && plagas > 0)) { toast('Completá riego, fertilización y plagas (en días)'); return; }
+  const p = id ? S.plantas.find(x => x.id === id)
+               : { id: S.plantas.length ? Math.max(...S.plantas.map(x => x.id)) + 1 : 1, variedad:'', exposicion:'Sol pleno', suelo:'Tierra directa', estadoCultivo:'activo' };
+  if (!p) return;
+  guardandoCultivo = true;
+  try {
+    const perenne = v('hc-ciclo') === 'perenne';
+    Object.assign(p, {
+      categoria:'huerta', cultivo:clave, nombre, especie:nombre, ciclo:v('hc-ciclo'),
+      fechaP:v('hc-fechaP'), fechaTrasplante:v('hc-fechaT'), ubicacion:v('hc-ubic'), notas:v('hc-notas'),
+      riegoVerano:rv, riegoInvierno:ri, diasFert:fert, diasPlagas:plagas,
+      diasATrasplante:num('hc-dt'), diasACosecha: perenne ? null : num('hc-dc'),
+    });
+    if (!id) S.plantas.push(p);
+    sv(); sheetSync('planta', p); await fbSave('plantas', p.id, p);   // sheetSync antes de esperar a Firestore
+    poblarSels(); closeRegistro();
+    toast(`✅ ${nombre} ${id ? 'guardado' : 'agregado a la huerta'}`);
+    go('hue');
+  } finally { guardandoCultivo = false; }
+};
+
+// ── Cierre de un cultivo ───────────────────────────────────────────────
+window.cerrarCultivo = async (id, estado) => {
+  const p = S.plantas.find(x => x.id === id); if (!p || !esCultivo(p)) return;
+  const cosechado = estado === 'cosechado';
+  if (!confirm(cosechado ? `¿Marcar "${pLbl(p)}" como cosechado? Se cierra el cultivo y pasa al historial.` : `¿Terminar "${pLbl(p)}"? Se cierra el cultivo y pasa al historial.`)) return;
+  p.estadoCultivo = estado; p.fechaCierre = fISO(TODAY);
+  sv(); sheetSync('planta', p);
+  const guardado = fbSave('plantas', id, p);
+  if (cosechado) await registrarEventoPlanta(id, fISO(TODAY), '🍂 Cosecha', 'Cultivo cosechado y cerrado');
+  await guardado;
+  closeMod();
+  toast(cosechado ? `🧺 ${pLbl(p)} cosechado` : `${pLbl(p)} terminado`);
+  refresh();
+};
+
+// ── Ficha del cultivo ──────────────────────────────────────────────────
+const historialPlantaHTML = eventos => eventos.length ? `<div style="overflow-x:auto"><table class="rtbl" style="width:100%">
+  <thead><tr><th>Fecha</th><th>Evento</th><th>Detalle</th><th>Resultado</th></tr></thead>
+  <tbody>${eventos.map(r=>`<tr>
+    <td><b>${fmt(r.fecha)}</b></td>
+    <td>${r.tipo}</td>
+    <td style="font-size:12px;color:var(--ink3)">${r.detalle||''}${r.producto?' — '+r.producto:''}</td>
+    <td style="font-size:12px;color:var(--ink3);font-style:italic">${r.resultado||''}</td>
+  </tr>`).join('')}</tbody>
+</table></div>` : `<div style="font-size:13px;color:var(--ink3)">Sin eventos registrados</div>`;
+
+window.openCultivo = id => {
+  const p = S.plantas.find(x => x.id === id); if (!p) return;
+  const e = estPlanta(p), fase = faseCultivo(p, TODAY), f = FASES_UI[fase];
+  const activo = !estaCerrado(p), cosecha = fechaCosechaEstimada(p);
+  document.getElementById('mtitle').textContent = pLbl(p);
+  document.getElementById('mbody').innerHTML = `
+    <div style="margin-bottom:14px"><span class="badge ${f ? f.cls : 'bv'}" style="font-size:12px;padding:5px 12px">${f ? f.t : (p.estadoCultivo === 'cosechado' ? '🧺 Cosechado' : 'Terminado')}</span></div>
+    <table class="mt-tbl">
+      <tr><td>Siembra</td><td>${fmt(p.fechaP)}</td></tr>
+      ${p.fechaTrasplante ? `<tr><td>Trasplante</td><td>${fmt(p.fechaTrasplante)}</td></tr>` : ''}
+      ${cosecha && p.ciclo !== 'perenne' ? `<tr><td>Cosecha estimada</td><td>${fmt(fISO(cosecha))}</td></tr>` : ''}
+      ${p.fechaCierre ? `<tr><td>Cerrado</td><td>${fmt(p.fechaCierre)}</td></tr>` : ''}
+      <tr><td>Ubicación</td><td>${p.ubicacion || '—'}</td></tr>
+      <tr><td>Ciclo</td><td>${p.ciclo === 'perenne' ? 'Perenne' : 'Anual'}</td></tr>
+      <tr><td>Días sin agua</td><td style="color:${e.riegoUrg?'var(--rust-mid)':e.riegoProx?'var(--umber-mid)':'var(--ink)'}">${e.diasSinAgua!=null?e.diasSinAgua+' días (límite '+e.limite+')':'—'}</td></tr>
+      <tr><td>Próxima fertilización</td><td style="color:${e.fertUrg?'var(--umber-mid)':'var(--ink)'}">${e.proximaFert?fmt(fISO(e.proximaFert))+(e.diasParaFert<0?' — atrasada':''):'—'}</td></tr>
+      <tr><td>Próxima revisión de plagas</td><td style="color:${e.plagasUrg?'var(--sky-mid)':'var(--ink)'}">${e.proximaPlagas?fmt(fISO(e.proximaPlagas))+(e.diasParaPlagas<0?' — atrasada':''):'—'}</td></tr>
+    </table>
+    ${p.notas?`<div style="font-size:12px;color:var(--ink2);background:var(--paper2);padding:11px;border-radius:var(--r);margin:14px 0">${p.notas}</div>`:''}
+    ${fitoHTML(p)}
+    <div style="font-family:var(--serif);font-size:17px;color:var(--ink);margin:18px 0 10px">Historial</div>
+    ${historialPlantaHTML(regEventos(id))}
+    <div style="height:14px"></div>
+    ${activo ? `<button class="btn-g" onclick="cerrarCultivo(${id},'cosechado')">🧺 Cosechado</button>
+    <div style="height:7px"></div>
+    <button class="btn-o" onclick="closeMod();openRegistro('fc-plaEvt',{planta:${id}})">Registrar evento</button>
+    <div style="height:7px"></div>
+    <button class="btn-o" onclick="closeMod();openRegistro('fc-huertaCultivo',{planta:${id}})">Editar cultivo</button>
+    <div style="height:7px"></div>
+    <button class="btn-o" onclick="cerrarCultivo(${id},'terminado')">Terminar</button>` : ''}`;
+  document.getElementById('mwrap').classList.add('on');
 };
 
 // ════ RENDER REVOLCADAS ════
@@ -1732,7 +2017,7 @@ window.renderPec = renderPec;
 
 // ════ FITOSANITARIO (sección de la ficha de cada planta) ════
 const fitoHTML = p => {
-  const ficha = fichaFito(p.nombre); // por nombre, no por especie (ver nota en Task 2 del plan fitosanitario)
+  const ficha = fichaFitoDe(p); // frutales/plantas: por nombre, no por especie; cultivos: por clave de catálogo
   if (!ficha) return '';
   const nivel = nivelVigilancia(ficha, TODAY.getMonth()+1);
   const rows = ficha.problemas.map(pr => `<tr>
@@ -1748,7 +2033,7 @@ const fitoHTML = p => {
       <thead><tr><th>Problema</th><th>Qué vas a ver</th><th>Producto / Dosis</th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>
-    <div style="font-size:12px;color:var(--ink3);font-style:italic;margin-top:10px">Referencia general — confirmá contra la etiqueta de tu producto, las concentraciones varían entre marcas. Para plagas persistentes o graves, conviene un diagnóstico específico antes de tratar.</div>
+    <div style="font-size:12px;color:var(--ink3);font-style:italic;margin-top:10px">Referencia general — confirmá contra la etiqueta de tu producto, las concentraciones varían entre marcas. Para plagas persistentes o graves, conviene un diagnóstico específico antes de tratar.${esCultivo(p) ? ' Respetá el tiempo de carencia que indica la etiqueta antes de cosechar y probá el producto en pocas hojas antes de tratar toda la planta (el azufre puede quemar zapallitos, zapallos y pepinos).' : ''}</div>
   </details>`;
 };
 
@@ -1895,6 +2180,7 @@ window.openSis = id => {
 };
 window.openPla = id => {
   const p = S.plantas.find(x=>x.id===id);
+  if (esCultivo(p)) return openCultivo(id);
   const e = estPlanta(p);
   const eventos = regEventos(id);
   document.getElementById('mtitle').textContent = pLbl(p);
@@ -1912,15 +2198,7 @@ window.openPla = id => {
     ${p.notas?`<div style="font-size:12px;color:var(--ink2);background:var(--paper2);padding:11px;border-radius:var(--r);margin:14px 0">${p.notas}</div>`:''}
     ${fitoHTML(p)}
     <div style="font-family:var(--serif);font-size:17px;color:var(--ink);margin:18px 0 10px">Historial</div>
-    ${eventos.length?`<div style="overflow-x:auto"><table class="rtbl" style="width:100%">
-      <thead><tr><th>Fecha</th><th>Evento</th><th>Detalle</th><th>Resultado</th></tr></thead>
-      <tbody>${eventos.map(r=>`<tr>
-        <td><b>${fmt(r.fecha)}</b></td>
-        <td>${r.tipo}</td>
-        <td style="font-size:12px;color:var(--ink3)">${r.detalle||''}${r.producto?' — '+r.producto:''}</td>
-        <td style="font-size:12px;color:var(--ink3);font-style:italic">${r.resultado||''}</td>
-      </tr>`).join('')}</tbody>
-    </table></div>`:`<div style="font-size:13px;color:var(--ink3)">Sin eventos registrados</div>`}
+    ${historialPlantaHTML(eventos)}
     <div style="height:14px"></div>
     <button class="btn-g" onclick="closeMod();openRegistro('fc-plaEvt',{planta:${id}})">Registrar evento</button>
     <div style="height:7px"></div>
@@ -1943,10 +2221,13 @@ const registrarLocal = async (lista, col, tipoSheet, datos) => {
   const fbId = await fbAdd(col, datos); if (fbId) { r.id = fbId; delete r._pend; sv(); }
   return r;
 };
+// Varios eventos en el mismo milisegundo (riego agrupado) no deben compartir id local.
+let seqId = 0;
+const idLocal = pref => pref + Date.now() + String(++seqId % 1000).padStart(3, '0');
 const registrarRevolcada = (sistema, fecha, obs = '') =>
   registrarLocal(S.revolcadas, 'revolcadas', 'revolcada', { id:Date.now().toString(), sistema, fecha, obs });
 const registrarEventoPlanta = (planta, fecha, tipo, detalle = '', producto = '', resultado = '') =>
-  registrarLocal(S.registroPlantas, 'registroPlantas', 'plantaEvento', { id:'ev'+Date.now(), planta, fecha, tipo, detalle, producto, resultado });
+  registrarLocal(S.registroPlantas, 'registroPlantas', 'plantaEvento', { id:idLocal('ev'), planta, fecha, tipo, detalle, producto, resultado });
 const registrarEventoPecera = (fecha, tipo, detalle = '', resultado = '') =>
   registrarLocal(S.registroPecera, 'registroPecera', 'peceraEvento', { id:'kv'+Date.now(), fecha, tipo, detalle, resultado });
 window.saveRev = async () => {
@@ -2093,6 +2374,7 @@ const renderTab = t => {
   if (t==='hoy')  renderHoy();
   if (t==='comp') { renderCompostResumen(); renderSist(); renderRev(); }
   if (t==='pla')  { renderPlaResumen(); renderPla(); renderPec(); }
+  if (t==='hue')  renderHue();
   if (t==='cli')  renderCli();
 };
 window.refresh = () => renderTab(cur);
@@ -2115,7 +2397,7 @@ window.go = t => {
 };
 
 // ════ HOJA DE REGISTRO ════
-const REG_TITLES = { 'fc-rev':'Nueva revolcada', 'fc-sisEdit':'Editar sistema', 'fc-plaEvt':'Actividad de planta', 'fc-plaEdit':'Editar planta', 'fc-pecEvt':'Evento de pecera', 'fc-pecData':'Datos de la pecera' };
+const REG_TITLES = { 'fc-rev':'Nueva revolcada', 'fc-sisEdit':'Editar sistema', 'fc-plaEvt':'Actividad de planta', 'fc-plaEdit':'Editar planta', 'fc-pecEvt':'Evento de pecera', 'fc-pecData':'Datos de la pecera', 'fc-huertaCultivo':'Cultivo de la huerta' };
 window.openRegistro = (fc, pre = {}) => {
   if (fc && !REG_TITLES[fc]) fc = undefined;
   const hoy = fISO(TODAY);
@@ -2127,6 +2409,7 @@ window.openRegistro = (fc, pre = {}) => {
   if (fc === 'fc-plaEdit') { if (pre.planta) document.getElementById('epv').value = pre.planta; loadPlanta(); }
   if (fc === 'fc-pecEvt') { const s = document.getElementById('kt'); s.value = pre.tipo || (s.options[0] && s.options[0].value); }
   if (fc === 'fc-pecData') loadPecera();
+  if (fc === 'fc-huertaCultivo') prepararCultivo(pre.planta);
   actualizarProblemaSel();
   document.getElementById('reg-menu').style.display = fc ? 'none' : '';
   Object.keys(REG_TITLES).forEach(id => document.getElementById(id).classList.toggle('on', id === fc));
@@ -2167,16 +2450,17 @@ const poblarSels = () => {
   const opts = S.sistemas.map(s=>`<option value="${s.id}">${sLbl(s)}</option>`).join('');
   ['rs','es'].forEach(id=>{const el=document.getElementById(id);const c=el.value;el.innerHTML=opts;if(c)el.value=c;});
   document.getElementById('hf').innerHTML = '<option value="todos">Todos los sistemas</option>'+opts;
-  const poptsPla = S.plantas.map(p=>`<option value="${p.id}">${pLbl(p)}</option>`).join('');
-  ['pv','epv'].forEach(id=>{const el=document.getElementById(id);const c=el.value;el.innerHTML=poptsPla;if(c)el.value=c;});
+  const opts1 = arr => arr.map(p=>`<option value="${p.id}">${pLbl(p)}</option>`).join('');
+  [['pv', S.plantas.filter(p => !estaCerrado(p))], ['epv', plantasComunes()]].forEach(([id, arr])=>{const el=document.getElementById(id);const c=el.value;el.innerHTML=opts1(arr);if(c)el.value=c;});
   actualizarProblemaSel();
+  poblarCultivosSel();
 };
 window.actualizarProblemaSel = () => {
   const wrap = document.getElementById('pb-wrap');
   const pid = +document.getElementById('pv').value;
   const tipo = document.getElementById('pt').value;
   const p = S.plantas.find(x=>x.id===pid);
-  const ficha = p ? fichaFito(p.nombre) : null; // por nombre, no por especie (ver nota en Task 2)
+  const ficha = p ? fichaFitoDe(p) : null;
   if (tipo !== '🐛 Revisión plagas' || !ficha) {
     wrap.style.display = 'none';
     document.getElementById('pb').innerHTML = '';
@@ -2189,7 +2473,7 @@ window.actualizarProblemaSel = () => {
 window.aplicarProblema = () => {
   const pid = +document.getElementById('pv').value;
   const p = S.plantas.find(x=>x.id===pid);
-  const ficha = p ? fichaFito(p.nombre) : null; // por nombre, no por especie (ver nota en Task 2)
+  const ficha = p ? fichaFitoDe(p) : null;
   const idx = document.getElementById('pb').value;
   if (!ficha || idx==='') return;
   const pr = ficha.problemas[+idx];
