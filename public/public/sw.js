@@ -1,7 +1,10 @@
-const CACHE = 'compost-tracker-v2';
+// Los módulos same-origin se sirven cache-first: cada cambio en huerta-catalogo.js
+// (o en cualquier archivo del shell) exige subir esta versión.
+const CACHE = 'compost-tracker-v3';
 const APP_SHELL = [
   '/',
   '/index.html',
+  '/huerta-catalogo.js',
   '/manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
