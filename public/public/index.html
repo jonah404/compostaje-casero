@@ -494,6 +494,7 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
         <button data-s="rev" onclick="setSeg('comp','rev')">Revolcadas</button>
       </div>
       <div class="seg-pane on" id="pane-sist">
+        <div id="comp-resumen"></div>
         <div id="sist-c"></div>
         <button class="add-btn" onclick="addSis()"><i class="ti ti-plus"></i> Agregar sistema</button>
       </div>
@@ -514,6 +515,7 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
         <button data-s="pec" onclick="setSeg('pla','pec')">Pecera</button>
       </div>
       <div class="seg-pane on" id="pane-pla">
+        <div id="pla-resumen"></div>
         <div id="pla-c"></div>
         <button class="add-btn" onclick="addPlanta()"><i class="ti ti-plus"></i> Agregar planta</button>
       </div>
@@ -533,11 +535,6 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
     <div class="pg" id="pg-cli">
       <div class="fetch-bar hide" id="fetch-bar"><i class="ti ti-cloud-download"></i> Actualizando clima desde Open-Meteo...</div>
       <div id="cli-c"></div>
-    </div>
-
-    <!-- FITOSANITARIO (se elimina en la Tarea 6) -->
-    <div class="pg" id="pg-fito">
-      <div id="fito-c"></div>
     </div>
 
     <!-- REGISTRAR -->
@@ -1346,182 +1343,6 @@ const ringSVG = (pct, color, size=76, thickness=8) => {
   </svg>`;
 };
 
-// Tarjeta de stat con acento de color arriba
-const statTile = (colorVar, label, value, sub) => `
-  <div class="stat" style="border-top:3px solid var(${colorVar})">
-    <div class="stat-l">${label}</div>
-    <div class="stat-v">${value}</div>
-    <div class="stat-s">${sub}</div>
-  </div>`;
-
-// ════ RENDER DASHBOARD ════
-const renderDash = () => {
-  const an      = analisis();
-  const ax      = analisisExtra();
-  const nCarga = S.sistemas.filter(s=>s.inicioC && est(s).fase==='c').length;
-  const nEstanque = S.sistemas.filter(s=>s.inicioC && est(s).fase==='s').length;
-  const nCasi = S.sistemas.filter(s=>s.inicioC && est(s).fase==='q').length;
-  const nListo = S.sistemas.filter(s=>s.inicioC && est(s).fase==='l').length;
-  const sisEstadoDonut = donutSVG([
-    {value: nCarga, color:'var(--chart-1)'},
-    {value: nEstanque, color:'var(--chart-2)'},
-    {value: nCasi, color:'var(--chart-3)'},
-    {value: nListo, color:'var(--chart-5)'},
-  ]);
-  const sisEstadoLegend = [
-    {n:'En carga', v:nCarga, c:'var(--chart-1)'},
-    {n:'En estanque', v:nEstanque, c:'var(--chart-2)'},
-    {n:'Casi listo', v:nCasi, c:'var(--chart-3)'},
-    {n:'Listo', v:nListo, c:'var(--chart-5)'},
-  ];
-  const nRiegoOk = S.plantas.filter(p=>!estPlanta(p).riegoUrg && !estPlanta(p).riegoProx).length;
-  const nRiegoProx = S.plantas.filter(p=>estPlanta(p).riegoProx).length;
-  const nRiegoUrg = S.plantas.filter(p=>estPlanta(p).riegoUrg).length;
-  const riegoDonut = donutSVG([
-    {value: nRiegoOk, color:'var(--chart-1)'},
-    {value: nRiegoProx, color:'var(--chart-3)'},
-    {value: nRiegoUrg, color:'var(--chart-4)'},
-  ], 112, 15, 'plantas');
-  const riegoLegend = [
-    {n:'Al día', v:nRiegoOk, c:'var(--chart-1)'},
-    {n:'Riego pronto', v:nRiegoProx, c:'var(--chart-3)'},
-    {n:'Regar ahora', v:nRiegoUrg, c:'var(--chart-4)'},
-  ];
-  const revBarMax = Math.max(1, ...S.sistemas.map(s=>S.revolcadas.filter(r=>r.sistema===s.id).length));
-  const als     = [];
-  S.sistemas.forEach(s=>{
-    const p=proxRev(s); if(!p)return; const d=dd(TODAY,p);
-    if(d<0) als.push({c:'al-r',t:`${sLbl(s)} — atrasado ${-d}d`,b:'Hacerlo cuanto antes'});
-    else if(d===0) als.push({c:'al-r',t:`${sLbl(s)} — revolver HOY`,b:'Se cumplen 7 días desde la última revolcada'});
-    else if(d<=2)  als.push({c:'al-w',t:`${sLbl(s)} — en ${d}d`,b:`Próximo: ${fmt(fISO(p))}`});
-  });
-  S.sistemas.filter(s=>est(s).fase==='q').forEach(s=>als.push({c:'al-w',t:`${sLbl(s)} — casi listo`,b:`${est(s).d}d en estanque`}));
-  S.sistemas.filter(s=>est(s).fase==='l').forEach(s=>als.push({c:'al-ok',t:`${sLbl(s)} — ¡listo!`,b:'Más de 180 días en estanque'}));
-  S.plantas.forEach(p=>{
-    const e = estPlanta(p);
-    if (e.riegoUrg) als.push({c:'al-r',t:`${pLbl(p)} — regar`,b:`${e.diasSinAgua} días sin agua (límite ${e.limite})`});
-    else if (e.riegoProx) als.push({c:'al-w',t:`${pLbl(p)} — riego pronto`,b:`${e.diasSinAgua} días sin agua`});
-    if (e.fertUrg) als.push({c:'al-w',t:`${pLbl(p)} — fertilizar`,b: e.diasParaFert<0 ? `${-e.diasParaFert} días de atraso` : 'toca hoy'});
-    if (e.plagasUrg) als.push({c:'al-w',t:`${pLbl(p)} — revisar plagas`,b: e.diasParaPlagas<0 ? `${-e.diasParaPlagas} días de atraso` : 'toca hoy'});
-  });
-  const ep = estPecera();
-  if (ep.cambioUrg) als.push({c:'al-r',t:'Pecera — cambio de agua',b:`${ep.diasSinCambio} días sin cambio (objetivo cada ${ep.limiteCambio}d)`});
-  if (ep.limpiezaUrg) als.push({c:'al-w',t:'Pecera — limpiar filtro/esponja',b:`${ep.diasSinLimpieza} días sin limpiar`});
-  if(!als.length) als.push({c:'al-ok',t:'Todo en orden 👍',b:'Sin alertas pendientes'});
-  const ch = cdDia(fISO(TODAY)) || [...S.clima].sort((a,b)=>a.fecha>b.fecha?-1:1)[0];
-
-  document.getElementById('dash-c').innerHTML = `
-    <div class="sh">Análisis <span class="sh-sub">con los datos acumulados hasta ahora</span></div>
-    <div class="dash-grid">
-      <div class="card">
-        <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:8px">Temperatura y lluvia — últimos 21 días</div>
-        ${climaSparkSVG(21)}
-        <div class="sep"></div>
-        <div class="g3">
-          <div style="font-size:12px;color:var(--ink3)">Lluvia 30d<br><b style="font-family:var(--serif);font-size:20px;color:var(--ink)">${n1(an.ll30)}</b> mm</div>
-          <div style="font-size:12px;color:var(--ink3)">Sin lluvia<br><b style="font-family:var(--serif);font-size:20px;color:var(--ink)">${an.sl}</b> días</div>
-          <div style="font-size:12px;color:var(--ink3)">Registros<br><b style="font-family:var(--serif);font-size:20px;color:var(--ink)">${S.clima.length}</b> días</div>
-        </div>
-        <div class="sep"></div>
-        <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:10px">Clima reciente <span class="sh-sub">${ch?fmt(ch.fecha):''}</span></div>
-        ${ch?`<div>
-          <div class="clh-row">
-            <div><div class="clh-temp">${n1(ch.temp)}°</div><div class="clh-sub">${ch.lluvia==='si'?'☔ Llovió':'Sin lluvia'}${+ch.mm>0?' — '+n1(ch.mm)+' mm':''}</div></div>
-            <div class="clh-right"><div class="clh-hum">${n0(ch.hum)}<span>%</span></div><div class="clh-mini">humedad relativa</div></div>
-          </div>
-          <div class="clg">
-            <div class="cli"><div class="cli-l">Máx</div><div class="cli-v">${n1(ch.tmax)}<span class="cli-u">°C</span></div></div>
-            <div class="cli"><div class="cli-l">Mín</div><div class="cli-v">${n1(ch.tmin)}<span class="cli-u">°C</span></div></div>
-            <div class="cli"><div class="cli-l">Viento</div><div class="cli-v">${n1(ch.viento)}<span class="cli-u"> km/h</span></div></div>
-            <div class="cli"><div class="cli-l">Evapo</div><div class="cli-v">${n1(ch.evapo)}<span class="cli-u"> mm</span></div></div>
-          </div>
-        </div>`:`<div style="font-size:13px;color:var(--ink3)">Sin datos. Pulsá Sincronizar.</div>`}
-      </div>
-      <div>
-        <div class="card">
-          <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:10px">Estado de sistemas</div>
-          <div class="donut-wrap">
-            ${sisEstadoDonut}
-            <div class="donut-legend">
-              ${sisEstadoLegend.map(l=>`<div class="donut-legend-item"><span style="display:flex;align-items:center;gap:7px"><span class="donut-dot" style="background:${l.c}"></span>${l.n}</span><b>${l.v}</b></div>`).join('')}
-            </div>
-          </div>
-        </div>
-        <div class="ring-row">
-          <div class="ring-tile">
-            ${ringSVG(ax.pctRevolcadas, ax.pctRevolcadas==null?'var(--ink3)':ax.pctRevolcadas>=80?'var(--chart-1)':ax.pctRevolcadas>=50?'var(--chart-3)':'var(--chart-4)')}
-            <div class="ring-tile-l">Revolcadas en tiempo</div>
-            <div class="ring-tile-s">${ax.totalPares?ax.totalPares+' intervalos':'sin datos'}</div>
-          </div>
-          <div class="ring-tile">
-            ${ringSVG(ax.pctPlantas, ax.pctPlantas==null?'var(--ink3)':ax.pctPlantas>=80?'var(--chart-1)':ax.pctPlantas>=50?'var(--chart-3)':'var(--chart-4)')}
-            <div class="ring-tile-l">Plantas al día</div>
-            <div class="ring-tile-s">${ax.totalPlantas} plantas</div>
-          </div>
-        </div>
-        <div class="sh" style="margin-top:20px">Alertas</div>
-        ${als.map(a=>`<div class="al ${a.c}"><div class="al-t">${a.t}</div>${a.b?`<div class="al-b">${a.b}</div>`:''}</div>`).join('')}
-      </div>
-    </div>
-    <div class="dash-grid" style="margin-top:10px">
-      <div class="card">
-        <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:10px">Riego de plantas</div>
-        ${S.plantas.length?`<div class="donut-wrap">
-          ${riegoDonut}
-          <div class="donut-legend">
-            ${riegoLegend.map(l=>`<div class="donut-legend-item"><span style="display:flex;align-items:center;gap:7px"><span class="donut-dot" style="background:${l.c}"></span>${l.n}</span><b>${l.v}</b></div>`).join('')}
-          </div>
-        </div>`:`<div style="font-size:13px;color:var(--ink3)">Sin plantas registradas.</div>`}
-      </div>
-      <div class="card">
-        <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:10px">Revolcadas por sistema</div>
-        ${S.sistemas.some(s=>s.inicioC)?hbarSVG(
-          S.sistemas.filter(s=>s.inicioC).map((s,i)=>({
-            label: sLbl(s),
-            value: S.revolcadas.filter(r=>r.sistema===s.id).length,
-            color: [`var(--chart-1)`,`var(--chart-2)`,`var(--chart-3)`,`var(--chart-5)`,`var(--chart-4)`][i%5]
-          })), revBarMax
-        ):`<div style="font-size:13px;color:var(--ink3)">Sin sistemas activos.</div>`}
-      </div>
-    </div>
-
-    <div class="dash-grid">
-      <div>
-        <div class="sh">Condición <span class="sh-sub">últimos 7 días</span></div>
-        <div class="cond">
-          <div class="cond-hdr">
-            <span class="cond-t">Índice de condición</span>
-            <span class="cond-s" style="color:${an.ic}">${an.idx}/100</span>
-          </div>
-          <div class="cond-bar"><div class="cond-f" style="width:${an.idx}%;background:${an.ic}"></div></div>
-          <div style="font-size:13px;color:${an.ic};font-weight:700;margin-bottom:10px">${an.il2}</div>
-          <div class="pills">
-            <span class="pill" style="background:${an.cr?'var(--sage-bg)':'var(--umber-bg)'};color:${an.cr?'var(--sage)':'var(--umber)'}">🔄 ${an.cr?'Conviene revolver':'Esperar para revolver'}</span>
-            <span class="pill" style="background:${an.nr?'var(--umber-bg)':'var(--sage-bg)'};color:${an.nr?'var(--umber)':'var(--sage)'}">💧 ${an.nr?'Necesita riego':'Riego OK'}</span>
-            ${an.df?`<span class="pill" style="background:var(--sky-bg);color:var(--sky)">❄️ ${an.df}d de frío</span>`:''}
-          </div>
-          <div class="sep"></div>
-          <div class="g2">
-            <div style="font-size:12px;color:var(--ink3)">Lluvia 7d<br><b style="font-family:var(--serif);font-size:20px;color:var(--ink)">${n1(an.ll7)}</b> mm</div>
-            <div style="font-size:12px;color:var(--ink3)">Lluvia 30d<br><b style="font-family:var(--serif);font-size:20px;color:var(--ink)">${n1(an.ll30)}</b> mm</div>
-            <div style="font-size:12px;color:var(--ink3)">Temp prom<br><b style="font-family:var(--serif);font-size:20px;color:var(--ink)">${n1(an.tp7)}</b> °C</div>
-            <div style="font-size:12px;color:var(--ink3)">Sin lluvia<br><b style="font-family:var(--serif);font-size:20px;color:var(--ink)">${an.sl}</b> días</div>
-          </div>
-        </div>
-      </div>
-      <div>
-        <div class="sh">Sistemas activos</div>
-        ${S.sistemas.filter(s=>s.inicioC).map(s=>sysHTML(s)).join('')||'<div style="font-size:13px;color:var(--ink3)">Sin sistemas activos.</div>'}
-      </div>
-    </div>
-
-    <div class="g3" style="margin-top:24px">
-      ${statTile(ep.cambioUrg?'--rust':'--sage', 'Pecera — agua', ep.diasSinCambio!=null?ep.diasSinCambio+'d':'—', `objetivo cada ${ep.limiteCambio}d`)}
-      ${statTile(ep.limpiezaUrg?'--umber':'--sage', 'Pecera — filtro', ep.diasSinLimpieza!=null?ep.diasSinLimpieza+'d':'—', ep.puedeLimpiar?`objetivo cada ${CFG_PEC.diasLimpiezaFiltro}d`:'aún no tocar')}
-      ${statTile('--sky', 'Pecera — fase', ep.enCiclado?'Ciclado':'Establecida', ep.diasArmado!=null?`día ${ep.diasArmado}`:'')}
-    </div>`;
-};
-
 // ════ HOY ════
 // Une lo que ya calculan estPlanta/proxRev/estPecera en una lista de tareas.
 // Mismos criterios que el evento "Tareas de hoy" del calendario (codigo.gs).
@@ -1682,6 +1503,61 @@ const renderSist = () => {
   document.getElementById('sist-c').innerHTML = S.sistemas.map(s=>sysHTML(s)).join('');
 };
 
+// ════ RESUMEN DE COMPOST (antes en Inicio) ════
+const renderCompostResumen = () => {
+  const an = analisis(), ax = analisisExtra();
+  const cnt = f => S.sistemas.filter(s => s.inicioC && est(s).fase === f).length;
+  const n = { c:cnt('c'), s:cnt('s'), q:cnt('q'), l:cnt('l') };
+  const donut = donutSVG([
+    {value:n.c, color:'var(--chart-1)'}, {value:n.s, color:'var(--chart-2)'},
+    {value:n.q, color:'var(--chart-3)'}, {value:n.l, color:'var(--chart-5)'},
+  ]);
+  const legend = [
+    {n:'En carga', v:n.c, c:'var(--chart-1)'}, {n:'En estanque', v:n.s, c:'var(--chart-2)'},
+    {n:'Casi listo', v:n.q, c:'var(--chart-3)'}, {n:'Listo', v:n.l, c:'var(--chart-5)'},
+  ];
+  const revBarMax = Math.max(1, ...S.sistemas.map(s => S.revolcadas.filter(r => r.sistema === s.id).length));
+  const colorPct = p => p == null ? 'var(--ink3)' : p >= 80 ? 'var(--chart-1)' : p >= 50 ? 'var(--chart-3)' : 'var(--chart-4)';
+  document.getElementById('comp-resumen').innerHTML = `
+    <div class="card">
+      <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:10px">Estado de sistemas</div>
+      <div class="donut-wrap">
+        ${donut}
+        <div class="donut-legend">
+          ${legend.map(l => `<div class="donut-legend-item"><span style="display:flex;align-items:center;gap:7px"><span class="donut-dot" style="background:${l.c}"></span>${l.n}</span><b>${l.v}</b></div>`).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="ring-row">
+      <div class="ring-tile">
+        ${ringSVG(ax.pctRevolcadas, colorPct(ax.pctRevolcadas))}
+        <div class="ring-tile-l">Revolcadas en tiempo</div>
+        <div class="ring-tile-s">${ax.totalPares ? ax.totalPares+' intervalos' : 'sin datos'}</div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:10px">Revolcadas por sistema</div>
+      ${S.sistemas.some(s => s.inicioC) ? hbarSVG(
+        S.sistemas.filter(s => s.inicioC).map((s,i) => ({
+          label: sLbl(s),
+          value: S.revolcadas.filter(r => r.sistema === s.id).length,
+          color: ['var(--chart-1)','var(--chart-2)','var(--chart-3)','var(--chart-5)','var(--chart-4)'][i%5]
+        })), revBarMax
+      ) : `<div style="font-size:13px;color:var(--ink3)">Sin sistemas activos.</div>`}
+    </div>
+    <div class="cond">
+      <div class="cond-hdr"><span class="cond-t">Índice de condición</span><span class="cond-s" style="color:${an.ic}">${an.idx}/100</span></div>
+      <div class="cond-bar"><div class="cond-f" style="width:${an.idx}%;background:${an.ic}"></div></div>
+      <div style="font-size:13px;color:${an.ic};font-weight:700;margin-bottom:10px">${an.il2}</div>
+      <div class="pills">
+        <span class="pill" style="background:${an.cr?'var(--sage-bg)':'var(--umber-bg)'};color:${an.cr?'var(--sage)':'var(--umber)'}">🔄 ${an.cr?'Conviene revolver':'Esperar para revolver'}</span>
+        <span class="pill" style="background:${an.nr?'var(--umber-bg)':'var(--sage-bg)'};color:${an.nr?'var(--umber)':'var(--sage)'}">💧 ${an.nr?'Necesita riego':'Riego OK'}</span>
+        ${an.df ? `<span class="pill" style="background:var(--sky-bg);color:var(--sky)">❄️ ${an.df}d de frío</span>` : ''}
+      </div>
+    </div>
+    <div class="sh">Sistemas</div>`;
+};
+
 // ════ RENDER PLANTAS ════
 const plantHTML = p => {
   const e = estPlanta(p);
@@ -1704,6 +1580,37 @@ const plantHTML = p => {
 };
 const renderPla = () => {
   document.getElementById('pla-c').innerHTML = S.plantas.map(p=>plantHTML(p)).join('') || '<div style="font-size:13px;color:var(--ink3)">Sin plantas registradas.</div>';
+};
+
+// ════ RESUMEN DE PLANTAS (antes en Inicio) ════
+const renderPlaResumen = () => {
+  const ax = analisisExtra();
+  const ests = S.plantas.map(estPlanta);
+  const nUrg = ests.filter(e => e.riegoUrg).length;
+  const nProx = ests.filter(e => e.riegoProx).length;
+  const nOk = ests.length - nUrg - nProx;
+  const donut = donutSVG([
+    {value:nOk, color:'var(--chart-1)'}, {value:nProx, color:'var(--chart-3)'}, {value:nUrg, color:'var(--chart-4)'},
+  ], 112, 15, 'plantas');
+  const legend = [ {n:'Al día', v:nOk, c:'var(--chart-1)'}, {n:'Riego pronto', v:nProx, c:'var(--chart-3)'}, {n:'Regar ahora', v:nUrg, c:'var(--chart-4)'} ];
+  document.getElementById('pla-resumen').innerHTML = S.plantas.length ? `
+    <div class="card">
+      <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:10px">Riego de plantas</div>
+      <div class="donut-wrap">
+        ${donut}
+        <div class="donut-legend">
+          ${legend.map(l => `<div class="donut-legend-item"><span style="display:flex;align-items:center;gap:7px"><span class="donut-dot" style="background:${l.c}"></span>${l.n}</span><b>${l.v}</b></div>`).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="ring-row">
+      <div class="ring-tile">
+        ${ringSVG(ax.pctPlantas, ax.pctPlantas == null ? 'var(--ink3)' : ax.pctPlantas >= 80 ? 'var(--chart-1)' : ax.pctPlantas >= 50 ? 'var(--chart-3)' : 'var(--chart-4)')}
+        <div class="ring-tile-l">Plantas al día</div>
+        <div class="ring-tile-s">${ax.totalPlantas} plantas</div>
+      </div>
+    </div>
+    <div class="sh">Plantas</div>` : '';
 };
 
 // ════ RENDER REVOLCADAS ════
@@ -1784,35 +1691,50 @@ const renderPec = () => {
 };
 window.renderPec = renderPec;
 
-// ════ RENDER FITOSANITARIO ════
-const renderFito = () => {
-  const mes = TODAY.getMonth()+1;
-  const cards = S.plantas.map(p => {
-    const ficha = fichaFito(p.nombre); // por nombre, no por especie (ver nota en Task 2)
-    if (!ficha) return '';
-    const nivel = nivelVigilancia(ficha, mes);
-    const rows = ficha.problemas.map(pr => `<tr>
-        <td>${pr.nombre}</td>
-        <td style="font-size:12px;color:var(--ink3)">${pr.sintoma}</td>
-        <td style="font-size:12px"><b>${pr.producto}</b><br><span style="color:var(--ink3)">${pr.dosis}</span></td>
-      </tr>`).join('');
-    return `<div class="fc" style="margin-bottom:16px">
-      <h3><i class="ti ti-bug"></i>${pLbl(p)}
-        <span class="badge" style="background:var(--sky-bg);color:var(--sky);margin-left:8px">${nivel} ${NIVEL_LABEL[nivel]}</span>
-      </h3>
-      <div style="font-size:12px;color:var(--ink3);margin-bottom:10px"><b>Momento crítico:</b> ${ficha.momentoCritico}</div>
-      <div style="font-size:12px;color:var(--ink3);margin-bottom:14px"><b>Qué monitorear:</b> ${ficha.monitoreo}</div>
-      <div class="tbl-wrap"><div class="tbl-scroll"><table class="rtbl">
-        <thead><tr><th>Problema</th><th>Qué vas a ver</th><th>Producto / Dosis</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table></div></div>
-      <div style="font-size:11px;color:var(--ink3);font-style:italic;margin-top:10px">Referencia general — confirmá contra la etiqueta de tu producto, las concentraciones varían entre marcas. Para plagas persistentes o graves, conviene un diagnóstico específico antes de tratar.</div>
-      <button class="btn-o" style="margin-top:12px" onclick="openPla(${p.id})">Ver planta</button>
-    </div>`;
-  }).filter(Boolean).join('');
-  document.getElementById('fito-c').innerHTML = cards || `<div style="font-size:13px;color:var(--ink3);padding:24px;text-align:center">Sin fichas fitosanitarias cargadas</div>`;
+// ════ FITOSANITARIO (sección de la ficha de cada planta) ════
+const fitoHTML = p => {
+  const ficha = fichaFito(p.nombre); // por nombre, no por especie (ver nota en Task 2 del plan fitosanitario)
+  if (!ficha) return '';
+  const nivel = nivelVigilancia(ficha, TODAY.getMonth()+1);
+  const rows = ficha.problemas.map(pr => `<tr>
+      <td>${pr.nombre}</td>
+      <td style="font-size:12px;color:var(--ink3)">${pr.sintoma}</td>
+      <td style="font-size:12px"><b>${pr.producto}</b><br><span style="color:var(--ink3)">${pr.dosis}</span></td>
+    </tr>`).join('');
+  return `<details class="fold" open>
+    <summary>🐛 Fitosanitario · ${nivel} ${NIVEL_LABEL[nivel]}</summary>
+    <div style="font-size:12px;color:var(--ink3);margin:6px 0"><b>Momento crítico:</b> ${ficha.momentoCritico}</div>
+    <div style="font-size:12px;color:var(--ink3);margin-bottom:10px"><b>Qué monitorear:</b> ${ficha.monitoreo}</div>
+    <div style="overflow-x:auto"><table class="rtbl" style="width:100%">
+      <thead><tr><th>Problema</th><th>Qué vas a ver</th><th>Producto / Dosis</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+    <div style="font-size:12px;color:var(--ink3);font-style:italic;margin-top:10px">Referencia general — confirmá contra la etiqueta de tu producto, las concentraciones varían entre marcas. Para plagas persistentes o graves, conviene un diagnóstico específico antes de tratar.</div>
+  </details>`;
 };
-window.renderFito = renderFito;
+
+// ════ CABECERA DE CLIMA (antes en Inicio): gráfico de 21 días + clima reciente ════
+const climaHeadHTML = () => {
+  const ch = cdDia(fISO(TODAY)) || [...S.clima].sort((a,b) => a.fecha > b.fecha ? -1 : 1)[0];
+  return `<div class="card">
+    <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:8px">Temperatura y lluvia — últimos 21 días</div>
+    ${climaSparkSVG(21)}
+    <div class="sep"></div>
+    <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:10px">Clima reciente <span class="sh-sub">${ch ? fmt(ch.fecha) : ''}</span></div>
+    ${ch ? `<div>
+      <div class="clh-row">
+        <div><div class="clh-temp">${n1(ch.temp)}°</div><div class="clh-sub">${ch.lluvia==='si' ? '☔ Llovió' : 'Sin lluvia'}${+ch.mm>0 ? ' — '+n1(ch.mm)+' mm' : ''}</div></div>
+        <div class="clh-right"><div class="clh-hum">${n0(ch.hum)}<span>%</span></div><div class="clh-mini">humedad relativa</div></div>
+      </div>
+      <div class="clg">
+        <div class="cli"><div class="cli-l">Máx</div><div class="cli-v">${n1(ch.tmax)}<span class="cli-u">°C</span></div></div>
+        <div class="cli"><div class="cli-l">Mín</div><div class="cli-v">${n1(ch.tmin)}<span class="cli-u">°C</span></div></div>
+        <div class="cli"><div class="cli-l">Viento</div><div class="cli-v">${n1(ch.viento)}<span class="cli-u"> km/h</span></div></div>
+        <div class="cli"><div class="cli-l">Evapo</div><div class="cli-v">${n1(ch.evapo)}<span class="cli-u"> mm</span></div></div>
+      </div>
+    </div>` : `<div style="font-size:13px;color:var(--ink3)">Sin datos. Pulsá Sincronizar.</div>`}
+  </div>`;
+};
 
 // ════ RENDER CLIMA ════
 const renderCli = () => {
@@ -1876,6 +1798,7 @@ const renderCli = () => {
     </div></div>` : `<div style="font-size:13px;color:var(--ink3);text-align:center;padding:32px">Sin datos. Pulsá Sincronizar.</div>`;
 
   document.getElementById('cli-c').innerHTML =
+    climaHeadHTML() +
     `<div class="sh">Resumen <span class="sh-sub">análisis climatico</span></div>${statsHTML}` +
     `<div class="sh">Historial <span class="sh-sub">${sorted.length} días — colores por valor</span></div>` +
     tableHTML;
@@ -1931,6 +1854,7 @@ window.openPla = id => {
       <tr><td>Próxima poda</td><td>${e.proximaPoda?fmt(fISO(e.proximaPoda)):'—'}</td></tr>
     </table>
     ${p.notas?`<div style="font-size:12px;color:var(--ink2);background:var(--paper2);padding:11px;border-radius:var(--r);margin:14px 0">${p.notas}</div>`:''}
+    ${fitoHTML(p)}
     <div style="font-family:var(--serif);font-size:17px;color:var(--ink);margin:18px 0 10px">Historial</div>
     ${eventos.length?`<div style="overflow-x:auto"><table class="rtbl" style="width:100%">
       <thead><tr><th>Fecha</th><th>Evento</th><th>Detalle</th><th>Resultado</th></tr></thead>
@@ -2110,15 +2034,14 @@ window.delRev = async (id, e) => {
 // ════ NAVEGACIÓN ════
 let cur = 'hoy';
 const TABS   = ['hoy','comp','pla','hue','cli'];
-const TITLES = {hoy:'Hoy',comp:'Compost',pla:'Plantas',hue:'Huerta',cli:'Clima',fito:'Fitosanitario'};
+const TITLES = {hoy:'Hoy',comp:'Compost',pla:'Plantas',hue:'Huerta',cli:'Clima'};
 // ids viejos → nueva ubicación (openSis/openPla/etc. todavía los usan)
-const LEGACY = { dash:{tab:'hoy'}, sist:{tab:'comp',seg:'sist'}, rev:{tab:'comp',seg:'rev'}, pec:{tab:'pla',seg:'pec'} };
+const LEGACY = { dash:{tab:'hoy'}, sist:{tab:'comp',seg:'sist'}, rev:{tab:'comp',seg:'rev'}, pec:{tab:'pla',seg:'pec'}, fito:{tab:'pla',seg:'pla'} };
 const renderTab = t => {
   if (t==='hoy')  renderHoy();
-  if (t==='comp') { renderSist(); renderRev(); }
-  if (t==='pla')  { renderPla(); renderPec(); }
+  if (t==='comp') { renderCompostResumen(); renderSist(); renderRev(); }
+  if (t==='pla')  { renderPlaResumen(); renderPla(); renderPec(); }
   if (t==='cli')  renderCli();
-  if (t==='fito') renderFito();
 };
 window.refresh = () => renderTab(cur);
 window.setSeg = (tab, s) => {
