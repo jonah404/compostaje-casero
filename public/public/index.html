@@ -419,6 +419,24 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
 .fab { position: fixed; right: 18px; bottom: 24px; width: 56px; height: 56px; border-radius: 50%; border: none; background: var(--sage); color: #fff; font-size: 26px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.3); z-index: 41; }
 .fab:active { transform: scale(.94); }
 @media (max-width: 767px) { .fab { bottom: calc(56px + env(safe-area-inset-bottom) + 16px); } }
+/* HOY */
+.hoy-date { font-family: var(--serif); font-size: 22px; color: var(--ink); text-transform: capitalize; margin-bottom: 10px; }
+.chips { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 14px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex: 0 0 auto; min-height: 44px; padding: 0 14px; border: 1px solid var(--rule2); background: var(--paper); color: var(--ink); border-radius: 22px; font-family: var(--sans); font-size: 13px; font-weight: 600; cursor: pointer; }
+.tk-grp { font-size: 12px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--ink3); margin: 16px 0 6px; }
+.tk { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 8px 8px 8px 14px; margin-bottom: 8px; background: var(--paper); border: 1px solid var(--rule); border-left: 3px solid var(--umber-mid); border-radius: var(--r); }
+.tk-late { border-left-color: var(--rust-mid); }
+.tk-body { flex: 1; min-width: 0; }
+.tk-t { font-size: 14px; font-weight: 600; color: var(--ink); }
+.tk-d { font-size: 12px; color: var(--ink3); margin-top: 2px; }
+.tk-btn { flex: 0 0 auto; min-width: 48px; min-height: 48px; border: none; border-radius: var(--r); background: var(--sage); color: #fff; font-size: 20px; font-weight: 700; font-family: var(--sans); cursor: pointer; }
+.tk-undo { background: var(--paper2); color: var(--ink); font-size: 13px; padding: 0 14px; }
+.tk-done { opacity: .75; border-left-color: var(--sage-mid); }
+.tk-done .tk-t { text-decoration: line-through; }
+.tk-empty { text-align: center; font-family: var(--serif); font-size: 18px; padding: 24px 16px; }
+.fold { margin-top: 12px; }
+.fold summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-size: 13px; font-weight: 700; color: var(--ink2); }
 </style>
 </head>
 <body>
@@ -467,7 +485,7 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
   <div class="pages" id="pages">
 
     <!-- HOY -->
-    <div class="pg on" id="pg-hoy"><div id="dash-c"></div></div>
+    <div class="pg on" id="pg-hoy"><div id="hoy-c"></div></div>
 
     <!-- COMPOST -->
     <div class="pg" id="pg-comp">
@@ -1090,7 +1108,7 @@ const estPlanta = p => {
     diasSinAgua, limite, agua,
     riegoUrg: diasSinAgua!=null && diasSinAgua>=limite,
     riegoProx: diasSinAgua!=null && diasSinAgua>=limite*0.7 && diasSinAgua<limite,
-    proximaFert: fert.proxima, diasParaFert: fert.dias, fertUrg: !fueraDeTemporadaFert && fert.dias!=null && fert.dias<=0,
+    proximaFert: fert.proxima, diasParaFert: fert.dias, fertEnTemporada: !fueraDeTemporadaFert, fertUrg: !fueraDeTemporadaFert && fert.dias!=null && fert.dias<=0,
     proximaPlagas: plagas.proxima, diasParaPlagas: plagas.dias, plagasUrg: plagas.dias!=null && plagas.dias<=0,
     proximaPoda: poda.proxima, diasParaPoda: poda.dias, podaProx: poda.dias!=null && poda.dias<=30 && poda.dias>=0,
   };
@@ -1503,6 +1521,125 @@ const renderDash = () => {
       ${statTile('--sky', 'Pecera — fase', ep.enCiclado?'Ciclado':'Establecida', ep.diasArmado!=null?`día ${ep.diasArmado}`:'')}
     </div>`;
 };
+
+// ════ HOY ════
+// Une lo que ya calculan estPlanta/proxRev/estPecera en una lista de tareas.
+// Mismos criterios que el evento "Tareas de hoy" del calendario (codigo.gs).
+const ETQ      = { riego:'regar', fert:'fertilizar', plagas:'revisar plagas', poda:'poda', revolcada:'revolver' };
+const TIPO_EVT = { riego:'💧 Riego', fert:'🌿 Fertilización', plagas:'🐛 Revisión plagas', poda:'✂️ Poda' };
+const AREAS_HOY = [ {id:'compost', t:'🌱 Compost'}, {id:'plantas', t:'🪴 Plantas'}, {id:'pecera', t:'🐠 Pecera'} ];
+const TEMP_CALOR = 38, TEMP_HELADA = 2, TEMP_HELADA_SEVERA = -2;
+const diferidos = new Map();   // id de tarea → { timer, commit } (ver "marcar hecho")
+let TAREAS = new Map();
+
+const armarTareasHoy = () => {
+  const hoy = [], prox = [];
+  S.sistemas.forEach(s => {
+    const p = proxRev(s); if (!p) return;
+    const d = dd(TODAY, p);
+    const base = { id:`revolcada-${s.id}`, area:'compost', tipo:'revolcada', ref:s.id, titulo:`${sLbl(s)} · revolver`, modo:'uno' };
+    if (d <= 0) hoy.push({ ...base, detalle: d < 0 ? `atrasado ${-d} d` : 'toca hoy', atraso: -d });
+    else if (d <= 3) prox.push({ ...base, detalle:`en ${d} d`, atraso: -d });
+  });
+  S.plantas.forEach(p => {
+    const e = estPlanta(p);
+    const base = (tipo, modo) => ({ id:`${tipo}-${p.id}`, area:'plantas', tipo, ref:p.id, titulo:`${pLbl(p)} · ${ETQ[tipo]}`, modo });
+    if (e.riegoUrg) hoy.push({ ...base('riego','uno'), detalle:`${e.diasSinAgua} días sin agua (límite ${e.limite})`, atraso: e.diasSinAgua - e.limite });
+    else if (e.riegoProx) prox.push({ ...base('riego','uno'), detalle:`${e.diasSinAgua} días sin agua`, atraso: 0 });
+    [ { tipo:'fert', dias:e.diasParaFert, activo:e.fertEnTemporada }, { tipo:'plagas', dias:e.diasParaPlagas, activo:true } ].forEach(c => {
+      if (!c.activo || c.dias == null) return;
+      if (c.dias <= 0) hoy.push({ ...base(c.tipo,'form'), detalle: c.dias < 0 ? `${-c.dias} días de atraso` : 'toca hoy', atraso: -c.dias });
+      else if (c.dias <= 3) prox.push({ ...base(c.tipo,'form'), detalle:`en ${c.dias} d`, atraso: -c.dias });
+    });
+    // Igual que "poda se acerca" del calendario: solo de 0 a 30 días antes.
+    if (e.diasParaPoda != null && e.diasParaPoda >= 0 && e.diasParaPoda <= 30) {
+      prox.push({ ...base('poda','form'), detalle: e.diasParaPoda === 0 ? 'toca hoy' : `en ${e.diasParaPoda} d`, atraso: -e.diasParaPoda });
+    }
+  });
+  const ep = estPecera();
+  const pec = (tipo, titulo, modo) => ({ id:`pec-${tipo}`, area:'pecera', tipo, ref:null, titulo, modo });
+  if (ep.cambioUrg) hoy.push({ ...pec('cambio-agua','Cambio de agua','uno'), detalle:`${ep.diasSinCambio} días sin cambio (objetivo cada ${ep.limiteCambio} d)`, atraso: ep.diasSinCambio - ep.limiteCambio });
+  else if (ep.diasSinCambio != null && ep.limiteCambio - ep.diasSinCambio <= 3) prox.push({ ...pec('cambio-agua','Cambio de agua','uno'), detalle:`en ${ep.limiteCambio - ep.diasSinCambio} d`, atraso: 0 });
+  if (ep.limpiezaUrg) hoy.push({ ...pec('filtro','Limpiar filtro/esponja','form'), detalle:`${ep.diasSinLimpieza} días sin limpiar`, atraso: ep.diasSinLimpieza - CFG_PEC.diasLimpiezaFiltro });
+  return { hoy, prox };
+};
+window.armarTareasHoy = armarTareasHoy;
+
+// Lo ya registrado hoy (de los mismos tipos que generan tareas).
+const hechasHoy = () => {
+  const hoyISO = fISO(TODAY), out = [];
+  S.revolcadas.filter(r => r.fecha === hoyISO).forEach(r => {
+    const s = S.sistemas.find(x => x.id === r.sistema);
+    out.push({ titulo:`${s ? sLbl(s) : 'Sistema '+r.sistema} · revolcada` });
+  });
+  S.registroPlantas.filter(r => r.fecha === hoyISO && /Riego|Fertiliz|plagas|Poda/.test(r.tipo)).forEach(r => {
+    const p = S.plantas.find(x => x.id === r.planta);
+    out.push({ titulo:`${p ? pLbl(p) : 'Planta'} · ${r.tipo.replace(/^\S+\s/, '')}` });
+  });
+  S.registroPecera.filter(r => r.fecha === hoyISO && /Cambio de agua|Limpieza/.test(r.tipo)).forEach(r => {
+    out.push({ titulo:`Pecera · ${r.tipo.replace(/^\S+\s/, '')}` });
+  });
+  return out;
+};
+
+// Urgentes: helada, frío en interior, calor extremo, compost listo (mismos umbrales que codigo.gs).
+const urgentesHoy = () => {
+  const out = [];
+  const ult = [...S.clima].sort((a,b) => a.fecha > b.fecha ? -1 : 1)[0];
+  const esInt = p => { const pf = perfilEspecie(p.especie || p.nombre); return !!(pf && pf.tipo === 'Interior'); };
+  if (ult && ult.tmin != null && ult.tmin !== '') {
+    const tmin = +ult.tmin;
+    if (S.plantas.some(p => !esInt(p)) && tmin <= TEMP_HELADA) {
+      const sev = tmin <= TEMP_HELADA_SEVERA;
+      out.push({ c: sev ? 'al-r' : 'al-w', t: (sev ? '🧊 Helada severa' : '❄️ Helada') + ' — proteger plantas de exterior', b:`Mínima registrada: ${n1(tmin)}°C` });
+    }
+    const frias = S.plantas.filter(p => { const pf = esInt(p) && perfilEspecie(p.especie || p.nombre); return pf && pf.tempMin != null && tmin <= pf.tempMin + 2; });
+    if (frias.length) out.push({ c:'al-w', t:'🥶 Frío — alejar de la ventana', b: frias.map(pLbl).join(', ') });
+  }
+  if (ult && ult.tmax != null && ult.tmax !== '' && +ult.tmax >= TEMP_CALOR) out.push({ c:'al-r', t:'🔥 Calor extremo — revisar humedad del compost', b:`Máxima registrada: ${n1(ult.tmax)}°C` });
+  S.sistemas.filter(s => est(s).fase === 'l').forEach(s => out.push({ c:'al-ok', t:`🎉 ${sLbl(s)} — listo para cosechar`, b:'Más de 180 días en estanque' }));
+  return out;
+};
+
+const filaTarea = (t, enEspera = false) => `<div class="tk ${enEspera ? 'tk-done' : (t.atraso > 0 ? 'tk-late' : '')}">
+  <div class="tk-body"><div class="tk-t">${t.titulo}</div><div class="tk-d">${enEspera ? 'Registrado — se guarda en unos segundos' : t.detalle}</div></div>
+  ${enEspera
+    ? `<button class="tk-btn tk-undo" onclick="deshacerTarea('${t.id}')">Deshacer</button>`
+    : `<button class="tk-btn" aria-label="${t.modo === 'uno' ? 'Marcar hecha' : 'Registrar'}" onclick="tareaTap('${t.id}')">${t.modo === 'uno' ? '✓' : '›'}</button>`}
+</div>`;
+
+const renderHoy = () => {
+  const { hoy, prox } = armarTareasHoy();
+  TAREAS = new Map([...hoy, ...prox].map(t => [t.id, t]));
+  const pend  = hoy.filter(t => !diferidos.has(t.id));
+  const hechas = hechasHoy();
+  const urg   = urgentesHoy();
+  const ch    = cdDia(fISO(TODAY)) || [...S.clima].sort((a,b) => a.fecha > b.fecha ? -1 : 1)[0];
+  const nC = pend.filter(t => t.area === 'compost').length, nP = pend.filter(t => t.area === 'plantas').length;
+  const seccion = a => {
+    const l = hoy.filter(t => t.area === a.id).sort((x,y) => y.atraso - x.atraso);
+    return l.length ? `<div class="tk-grp">${a.t}</div>${l.map(t => filaTarea(t, diferidos.has(t.id))).join('')}` : '';
+  };
+  document.getElementById('hoy-c').innerHTML = `
+    <div class="hoy-date">${TODAY.toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'})}</div>
+    <div class="chips">
+      <button class="chip" onclick="go('cli')">${ch ? `🌡 ${n1(ch.temp)}°${+ch.mm > 0 ? ` · ☔ ${n1(ch.mm)} mm` : ''}` : '🌡 —'}</button>
+      <button class="chip" onclick="go('comp')">🌱 Compost · ${nC}</button>
+      <button class="chip" onclick="go('pla')">🪴 Plantas · ${nP}</button>
+    </div>
+    ${urg.map(a => `<div class="al ${a.c}"><div class="al-t">${a.t}</div>${a.b ? `<div class="al-b">${a.b}</div>` : ''}</div>`).join('')}
+    <div class="sh">Tareas de hoy <span class="sh-sub">${pend.length}</span></div>
+    ${hoy.length
+      ? AREAS_HOY.map(seccion).join('')
+      : `<div class="card tk-empty">Todo al día 🌿${prox[0] ? `<div class="tk-d" style="font-family:var(--sans)">Próximo: ${prox[0].titulo} — ${prox[0].detalle}</div>` : ''}</div>`}
+    ${hechas.length ? `<details class="fold"><summary>Hechas hoy · ${hechas.length}</summary>${hechas.map(h => `<div class="tk tk-done"><div class="tk-body"><div class="tk-t">${h.titulo}</div></div></div>`).join('')}</details>` : ''}
+    ${prox.length ? `<details class="fold"><summary>Próximos · ${prox.length}</summary>${prox.map(t => `<div class="tk"><div class="tk-body"><div class="tk-t">${t.titulo}</div><div class="tk-d">${t.detalle}</div></div></div>`).join('')}</details>` : ''}`;
+};
+window.renderHoy = renderHoy;
+
+// Se completa en la Tarea 5.
+window.tareaTap = id => { const t = TAREAS.get(id); if (t) toast(`${t.titulo} (pendiente de conectar)`); };
+window.deshacerTarea = () => {};
 
 // ════ RENDER SISTEMAS ════
 const renderSist = () => {
@@ -1938,7 +2075,7 @@ const TITLES = {hoy:'Hoy',comp:'Compost',pla:'Plantas',hue:'Huerta',cli:'Clima',
 // ids viejos → nueva ubicación (openSis/openPla/etc. todavía los usan)
 const LEGACY = { dash:{tab:'hoy'}, sist:{tab:'comp',seg:'sist'}, rev:{tab:'comp',seg:'rev'}, pec:{tab:'pla',seg:'pec'} };
 const renderTab = t => {
-  if (t==='hoy')  renderDash();
+  if (t==='hoy')  renderHoy();
   if (t==='comp') { renderSist(); renderRev(); }
   if (t==='pla')  { renderPla(); renderPec(); }
   if (t==='cli')  renderCli();
