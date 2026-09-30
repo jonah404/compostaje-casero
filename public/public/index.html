@@ -875,23 +875,37 @@ async function autoFetch(force = false) {
 const fbSave = async (col, id, data) => { if (DRY) { console.info('[dry] fbSave', col, id); return; } if (!useFirebase) return; try { await setDoc(doc(db,col,String(id)),{...data,_ts:serverTimestamp()}); } catch(e){} };
 const fbAdd  = async (col, data) => { if (DRY) { console.info('[dry] fbAdd', col, data); return null; } if (!useFirebase) return null; try { const r=await addDoc(collection(db,col),{...data,_ts:serverTimestamp()}); return r.id; } catch(e){ return null; } };
 const fbDel  = async (col, id)   => { if (DRY) { console.info('[dry] fbDel', col, id); return; } if (!useFirebase) return; try { await deleteDoc(doc(db,col,String(id))); } catch(e){} };
+// Al reemplazar una colección con lo que trae Firestore, conserva los registros
+// locales pendientes (_pend + id generado en el dispositivo) que todavía no tienen
+// su par allá: los guardados mientras la consulta estaba en curso o que nunca
+// llegaron. Hace falta _pend porque muchos documentos de Firestore también tienen
+// ids con formato local (vienen del Sheet); sin él, lo borrado o editado en otro
+// lado reaparecería. No se re-envían a Firestore/Sheet (duplicaría).
+const conservarLocales = (antes, ahora, esLocalId, claveFn) => {
+  const claves = new Set(ahora.map(claveFn));
+  return ahora.concat((antes || []).filter(r => r && r._pend && esLocalId(String(r.id)) && !claves.has(claveFn(r))));
+};
+const ID_LOCAL_REV = id => /^\d{13}$/.test(id);
+const ID_LOCAL_PLA = id => /^ev\d/.test(id);
+const ID_LOCAL_PEC = id => /^kv\d/.test(id);
+let climaCursor = null;   // fecha del clima más viejo traído de Firestore (para "Ver más")
 const fbLoad = async () => {
   if (!useFirebase) return;
   try {
     const sd = await getDocs(collection(db,'sistemas'));
     sd.forEach(d => { const x=d.data(); const i=S.sistemas.findIndex(s=>s.id===x.id); i>=0?(S.sistemas[i]={...S.sistemas[i],...x}):S.sistemas.push(x); });
     const rd = await getDocs(query(collection(db,'revolcadas'),orderBy('fecha','desc')));
-    if (rd.docs.length) S.revolcadas = rd.docs.map(d=>({id:d.id,...d.data()}));
+    if (rd.docs.length) S.revolcadas = conservarLocales(S.revolcadas, rd.docs.map(d=>({id:d.id,...d.data()})), ID_LOCAL_REV, r => r.sistema+'|'+r.fecha);
     const cd = await getDocs(query(collection(db,'clima'),orderBy('fecha','desc'),limit(CLIMA_DIAS_FIRESTORE)));
-    if (cd.docs.length) upsertCli(cd.docs.map(d=>({id:d.id,...d.data()})));
+    if (cd.docs.length) { upsertCli(cd.docs.map(d=>({id:d.id,...d.data()}))); climaCursor = cd.docs[cd.docs.length-1].data().fecha; }
     const pd = await getDocs(collection(db,'plantas'));
     pd.forEach(d => { const x=d.data(); const i=S.plantas.findIndex(p=>p.id===x.id); i>=0?(S.plantas[i]={...S.plantas[i],...x}):S.plantas.push(x); });
     const prd = await getDocs(query(collection(db,'registroPlantas'),orderBy('fecha','desc')));
-    if (prd.docs.length) S.registroPlantas = prd.docs.map(d=>({id:d.id,...d.data()}));
+    if (prd.docs.length) S.registroPlantas = conservarLocales(S.registroPlantas, prd.docs.map(d=>({id:d.id,...d.data()})), ID_LOCAL_PLA, r => r.planta+'|'+r.fecha+'|'+r.tipo);
     const kd = await getDocs(collection(db,'pecera'));
     kd.forEach(d => { if (d.id==='main') S.pecera = {...S.pecera, ...d.data()}; });
     const krd = await getDocs(query(collection(db,'registroPecera'),orderBy('fecha','desc')));
-    if (krd.docs.length) S.registroPecera = krd.docs.map(d=>({id:d.id,...d.data()}));
+    if (krd.docs.length) S.registroPecera = conservarLocales(S.registroPecera, krd.docs.map(d=>({id:d.id,...d.data()})), ID_LOCAL_PEC, r => r.fecha+'|'+r.tipo);
     sv();
   } catch(e) {}
 };
@@ -1487,9 +1501,12 @@ const marcarHecha = t => {
   const commit = async () => {
     const d = diferidos.get(t.id); if (!d) return;
     clearTimeout(d.timer); diferidos.delete(t.id);
-    await ejecutarTarea(t);
-    toast(`✅ Registrado — ${t.titulo}`);
-    refresh();
+    // La parte síncrona de ejecutarTarea ya deja el registro en S: se re-renderiza
+    // enseguida para que "Deshacer" no quede visible sin efecto durante la escritura.
+    const p = ejecutarTarea(t);
+    renderHoy();
+    try { await p; toast(`✅ Registrado — ${t.titulo}`); }
+    finally { refresh(); }
   };
   diferidos.set(t.id, { timer: setTimeout(commit, DEMORA_DESHACER), commit });
   renderHoy();
@@ -1502,6 +1519,12 @@ window.deshacerTarea = id => {
 // Si la app se cierra o pasa a segundo plano dentro de la demora, se guarda ya.
 const vaciarDiferidos = () => [...diferidos.values()].forEach(d => d.commit());
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') vaciarDiferidos(); });
+// TODAY se fija al cargar: si la PWA vuelve a primer plano en otro día, se recarga
+// (los toques pendientes ya se guardaron al pasar a segundo plano).
+const DIA_CARGA = new Date().toDateString();
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && new Date().toDateString() !== DIA_CARGA) location.reload();
+});
 window.addEventListener('pagehide', vaciarDiferidos);
 
 window.tareaTap = id => {
@@ -1754,11 +1777,13 @@ let climaVerTodo = false;
 // Muestra todo lo que hay en el dispositivo y, si Firestore tiene días anteriores, trae otro bloque.
 window.climaMas = async () => {
   climaVerTodo = true;
-  const viejo = [...S.clima].sort((a,b) => a.fecha < b.fecha ? -1 : 1)[0];
-  if (useFirebase && viejo) {
+  // Cursor: el día más viejo que trajo Firestore (no el local, que en un
+  // dispositivo nuevo es el seed y dejaría un hueco sin traer).
+  const cursor = climaCursor || [...S.clima].sort((a,b) => a.fecha < b.fecha ? -1 : 1)[0]?.fecha;
+  if (useFirebase && cursor) {
     try {
-      const cd = await getDocs(query(collection(db,'clima'),orderBy('fecha','desc'),startAfter(viejo.fecha),limit(CLIMA_DIAS_FIRESTORE)));
-      if (cd.docs.length) { upsertCli(cd.docs.map(d => ({id:d.id,...d.data()}))); sv(); }
+      const cd = await getDocs(query(collection(db,'clima'),orderBy('fecha','desc'),startAfter(cursor),limit(CLIMA_DIAS_FIRESTORE)));
+      if (cd.docs.length) { upsertCli(cd.docs.map(d => ({id:d.id,...d.data()}))); climaCursor = cd.docs[cd.docs.length-1].data().fecha; sv(); }
     } catch(e) {}
   }
   renderCli();
@@ -1904,27 +1929,23 @@ window.closeMod = () => document.getElementById('mwrap').classList.remove('on');
 
 // ════ ACCIONES ════
 // Escritura compartida entre los formularios y los toques de "Hoy".
-const registrarRevolcada = async (sistema, fecha, obs = '') => {
-  const r = { id:Date.now().toString(), sistema, fecha, obs };
-  S.revolcadas.push(r); sv();
-  const fbId = await fbAdd('revolcadas', r); if (fbId) { r.id = fbId; sv(); }
-  sheetSync('revolcada', r);
+// sheetSync va ANTES de esperar a Firestore: addDoc solo resuelve con el ack del
+// servidor, y si la app se cierra en el medio el POST (keepalive) nunca saldría.
+// _pend (solo local, no viaja a Firestore/Sheet) marca lo que aún no tiene ack de
+// Firestore: fbLoad lo conserva (ver conservarLocales).
+const registrarLocal = async (lista, col, tipoSheet, datos) => {
+  const r = { ...datos, _pend:true };
+  lista.push(r); sv();
+  sheetSync(tipoSheet, datos);
+  const fbId = await fbAdd(col, datos); if (fbId) { r.id = fbId; delete r._pend; sv(); }
   return r;
 };
-const registrarEventoPlanta = async (planta, fecha, tipo, detalle = '', producto = '', resultado = '') => {
-  const r = { id:'ev'+Date.now(), planta, fecha, tipo, detalle, producto, resultado };
-  S.registroPlantas.push(r); sv();
-  const fbId = await fbAdd('registroPlantas', r); if (fbId) { r.id = fbId; sv(); }
-  sheetSync('plantaEvento', r);
-  return r;
-};
-const registrarEventoPecera = async (fecha, tipo, detalle = '', resultado = '') => {
-  const r = { id:'kv'+Date.now(), fecha, tipo, detalle, resultado };
-  S.registroPecera.push(r); sv();
-  const fbId = await fbAdd('registroPecera', r); if (fbId) { r.id = fbId; sv(); }
-  sheetSync('peceraEvento', r);
-  return r;
-};
+const registrarRevolcada = (sistema, fecha, obs = '') =>
+  registrarLocal(S.revolcadas, 'revolcadas', 'revolcada', { id:Date.now().toString(), sistema, fecha, obs });
+const registrarEventoPlanta = (planta, fecha, tipo, detalle = '', producto = '', resultado = '') =>
+  registrarLocal(S.registroPlantas, 'registroPlantas', 'plantaEvento', { id:'ev'+Date.now(), planta, fecha, tipo, detalle, producto, resultado });
+const registrarEventoPecera = (fecha, tipo, detalle = '', resultado = '') =>
+  registrarLocal(S.registroPecera, 'registroPecera', 'peceraEvento', { id:'kv'+Date.now(), fecha, tipo, detalle, resultado });
 window.saveRev = async () => {
   const f=document.getElementById('rf').value, si=+document.getElementById('rs').value;
   if(!f){ toast('Completá la fecha'); return; }
