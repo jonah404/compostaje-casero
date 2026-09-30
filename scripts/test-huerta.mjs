@@ -53,4 +53,48 @@ t('funciones de catálogo con clave desconocida', () => {
   assert.equal(H.enEpocaDeSiembra('nada', 5), true);
 });
 
+console.log('catálogo');
+const CLAVES = ['acelga','albahaca','berenjena','brocoli','cebolla-verdeo','choclo','cilantro','espinaca','frutilla','lechuga','menta','morron','oregano','pepino','perejil','remolacha','repollo','romero','rucula','tomate','tomillo','zanahoria','zapallito','zapallo'];
+const GRUPOS = ['Hojas y crucíferas', 'Frutos', 'Raíces y bulbos', 'Aromáticas y perennes'];
+const NIVELES = ['🟢', '🟠', '🔴', '🔴🔴'];
+t('exactamente las 24 claves, sin duplicados', () => {
+  assert.deepEqual(H.CATALOGO_HUERTA.map(c => c.clave).sort(), CLAVES);
+  assert.equal(new Set(H.CATALOGO_HUERTA.map(c => c.clave)).size, 24);
+});
+H.CATALOGO_HUERTA.forEach(c => {
+  t(`esquema de ${c.clave}`, () => {
+    assert.ok(c.nombre && typeof c.nombre === 'string', 'nombre');
+    assert.ok(GRUPOS.includes(c.grupo), 'grupo válido: ' + c.grupo);
+    assert.ok(['anual', 'perenne'].includes(c.ciclo), 'ciclo');
+    ['riegoVerano', 'riegoInvierno', 'diasFert', 'diasPlagas'].forEach(k => assert.ok(Number.isFinite(c[k]) && c[k] > 0, k + ' numérico y positivo'));
+    assert.ok(c.riegoVerano <= c.riegoInvierno, 'riegoVerano <= riegoInvierno');
+    assert.ok(Array.isArray(c.mesesSiembra) && c.mesesSiembra.length > 0 && c.mesesSiembra.every(m => Number.isInteger(m) && m >= 1 && m <= 12), 'mesesSiembra');
+    if (c.ciclo === 'anual') {
+      assert.ok(Number.isFinite(c.diasACosecha) && c.diasACosecha > 0, 'anual con diasACosecha');
+      if (c.diasATrasplante != null) assert.ok(c.diasACosecha > c.diasATrasplante, 'diasACosecha > diasATrasplante');
+    } else {
+      assert.equal(c.diasACosecha, null, 'perenne sin diasACosecha');
+    }
+    const f = c.ficha;
+    assert.ok(f && f.monitoreo && f.momentoCritico, 'ficha con monitoreo y momentoCritico');
+    assert.ok(Array.isArray(f.problemas) && f.problemas.length >= 2, 'al menos 2 problemas');
+    f.problemas.forEach(p => ['nombre', 'sintoma', 'producto', 'dosis'].forEach(k => assert.ok(p[k] && typeof p[k] === 'string', 'problema.' + k)));
+    for (let m = 1; m <= 12; m++) assert.ok(NIVELES.includes(f.calendarioVigilancia[m]), `vigilancia mes ${m}`);
+  });
+});
+t('cuatro grupos con la cantidad esperada', () => {
+  const n = g => H.CATALOGO_HUERTA.filter(c => c.grupo === g).length;
+  assert.deepEqual([n(GRUPOS[0]), n(GRUPOS[1]), n(GRUPOS[2]), n(GRUPOS[3])], [6, 7, 3, 8]);
+});
+t('perfilDeCatalogo copia lo necesario', () => {
+  const p = H.perfilDeCatalogo('tomate');
+  assert.equal(p.clave, 'tomate'); assert.equal(p.ciclo, 'anual');
+  assert.ok(p.diasATrasplante > 0 && p.diasACosecha > p.diasATrasplante);
+  assert.ok(Array.isArray(p.mesesSiembra));
+  p.mesesSiembra.push(99);   // es una copia
+  assert.ok(!H.buscarCultivo('tomate').mesesSiembra.includes(99));
+});
+t('enEpocaDeSiembra', () => { assert.equal(H.enEpocaDeSiembra('tomate', 9), true); assert.equal(H.enEpocaDeSiembra('tomate', 5), false); });
+t('fichaDeCatalogo devuelve la ficha', () => assert.ok(H.fichaDeCatalogo('lechuga').problemas.length >= 2));
+
 console.log(`\n${ok} pruebas OK` + (process.exitCode ? ' — HAY FALLAS' : ''));
