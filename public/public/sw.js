@@ -1,4 +1,4 @@
-const CACHE = 'compost-tracker-v1';
+const CACHE = 'compost-tracker-v2';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -6,6 +6,8 @@ const APP_SHELL = [
   '/icons/icon-192.png',
   '/icons/icon-512.png',
 ];
+// Fuentes de Google e íconos Tabler: se sirven de la caché y se refrescan en segundo plano.
+const EXTERNAL_CACHE = ['fonts.googleapis.com', 'fonts.gstatic.com', 'cdn.jsdelivr.net'];
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -24,7 +26,21 @@ self.addEventListener('fetch', event => {
   const req = event.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  if (url.origin !== self.location.origin) return; // Firebase/Open-Meteo/fuentes: siempre a la red
+  if (url.origin !== self.location.origin) {
+    // Firebase/Open-Meteo: siempre a la red. Solo fuentes e íconos van por caché.
+    if (EXTERNAL_CACHE.includes(url.hostname)) {
+      event.respondWith(
+        caches.open(CACHE).then(cache => cache.match(req).then(cached => {
+          const red = fetch(req).then(res => {
+            if (res && (res.ok || res.type === 'opaque')) cache.put(req, res.clone());
+            return res;
+          }).catch(() => cached);
+          return cached || red;
+        }))
+      );
+    }
+    return;
+  }
 
   if (req.mode === 'navigate') {
     event.respondWith(
