@@ -751,7 +751,7 @@ import {
 import {
   CATALOGO_HUERTA, perfilDeCultivo, perfilDeCatalogo, fichaDeCatalogo, enEpocaDeSiembra,
   faseCultivo, diaDeCultivo, progresoCosecha, diasParaCosecha, fechaCosechaEstimada,
-  estaCerrado, numero
+  estaCerrado, numero, baseFertilizacion
 } from './huerta-catalogo.js';
 
 // ════ FIREBASE CONFIG ════
@@ -1155,6 +1155,17 @@ const proxCalc = (p, tipoEvento, ultimaKey, proximaKey, intervaloDias) => {
   }
   return { proxima, dias: dd(TODAY, proxima) };
 };
+// Próxima fertilización de un cultivo: no hay en el almácigo; después del trasplante se cuenta
+// desde el trasplante o la última fertilización (ver baseFertilizacion). No usa la
+// "Próxima fertilización" del Sheet: Apps Script calcula la misma regla.
+const proxFertCultivo = (p, dias) => {
+  const ev = ultimoEvento(p.id, 'Fertiliz');
+  const ultima = [ev ? ev.fecha : null, p.ultimaFert || null].filter(Boolean).sort().pop() || null;
+  const base = baseFertilizacion(p, ultima, TODAY);
+  if (!base) return { proxima:null, dias:null };
+  const proxima = new Date(base); proxima.setDate(proxima.getDate() + dias);
+  return { proxima, dias: dd(TODAY, proxima) };
+};
 const estPlanta = p => {
   const hoy = TODAY, mes = hoy.getMonth()+1;
   const esVerano = CFG_PLA.mesesVerano.includes(mes);
@@ -1163,7 +1174,8 @@ const estPlanta = p => {
   const agua = aguaEfectiva(p);
   const diasSinAgua = agua ? dd(agua.fecha, hoy) : null;
   const fueraDeTemporadaFert = perfil && !mesEnTemporada(mes, perfil.fertMesIni, perfil.fertMesFin);
-  const fert   = proxCalc(p, 'Fertiliz', 'ultimaFert',   'proximaFert',   perfil ? perfil.diasFert : CFG_PLA.diasFert);
+  const fert   = esCultivo(p) ? proxFertCultivo(p, perfil.diasFert)
+                              : proxCalc(p, 'Fertiliz', 'ultimaFert',   'proximaFert',   perfil ? perfil.diasFert : CFG_PLA.diasFert);
   const fichaFitoP = esCultivo(p) ? null : fichaFito(p.nombre);
   // Cultivos: intervalo fijo de su foto (el calendario del servidor usa el mismo número).
   const intervaloPlagas = esCultivo(p) ? perfil.diasPlagas : (fichaFitoP ? diasVigilancia(fichaFitoP, mes) : CFG_PLA.diasPlagas);

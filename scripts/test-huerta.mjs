@@ -97,4 +97,27 @@ t('perfilDeCatalogo copia lo necesario', () => {
 t('enEpocaDeSiembra', () => { assert.equal(H.enEpocaDeSiembra('tomate', 9), true); assert.equal(H.enEpocaDeSiembra('tomate', 5), false); });
 t('fichaDeCatalogo devuelve la ficha', () => assert.ok(H.fichaDeCatalogo('lechuga').problemas.length >= 2));
 
+console.log('baseFertilizacion (desde cuándo se cuenta la próxima fertilización)');
+{
+  const tom = { categoria:'huerta', ciclo:'anual', fechaP:'2026-09-10', diasATrasplante:40, diasACosecha:120 };
+  const dia = (y, m, dd) => d(y, m, dd).getTime();
+  const base = (p, ult, hoy) => { const b = H.baseFertilizacion(p, ult, hoy); return b && b.getTime(); };
+  t('en el almácigo (semillero) no hay fertilización', () => assert.equal(H.baseFertilizacion(tom, null, d(2026, 9, 30)), null));
+  t('por trasplantar (pasó el día de trasplante sin cargarlo): tampoco', () => assert.equal(H.baseFertilizacion(tom, null, d(2026, 10, 25)), null));
+  t('aunque haya una fertilización registrada, en el almácigo no se cuenta', () => assert.equal(H.baseFertilizacion(tom, '2026-09-25', d(2026, 9, 30)), null));
+  t('trasplantado: se cuenta desde el trasplante', () => assert.equal(base({ ...tom, fechaTrasplante:'2026-10-20' }, null, d(2026, 10, 25)), dia(2026, 10, 20)));
+  t('una fertilización posterior al trasplante manda', () => assert.equal(base({ ...tom, fechaTrasplante:'2026-10-20' }, '2026-10-28', d(2026, 11, 1)), dia(2026, 10, 28)));
+  t('una fertilización anterior al trasplante no adelanta el aviso', () => assert.equal(base({ ...tom, fechaTrasplante:'2026-10-20' }, '2026-10-05', d(2026, 10, 25)), dia(2026, 10, 20)));
+  const zan = { categoria:'huerta', ciclo:'anual', fechaP:'2026-03-01', diasATrasplante:null, diasACosecha:120 };
+  t('siembra directa: desde la siembra', () => assert.equal(base(zan, null, d(2026, 3, 15)), dia(2026, 3, 1)));
+  t('siembra directa: la última fertilización manda si es posterior', () => assert.equal(base(zan, '2026-03-20', d(2026, 4, 1)), dia(2026, 3, 20)));
+  const rom = { categoria:'huerta', ciclo:'perenne', fechaP:'2025-01-01', diasATrasplante:null, diasACosecha:null };
+  t('perenne: desde la siembra', () => assert.equal(base(rom, null, d(2026, 9, 30)), dia(2025, 1, 1)));
+  t('cerrado: ninguna', () => assert.equal(H.baseFertilizacion({ ...tom, estadoCultivo:'cosechado' }, null, d(2026, 9, 30)), null));
+  t('sin fecha de siembra ni trasplante: usa la última fertilización o nada', () => {
+    assert.equal(H.baseFertilizacion({ ciclo:'perenne' }, null, d(2026, 9, 30)), null);
+    assert.equal(base({ ciclo:'perenne' }, '2026-09-01', d(2026, 9, 30)), dia(2026, 9, 1));
+  });
+}
+
 console.log(`\n${ok} pruebas OK` + (process.exitCode ? ' — HAY FALLAS' : ''));

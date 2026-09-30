@@ -2032,6 +2032,7 @@ function actualizarFichaPlantas() {
     }
 
     actualizarProximoEvento_(shP, fila, idPlanta, 'Fertiliz', 11, 12, perfil ? perfil.diasFert : CFG_PLANTAS.diasFertilizante);
+    if (esHuerta) actualizarProximoFertHuerta_(shP, fila, datos[i], perfil);   // cultivos: desde el trasplante, no en el almácigo
     if (!esHuerta) actualizarProximoEvento_(shP, fila, idPlanta, 'Poda', 13, 14, perfil && perfil.podaDias ? perfil.podaDias : CFG_PLANTAS.diasPoda);
     var fichaFitoP = esHuerta ? null : fichaFito(datos[i][1]);
     var intervaloPlagas = esHuerta ? perfil.diasPlagas : (fichaFitoP ? diasVigilancia(fichaFitoP, mes) : CFG_PLANTAS.diasRevisionPlagas);
@@ -2914,17 +2915,55 @@ function perfilHuertaFila_(row) {
   };
 }
 
-// guardarPlantaSheet no toca las columnas I–S: un cultivo nuevo arranca con las
-// fechas de "último riego / próxima fertilización / próxima revisión de plagas"
-// contadas desde la siembra (col. E).
+// Cultivo con trasplante pendiente (semillero o "por trasplantar"): mismas condiciones
+// que faseCultivo (huerta-catalogo.js). Anual con días a cosecha y a trasplante > 0 y
+// sin fecha de trasplante. Una celda de trasplante con solo espacios cuenta como vacía.
+function esViveroHuertaFila_(row) {
+  var siembra = row[4] ? new Date(row[4]) : null;
+  if (!siembra || isNaN(siembra.getTime())) return false;
+  var dt = numOVacio_(row[28]), dc = numOVacio_(row[29]);
+  var esPerenne = String(row[22]).toLowerCase().trim() === 'perenne';
+  return !esPerenne && dc !== '' && dc > 0 && dt !== '' && dt > 0 && String(row[23]).trim() === '';
+}
+
+// Desde cuándo se cuenta la próxima fertilización de un cultivo (Date | null): espejo de
+// baseFertilizacion() en huerta-catalogo.js. En el almácigo no se fertiliza; después del
+// trasplante cuenta el trasplante o la última fertilización (la más reciente); en siembra
+// directa y perennes, la siembra o la última fertilización.
+function baseFertHuertaFila_(row, ultimaFert) {
+  if (esViveroHuertaFila_(row)) return null;
+  function fecha(v) {
+    var x = v ? new Date(v) : null;
+    if (x && isNaN(x.getTime())) x = null;
+    if (x) x.setHours(0, 0, 0, 0);
+    return x;
+  }
+  var ancla = fecha(row[23]) || fecha(row[4]);
+  var ult = fecha(ultimaFert);
+  if (!ancla) return ult;
+  return (ult && ult.getTime() > ancla.getTime()) ? ult : ancla;
+}
+
+// Recalcula "Próxima fertilización" (col. L) de un cultivo con la regla de arriba; vacía la
+// celda si no corresponde (almácigo). Corre después de actualizarProximoEvento_, que ya dejó
+// "Última fertilización" (col. K) al día con los eventos.
+function actualizarProximoFertHuerta_(sh, fila, row, perfil) {
+  var base = baseFertHuertaFila_(row, sh.getRange(fila, 11).getValue());
+  var celda = sh.getRange(fila, 12);
+  if (!base) { celda.clearContent(); row[11] = ''; return; }
+  var prox = new Date(base); prox.setDate(prox.getDate() + perfil.diasFert);
+  celda.setValue(prox).setNumberFormat('DD/MM/YYYY');
+  row[11] = prox;
+}
+
+// guardarPlantaSheet no toca las columnas I–S: un cultivo nuevo arranca con las fechas de
+// "último riego / próxima revisión de plagas" contadas desde la siembra (col. E). La
+// fertilización NO se inicializa acá: la calcula actualizarProximoFertHuerta_ (no hay en
+// el almácigo y después se cuenta desde el trasplante).
 function inicializarProximosHuerta_(sh, fila, row, perfil) {
   var base = row[4] ? new Date(row[4]) : null;
   if (!base || isNaN(base.getTime())) return;
   if (!row[16]) { sh.getRange(fila, 17).setValue(base).setNumberFormat('DD/MM/YYYY'); row[16] = base; }
-  if (!row[11]) {
-    var pf = new Date(base); pf.setDate(pf.getDate() + perfil.diasFert);
-    sh.getRange(fila, 12).setValue(pf).setNumberFormat('DD/MM/YYYY'); row[11] = pf;
-  }
   if (!row[15]) {
     var pp = new Date(base); pp.setDate(pp.getDate() + perfil.diasPlagas);
     sh.getRange(fila, 16).setValue(pp).setNumberFormat('DD/MM/YYYY'); row[15] = pp;
@@ -2992,7 +3031,8 @@ function verificarEventosHuerta() {
     }
 
     // Fertilización y plagas: fechas "Próxima ..." que mantiene actualizarFichaPlantas.
-    var proxFert = p[11] ? new Date(p[11]) : null;
+    // En el almácigo no se fertiliza (aunque la celda traiga una fecha vieja calculada desde la siembra).
+    var proxFert = (p[11] && !esViveroHuertaFila_(p)) ? new Date(p[11]) : null;
     if (proxFert && !isNaN(proxFert.getTime())) {
       proxFert.setHours(0, 0, 0, 0);
       if (Math.floor((proxFert - hoy) / 86400000) <= 0) g.fertilizar.push({ nombre: nombre });
