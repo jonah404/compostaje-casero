@@ -717,6 +717,11 @@ import {
   setDoc, getDocs, addDoc, deleteDoc,
   query, orderBy, limit, startAfter, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import {
+  CATALOGO_HUERTA, perfilDeCultivo, perfilDeCatalogo, fichaDeCatalogo, enEpocaDeSiembra,
+  faseCultivo, diaDeCultivo, progresoCosecha, diasParaCosecha, fechaCosechaEstimada,
+  estaCerrado, numero
+} from './huerta-catalogo.js';
 
 // ════ FIREBASE CONFIG ════
 const firebaseConfig = {
@@ -1094,7 +1099,7 @@ const aguaEfectiva = p => {
   }
   // Las plantas de interior no cuentan la lluvia como riego (no les llueve
   // encima) — igual que calcularUltimaAguaEfectiva() en Apps Script.
-  const perfil = perfilEspecie(p.especie || p.nombre);
+  const perfil = perfilDePlanta(p);
   if (perfil && perfil.tipo === 'Interior') return fRiego ? { fecha: fRiego, tipo:'riego', mm:null } : null;
   let lluvia = null, mmLluvia = 0;
   [...S.clima].sort((a,b)=>a.fecha>b.fecha?-1:1).forEach(c => {
@@ -1122,15 +1127,18 @@ const proxCalc = (p, tipoEvento, ultimaKey, proximaKey, intervaloDias) => {
 const estPlanta = p => {
   const hoy = TODAY, mes = hoy.getMonth()+1;
   const esVerano = CFG_PLA.mesesVerano.includes(mes);
-  const perfil = perfilEspecie(p.especie || p.nombre);
+  const perfil = perfilDePlanta(p);
   const limite = perfil ? (esVerano ? perfil.riegoVerano : perfil.riegoInvierno) : (esVerano ? CFG_PLA.diasSinRiegoVerano : CFG_PLA.diasSinRiegoInvierno);
   const agua = aguaEfectiva(p);
   const diasSinAgua = agua ? dd(agua.fecha, hoy) : null;
   const fueraDeTemporadaFert = perfil && !mesEnTemporada(mes, perfil.fertMesIni, perfil.fertMesFin);
   const fert   = proxCalc(p, 'Fertiliz', 'ultimaFert',   'proximaFert',   perfil ? perfil.diasFert : CFG_PLA.diasFert);
-  const fichaFitoP = fichaFito(p.nombre);
-  const plagas = proxCalc(p, 'plagas', 'ultimaPlagas', 'proximaPlagas', fichaFitoP ? diasVigilancia(fichaFitoP, mes) : CFG_PLA.diasPlagas);
-  const poda   = proxCalc(p, 'Poda',     'ultimaPoda',   'proximaPoda',   (perfil && perfil.podaDias) ? perfil.podaDias : CFG_PLA.diasPoda);
+  const fichaFitoP = esCultivo(p) ? null : fichaFito(p.nombre);
+  // Cultivos: intervalo fijo de su foto (el calendario del servidor usa el mismo número).
+  const intervaloPlagas = esCultivo(p) ? perfil.diasPlagas : (fichaFitoP ? diasVigilancia(fichaFitoP, mes) : CFG_PLA.diasPlagas);
+  const plagas = proxCalc(p, 'plagas', 'ultimaPlagas', 'proximaPlagas', intervaloPlagas);
+  const poda   = esCultivo(p) ? { proxima:null, dias:null }
+                              : proxCalc(p, 'Poda', 'ultimaPoda', 'proximaPoda', (perfil && perfil.podaDias) ? perfil.podaDias : CFG_PLA.diasPoda);
   return {
     diasSinAgua, limite, agua,
     riegoUrg: diasSinAgua!=null && diasSinAgua>=limite,
@@ -1141,6 +1149,16 @@ const estPlanta = p => {
   };
 };
 const pLbl = p => p.nombre || `Planta ${p.id}`;
+// ════ HUERTA — modelo ════
+// Un cultivo es una planta con categoria === 'huerta' (ver spec de la huerta).
+const esCultivo = p => p.categoria === 'huerta';
+const plantasComunes  = () => S.plantas.filter(p => !esCultivo(p));
+const cultivos        = () => S.plantas.filter(esCultivo);
+const cultivosActivos = () => cultivos().filter(p => !estaCerrado(p));
+// Perfil de riego/fertilización de CUALQUIER planta: los cultivos usan su foto.
+const perfilDePlanta = p => esCultivo(p) ? perfilDeCultivo(p) : perfilEspecie(p.especie || p.nombre);
+// Ficha fitosanitaria: los cultivos por clave de catálogo, el resto por nombre.
+const fichaFitoDe = p => esCultivo(p) ? fichaDeCatalogo(p.cultivo) : fichaFito(p.nombre);
 
 // ════ PECERA ════
 // Fase "ciclado" = primeros CFG_PEC.diasFinCiclado días desde el armado/limpieza
@@ -1284,9 +1302,10 @@ const analisisExtra = () => {
   });
   const pctRevolcadas = totalPares ? Math.round(enTiempo/totalPares*100) : null;
 
-  const totalPlantas = S.plantas.length;
+  const comunes = plantasComunes();
+  const totalPlantas = comunes.length;
   let plantasOk = 0;
-  S.plantas.forEach(p=>{ const e=estPlanta(p); if(!e.riegoUrg && !e.fertUrg && !e.plagasUrg) plantasOk++; });
+  comunes.forEach(p=>{ const e=estPlanta(p); if(!e.riegoUrg && !e.fertUrg && !e.plagasUrg) plantasOk++; });
   const pctPlantas = totalPlantas ? Math.round(plantasOk/totalPlantas*100) : null;
 
   return { pctRevolcadas, totalPares, pctPlantas, plantasOk, totalPlantas };
@@ -1392,7 +1411,7 @@ const armarTareasHoy = () => {
     if (d <= 0) hoy.push({ ...base, detalle: d < 0 ? `atrasado ${-d} d` : 'toca hoy', atraso: -d });
     else if (d <= 3) prox.push({ ...base, detalle:`en ${d} d`, atraso: -d });
   });
-  S.plantas.forEach(p => {
+  plantasComunes().forEach(p => {
     const e = estPlanta(p);
     const base = (tipo, modo) => ({ id:`${tipo}-${p.id}`, area:'plantas', tipo, ref:p.id, titulo:`${pLbl(p)} · ${ETQ[tipo]}`, modo });
     if (e.riegoUrg) hoy.push({ ...base('riego','uno'), detalle:`${e.diasSinAgua} días sin agua (límite ${e.limite})`, atraso: e.diasSinAgua - e.limite });
@@ -1415,7 +1434,6 @@ const armarTareasHoy = () => {
   return { hoy, prox };
 };
 window.armarTareasHoy = armarTareasHoy;
-
 // Lo ya registrado hoy (de los mismos tipos que generan tareas).
 const hechasHoy = () => {
   const hoyISO = fISO(TODAY), out = [];
@@ -1436,15 +1454,16 @@ const hechasHoy = () => {
 // Urgentes: helada, frío en interior, calor extremo, compost listo (mismos umbrales que codigo.gs).
 const urgentesHoy = () => {
   const out = [];
+  const vivas = S.plantas.filter(p => !estaCerrado(p));
   const ult = [...S.clima].sort((a,b) => a.fecha > b.fecha ? -1 : 1)[0];
-  const esInt = p => { const pf = perfilEspecie(p.especie || p.nombre); return !!(pf && pf.tipo === 'Interior'); };
+  const esInt = p => { const pf = perfilDePlanta(p); return !!(pf && pf.tipo === 'Interior'); };
   if (ult && ult.tmin != null && ult.tmin !== '') {
     const tmin = +ult.tmin;
-    if (S.plantas.some(p => !esInt(p)) && tmin <= TEMP_HELADA) {
+    if (vivas.some(p => !esInt(p)) && tmin <= TEMP_HELADA) {
       const sev = tmin <= TEMP_HELADA_SEVERA;
       out.push({ c: sev ? 'al-r' : 'al-w', t: (sev ? '🧊 Helada severa' : '❄️ Helada') + ' — proteger plantas de exterior', b:`Mínima registrada: ${n1(tmin)}°C` });
     }
-    const frias = S.plantas.filter(p => { const pf = esInt(p) && perfilEspecie(p.especie || p.nombre); return pf && pf.tempMin != null && tmin <= pf.tempMin + 2; });
+    const frias = vivas.filter(p => { const pf = esInt(p) && perfilDePlanta(p); return pf && pf.tempMin != null && tmin <= pf.tempMin + 2; });
     if (frias.length) out.push({ c:'al-w', t:'🥶 Frío — alejar de la ventana', b: frias.map(pLbl).join(', ') });
   }
   if (ult && ult.tmax != null && ult.tmax !== '' && +ult.tmax >= TEMP_CALOR) out.push({ c:'al-r', t:'🔥 Calor extremo — revisar humedad del compost', b:`Máxima registrada: ${n1(ult.tmax)}°C` });
@@ -1618,13 +1637,14 @@ const plantHTML = p => {
   </div>`;
 };
 const renderPla = () => {
-  document.getElementById('pla-c').innerHTML = S.plantas.map(p=>plantHTML(p)).join('') || '<div style="font-size:13px;color:var(--ink3)">Sin plantas registradas.</div>';
+  document.getElementById('pla-c').innerHTML = plantasComunes().map(p=>plantHTML(p)).join('') || '<div style="font-size:13px;color:var(--ink3)">Sin plantas registradas.</div>';
 };
 
 // ════ RESUMEN DE PLANTAS (antes en Inicio) ════
 const renderPlaResumen = () => {
   const ax = analisisExtra();
-  const ests = S.plantas.map(estPlanta);
+  const comunes = plantasComunes();
+  const ests = comunes.map(estPlanta);
   const nUrg = ests.filter(e => e.riegoUrg).length;
   const nProx = ests.filter(e => e.riegoProx).length;
   const nOk = ests.length - nUrg - nProx;
@@ -1632,7 +1652,7 @@ const renderPlaResumen = () => {
     {value:nOk, color:'var(--chart-1)'}, {value:nProx, color:'var(--chart-3)'}, {value:nUrg, color:'var(--chart-4)'},
   ], 112, 15, 'plantas');
   const legend = [ {n:'Al día', v:nOk, c:'var(--chart-1)'}, {n:'Riego pronto', v:nProx, c:'var(--chart-3)'}, {n:'Regar ahora', v:nUrg, c:'var(--chart-4)'} ];
-  document.getElementById('pla-resumen').innerHTML = S.plantas.length ? `
+  document.getElementById('pla-resumen').innerHTML = comunes.length ? `
     <div class="card">
       <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:10px">Riego de plantas</div>
       <div class="donut-wrap">
@@ -1732,7 +1752,7 @@ window.renderPec = renderPec;
 
 // ════ FITOSANITARIO (sección de la ficha de cada planta) ════
 const fitoHTML = p => {
-  const ficha = fichaFito(p.nombre); // por nombre, no por especie (ver nota en Task 2 del plan fitosanitario)
+  const ficha = fichaFitoDe(p); // frutales/plantas: por nombre, no por especie; cultivos: por clave de catálogo
   if (!ficha) return '';
   const nivel = nivelVigilancia(ficha, TODAY.getMonth()+1);
   const rows = ficha.problemas.map(pr => `<tr>
@@ -2167,8 +2187,8 @@ const poblarSels = () => {
   const opts = S.sistemas.map(s=>`<option value="${s.id}">${sLbl(s)}</option>`).join('');
   ['rs','es'].forEach(id=>{const el=document.getElementById(id);const c=el.value;el.innerHTML=opts;if(c)el.value=c;});
   document.getElementById('hf').innerHTML = '<option value="todos">Todos los sistemas</option>'+opts;
-  const poptsPla = S.plantas.map(p=>`<option value="${p.id}">${pLbl(p)}</option>`).join('');
-  ['pv','epv'].forEach(id=>{const el=document.getElementById(id);const c=el.value;el.innerHTML=poptsPla;if(c)el.value=c;});
+  const opts1 = arr => arr.map(p=>`<option value="${p.id}">${pLbl(p)}</option>`).join('');
+  [['pv', S.plantas.filter(p => !estaCerrado(p))], ['epv', plantasComunes()]].forEach(([id, arr])=>{const el=document.getElementById(id);const c=el.value;el.innerHTML=opts1(arr);if(c)el.value=c;});
   actualizarProblemaSel();
 };
 window.actualizarProblemaSel = () => {
@@ -2176,7 +2196,7 @@ window.actualizarProblemaSel = () => {
   const pid = +document.getElementById('pv').value;
   const tipo = document.getElementById('pt').value;
   const p = S.plantas.find(x=>x.id===pid);
-  const ficha = p ? fichaFito(p.nombre) : null; // por nombre, no por especie (ver nota en Task 2)
+  const ficha = p ? fichaFitoDe(p) : null;
   if (tipo !== '🐛 Revisión plagas' || !ficha) {
     wrap.style.display = 'none';
     document.getElementById('pb').innerHTML = '';
@@ -2189,7 +2209,7 @@ window.actualizarProblemaSel = () => {
 window.aplicarProblema = () => {
   const pid = +document.getElementById('pv').value;
   const p = S.plantas.find(x=>x.id===pid);
-  const ficha = p ? fichaFito(p.nombre) : null; // por nombre, no por especie (ver nota en Task 2)
+  const ficha = p ? fichaFitoDe(p) : null;
   const idx = document.getElementById('pb').value;
   if (!ficha || idx==='') return;
   const pr = ficha.problemas[+idx];
