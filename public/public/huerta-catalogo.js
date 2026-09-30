@@ -161,6 +161,21 @@ export const fechaCosechaEstimada = p => {
   return new Date(s.getTime() + dc * MS_DIA);
 };
 
+// Desde cuándo se cuenta la próxima fertilización (Date | null). `ultimaFert` es la
+// última fertilización registrada (YYYY-MM-DD) o null.
+// - Semillero y "por trasplantar": null (el plantín no se fertiliza en el almácigo).
+// - Trasplantado: el trasplante o la última fertilización, lo que sea más reciente.
+// - Siembra directa y perennes: la siembra o la última fertilización, la más reciente.
+// Apps Script replica esta regla (baseFertHuertaFila_ en codigo.gs).
+export const baseFertilizacion = (p, ultimaFert, hoy) => {
+  const fase = faseCultivo(p, hoy);
+  if (fase === 'cerrado' || fase === 'semillero' || fase === 'por-trasplantar') return null;
+  const ancla = dia(p.fechaTrasplante) || dia(p.fechaP);
+  const ult = dia(ultimaFert);
+  if (!ancla) return ult;
+  return ult && ult > ancla ? ult : ancla;
+};
+
 // ── Catálogo ─────────────────────────────────────────────────────────
 export const buscarCultivo = clave => CATALOGO_HUERTA.find(c => c.clave === clave) || null;
 

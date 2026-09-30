@@ -114,7 +114,11 @@ console.log('verificarEventosHuerta');
   });
   t('fertilizar y plagas: solo los vencidos (no la albahaca con fechas futuras, ni cerrados, ni plantas comunes)', () => {
     const f = buscar('Fertilizar'), p = buscar('Revisar plagas');
-    [f, p].forEach(e => { assert.ok(e); assert.match(e.desc, /Tomate/); assert.match(e.desc, /Lechuga/); assert.match(e.desc, /Romero/); assert.doesNotMatch(e.desc, /Albahaca|Zanahoria|Mandarina/); });
+    [f, p].forEach(e => { assert.ok(e); assert.match(e.desc, /Lechuga/); assert.match(e.desc, /Romero/); assert.doesNotMatch(e.desc, /Albahaca|Zanahoria|Mandarina/); });
+    assert.match(p.desc, /Tomate/);   // las plagas se revisan también en el almácigo
+  });
+  t('fertilizar: el tomate sin trasplantar (en vivero) NO lleva aviso aunque su "Próxima fertilización" esté vencida', () => {
+    assert.doesNotMatch(buscar('Fertilizar').desc, /Tomate/);
   });
   t('no hay eventos de plantas comunes ni de cerrados', () => assert.ok(evs.every(e => !/Mandarina|Zanahoria/.test(e.desc))));
   t('la cosecha se silencia 3 días tras un evento de cosecha', () => {
@@ -209,11 +213,67 @@ console.log('actualizarFichaPlantas: inicialización de un cultivo nuevo');
   const g = cargar({ Plantas: sh });
   g.actualizarFichaPlantas();
   const r = sh.rows[1];
-  t('completa Último riego, Próxima fertilización y Próxima revisión de plagas desde la siembra', () => {
+  t('completa Último riego y Próxima revisión de plagas desde la siembra (también en el almácigo)', () => {
     assert.equal(iso(new Date(r[16])), iso(hace(10)));                                   // último riego = siembra
     const dias = d => Math.round((new Date(d) - hace(10)) / 86400000);
-    assert.equal(dias(r[11]), 20);                                                       // + diasFert
     assert.equal(dias(r[15]), 7);                                                        // + diasPlagas
+  });
+  t('almácigo (con trasplante pendiente): NO hay "Próxima fertilización"', () => {
+    assert.ok(r[11] === '' || r[11] === undefined, 'col 12 vacía');
+  });
+}
+
+console.log('actualizarFichaPlantas: la fertilización se cuenta desde el trasplante');
+{
+  const dias = (d, desde) => Math.round((new Date(d) - desde) / 86400000);
+  const correr = (filaCultivo, registro) => {
+    const sh = hoja([ENC, filaCultivo]);
+    const hojas = { Plantas: sh }; if (registro) hojas['Registro Plantas'] = hoja(registro);
+    cargar(hojas).actualizarFichaPlantas();
+    return sh.rows[1];
+  };
+  const tomate = o => fila({ id: 1, nombre: 'Tomate', categoria: 'huerta', cultivo: 'tomate', ciclo: 'anual', rv: 2, ri: 4, fert: 20, plagas: 7, dt: 40, dc: 120, ...o });
+
+  t('la "Próxima fertilización" vieja (calculada desde la siembra) se borra mientras siga en el almácigo', () => {
+    const r = correr(tomate({ siembra: hace(20), proxFert: HOY }));          // ya venía fijada desde la siembra (+20 d)
+    assert.ok(r[11] === '' || r[11] === undefined);
+  });
+  t('por trasplantar (pasó el día 40 sin trasplante): tampoco hay fertilización', () => {
+    const r = correr(tomate({ siembra: hace(45), proxFert: hace(5) }));
+    assert.ok(r[11] === '' || r[11] === undefined);
+  });
+  t('trasplantado: próxima fertilización = trasplante + diasFert', () => {
+    const r = correr(tomate({ siembra: hace(50), fechaTrasplante: hace(5), proxFert: hace(10) }));
+    assert.equal(dias(r[11], hace(5)), 20);
+  });
+  t('una fertilización registrada DESPUÉS del trasplante manda (evento + diasFert)', () => {
+    const reg = [['id', 'n', 'fecha', 'tipo'], [1, 'Tomate', hace(2), '🌿 Fertilización']];
+    const r = correr(tomate({ siembra: hace(50), fechaTrasplante: hace(5) }), reg);
+    assert.equal(dias(r[11], hace(2)), 20);
+  });
+  t('una fertilización anterior al trasplante no adelanta el aviso (manda el trasplante)', () => {
+    const reg = [['id', 'n', 'fecha', 'tipo'], [1, 'Tomate', hace(30), '🌿 Fertilización']];
+    const r = correr(tomate({ siembra: hace(50), fechaTrasplante: hace(5) }), reg);
+    assert.equal(dias(r[11], hace(5)), 20);
+  });
+  t('siembra directa (sin días a trasplante): se cuenta desde la siembra, como antes', () => {
+    const r = correr(fila({ id: 2, nombre: 'Zanahoria', categoria: 'huerta', cultivo: 'zanahoria', ciclo: 'anual', siembra: hace(10), rv: 3, ri: 5, fert: 30, plagas: 10, dc: 120 }));
+    assert.equal(dias(r[11], hace(10)), 30);
+  });
+  t('perenne: se cuenta desde la siembra', () => {
+    const r = correr(fila({ id: 3, nombre: 'Romero', categoria: 'huerta', cultivo: 'romero', ciclo: 'perenne', siembra: hace(100), rv: 7, ri: 12, fert: 90, plagas: 14 }));
+    assert.equal(dias(r[11], hace(100)), 90);
+  });
+  t('es idempotente: correrlo dos veces deja la misma fecha', () => {
+    const sh = hoja([ENC, tomate({ siembra: hace(50), fechaTrasplante: hace(5) })]);
+    const g = cargar({ Plantas: sh });
+    g.actualizarFichaPlantas(); const primera = String(sh.rows[1][11]);
+    g.actualizarFichaPlantas();
+    assert.equal(String(sh.rows[1][11]), primera);
+  });
+  t('un cultivo cerrado no se toca', () => {
+    const r = correr(tomate({ siembra: hace(50), fechaTrasplante: hace(5), estado: 'cosechado', cierre: hace(1), proxFert: hace(3) }));
+    assert.equal(iso(new Date(r[11])), iso(hace(3)));
   });
 }
 

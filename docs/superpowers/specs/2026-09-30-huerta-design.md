@@ -177,7 +177,7 @@ cerrados no generan tareas (tampoco alerta de helada).
 |---|---|---|
 | **Regar la huerta** (`riego-huerta`) | algún cultivo activo `riegoUrg`; lista los que tocan; "Próximos" si solo hay `riegoProx` | ✓ un toque: registra `💧 Riego` de hoy en **cada** cultivo listado (una entrada por cultivo) |
 | **Trasplantar** (`trasplante-<id>`) | fase `por-trasplantar` | ✓ un toque: `fechaTrasplante = hoy` (`fbSave` + `sheetSync('planta')`) y evento `🌱 Trasplante` |
-| **Fertilizar** (`fert-<id>`) | pasaron `diasFert` desde la última fertilización (sin temporada) | › mini formulario `🌿 Fertilización` |
+| **Fertilizar** (`fert-<id>`) | pasaron `diasFert` desde la base de fertilización (sin temporada). **No hay fertilización en el almácigo** (`semillero` ni `por-trasplantar`); después del trasplante la base es el trasplante o la última fertilización, la más reciente; en siembra directa y perennes, la siembra o la última. *(Ajuste del 2026-09-30: antes se contaba desde la siembra y el plantín recibía el aviso.)* | › mini formulario `🌿 Fertilización` |
 | **Revisar plagas** (`plagas-<id>`) | pasaron `diasPlagas` desde la última revisión | › mini formulario `🐛 Revisión plagas` |
 | **Cosechar** (`cosecha-<id>`) | fase `cosecha` (a `cosecha-proxima` va a "Próximos"); solo anuales | › confirmación "Cosechado" |
 
