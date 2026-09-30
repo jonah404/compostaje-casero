@@ -402,6 +402,23 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
 
 /* divider */
 .sep { height: 1px; background: var(--rule); margin: 20px 0; }
+
+/* hoja de registro + botón flotante */
+.regsheet { position: fixed; inset: 0; z-index: 60; background: var(--cream); overflow-y: auto; padding: 0 14px calc(24px + env(safe-area-inset-bottom)); }
+.regsheet > * { max-width: 560px; margin-left: auto; margin-right: auto; }
+.regsheet .form-row { display: block; margin-top: 0 !important; }
+.regsheet .fc { display: none; }
+.regsheet .fc.on { display: block; }
+.reg-hdr { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px; padding: 14px 0; background: var(--cream); }
+.reg-hdr h2 { flex: 1; font-family: var(--serif); font-size: 20px; color: var(--ink); }
+.reg-hdr .mclose { width: 44px; height: 44px; font-size: 18px; }
+.reg-grp { font-size: 12px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--ink3); margin: 18px 0 8px; }
+.reg-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.reg-item { min-height: 72px; border: 1px solid var(--rule2); background: var(--paper); border-radius: var(--rl); font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--ink); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+.reg-item span { font-size: 24px; }
+.fab { position: fixed; right: 18px; bottom: 24px; width: 56px; height: 56px; border-radius: 50%; border: none; background: var(--sage); color: #fff; font-size: 26px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.3); z-index: 41; }
+.fab:active { transform: scale(.94); }
+@media (max-width: 767px) { .fab { bottom: calc(56px + env(safe-area-inset-bottom) + 16px); } }
 </style>
 </head>
 <body>
@@ -506,10 +523,34 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
     </div>
 
     <!-- REGISTRAR -->
-    <div class="pg" id="pg-reg">
+    <div class="pg regsheet" id="pg-reg">
+      <div class="reg-hdr">
+        <button class="mclose" id="reg-back" onclick="openRegistro()" aria-label="Volver">‹</button>
+        <h2 id="reg-title">Registrar</h2>
+        <button class="mclose" onclick="closeRegistro()" aria-label="Cerrar">✕</button>
+      </div>
+      <div id="reg-menu">
+        <div class="reg-grp">Registrar</div>
+        <div class="reg-grid">
+          <button class="reg-item" data-ctx="pla"  onclick="openRegistro('fc-plaEvt',{tipo:'💧 Riego'})"><span>💧</span>Regar</button>
+          <button class="reg-item" data-ctx="pla"  onclick="openRegistro('fc-plaEvt',{tipo:'🌿 Fertilización'})"><span>🌿</span>Fertilizar</button>
+          <button class="reg-item" data-ctx="pla"  onclick="openRegistro('fc-plaEvt',{tipo:'🐛 Revisión plagas'})"><span>🐛</span>Plagas</button>
+          <button class="reg-item" data-ctx="pla"  onclick="openRegistro('fc-plaEvt',{tipo:'✂️ Poda'})"><span>✂️</span>Poda</button>
+          <button class="reg-item" data-ctx="pla"  onclick="openRegistro('fc-plaEvt',{tipo:'🍂 Cosecha'})"><span>🍂</span>Cosecha</button>
+          <button class="reg-item" data-ctx="comp" onclick="openRegistro('fc-rev')"><span>🔄</span>Revolcada</button>
+          <button class="reg-item" data-ctx="pla"  onclick="openRegistro('fc-pecEvt',{tipo:'💧 Cambio de agua parcial'})"><span>🐟</span>Cambio de agua</button>
+          <button class="reg-item" data-ctx="pla"  onclick="openRegistro('fc-pecEvt')"><span>🐠</span>Otro de pecera</button>
+        </div>
+        <div class="reg-grp">Editar</div>
+        <div class="reg-grid">
+          <button class="reg-item" data-ctx="comp" onclick="openRegistro('fc-sisEdit')"><span>⚙️</span>Sistema</button>
+          <button class="reg-item" data-ctx="pla"  onclick="openRegistro('fc-plaEdit')"><span>⚙️</span>Planta</button>
+          <button class="reg-item" data-ctx="pla"  onclick="openRegistro('fc-pecData')"><span>⚙️</span>Datos de pecera</button>
+        </div>
+      </div>
       <div class="form-row" style="align-items:start">
         <div>
-          <div class="fc">
+          <div class="fc" id="fc-rev">
             <h3><i class="ti ti-refresh"></i>Nueva revolcada</h3>
             <div class="f"><label>Sistema</label><select id="rs"></select></div>
             <div class="f"><label>Fecha</label><input type="date" id="rf"></div>
@@ -519,7 +560,7 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
           </div>
         </div>
         <div>
-          <div class="fc">
+          <div class="fc" id="fc-sisEdit">
             <h3><i class="ti ti-settings"></i>Editar sistema</h3>
             <div class="f"><label>Sistema</label><select id="es" onchange="loadSis()"></select></div>
             <div class="f"><label>Nombre (opcional)</label><input type="text" id="en" placeholder="ej: Compost Norte"></div>
@@ -541,7 +582,7 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
 
       <div class="form-row" style="align-items:start;margin-top:20px">
         <div>
-          <div class="fc">
+          <div class="fc" id="fc-plaEvt">
             <h3><i class="ti ti-leaf"></i>Nueva actividad de planta</h3>
             <div class="f"><label>Planta</label><select id="pv" onchange="actualizarProblemaSel()"></select></div>
             <div class="f"><label>Tipo de evento</label>
@@ -566,7 +607,7 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
           </div>
         </div>
         <div>
-          <div class="fc">
+          <div class="fc" id="fc-plaEdit">
             <h3><i class="ti ti-settings"></i>Editar planta</h3>
             <div class="f"><label>Planta</label><select id="epv" onchange="loadPlanta()"></select></div>
             <div class="f"><label>Nombre</label><input type="text" id="epn"></div>
@@ -590,7 +631,7 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
 
       <div class="form-row" style="align-items:start;margin-top:20px">
         <div>
-          <div class="fc">
+          <div class="fc" id="fc-pecEvt">
             <h3><i class="ti ti-fish"></i>Nuevo evento de pecera</h3>
             <div class="f"><label>Tipo de evento</label>
               <select id="kt">
@@ -609,7 +650,7 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
           </div>
         </div>
         <div>
-          <div class="fc">
+          <div class="fc" id="fc-pecData">
             <h3><i class="ti ti-settings"></i>Datos de la pecera</h3>
             <div class="form-row" style="margin-bottom:0">
               <div class="f"><label>Litros</label><input type="number" id="kl"></div>
@@ -633,6 +674,7 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
     <div class="mbody" id="mbody"></div>
   </div>
 </div>
+<button class="fab" onclick="openRegistro()" aria-label="Registrar"><i class="ti ti-plus"></i></button>
 <nav class="bnav"><div class="bnav-in">
   <button class="bt on" data-tab="hoy"  onclick="go('hoy')"><i class="ti ti-home"></i>Hoy</button>
   <button class="bt"    data-tab="comp" onclick="go('comp')"><i class="ti ti-recycle"></i>Compost</button>
@@ -1694,9 +1736,9 @@ window.openSis = id => {
     </table></div>`:
     `<div style="font-size:13px;color:var(--ink3)">Sin revolcadas registradas</div>`}
     <div style="height:14px"></div>
-    <button class="btn-g" onclick="closeMod();go('reg');document.getElementById('rs').value=${id}">Registrar revolcada</button>
+    <button class="btn-g" onclick="closeMod();openRegistro('fc-rev',{sistema:${id}})">Registrar revolcada</button>
     <div style="height:7px"></div>
-    <button class="btn-o" onclick="closeMod();go('reg');document.getElementById('es').value=${id};loadSis()">Editar sistema</button>`;
+    <button class="btn-o" onclick="closeMod();openRegistro('fc-sisEdit',{sistema:${id}})">Editar sistema</button>`;
   document.getElementById('mwrap').classList.add('on');
 };
 window.openPla = id => {
@@ -1727,9 +1769,9 @@ window.openPla = id => {
       </tr>`).join('')}</tbody>
     </table></div>`:`<div style="font-size:13px;color:var(--ink3)">Sin eventos registrados</div>`}
     <div style="height:14px"></div>
-    <button class="btn-g" onclick="closeMod();go('reg');document.getElementById('pv').value=${id};actualizarProblemaSel()">Registrar evento</button>
+    <button class="btn-g" onclick="closeMod();openRegistro('fc-plaEvt',{planta:${id}})">Registrar evento</button>
     <div style="height:7px"></div>
-    <button class="btn-o" onclick="closeMod();go('reg');document.getElementById('epv').value=${id};loadPlanta()">Editar planta</button>`;
+    <button class="btn-o" onclick="closeMod();openRegistro('fc-plaEdit',{planta:${id}})">Editar planta</button>`;
   document.getElementById('mwrap').classList.add('on');
 };
 window.onMClick = e => { if(e.target===document.getElementById('mwrap')) closeMod(); };
@@ -1744,6 +1786,7 @@ window.saveRev = async () => {
   const fbId = await fbAdd('revolcadas', r); if(fbId){r.id=fbId;sv();}
   sheetSync('revolcada', r);
   document.getElementById('ro').value = '';
+  closeRegistro();
   toast(`✅ Revolcada guardada — Sistema ${si}`);
   refresh();
 };
@@ -1770,6 +1813,7 @@ window.savePlanta = async () => {
   p.suelo = document.getElementById('eps').value;
   p.notas = document.getElementById('epno').value;
   sv(); await fbSave('plantas', id, p); sheetSync('planta', p); poblarSels();
+  closeRegistro();
   toast(`✅ ${pLbl(p)} guardada`);
   refresh();
 };
@@ -1778,9 +1822,7 @@ window.addPlanta = async () => {
   const p = {id:nid, nombre:'', variedad:'', especie:'', fechaP:fISO(TODAY), ubicacion:'', exposicion:'', suelo:'', notas:''};
   S.plantas.push(p); sv(); await fbSave('plantas', nid, p); sheetSync('planta', p);
   poblarSels(); renderPla();
-  go('reg');
-  document.getElementById('epv').value = nid;
-  loadPlanta();
+  openRegistro('fc-plaEdit', {planta:nid});
   toast(`Planta ${nid} agregada — completá sus datos`);
 };
 window.saveEventoPlanta = async () => {
@@ -1797,6 +1839,7 @@ window.saveEventoPlanta = async () => {
   const fbId = await fbAdd('registroPlantas', r); if(fbId){r.id=fbId;sv();}
   sheetSync('plantaEvento', r);
   ['pd','pp','pr'].forEach(x=>document.getElementById(x).value='');
+  closeRegistro();
   toast(`✅ Evento guardado — ${pLbl(S.plantas.find(p=>p.id===pid))}`);
   refresh();
 };
@@ -1813,6 +1856,7 @@ window.savePecera = async () => {
   p.fechaArmado = document.getElementById('ka').value || p.fechaArmado;
   p.notas = document.getElementById('kn').value;
   sv(); await fbSave('pecera', 'main', p); sheetSync('pecera', p);
+  closeRegistro();
   toast('✅ Datos de la pecera guardados');
   refresh();
 };
@@ -1829,6 +1873,7 @@ window.saveEventoPecera = async () => {
   const fbId = await fbAdd('registroPecera', r); if(fbId){r.id=fbId;sv();}
   sheetSync('peceraEvento', r);
   ['kd','kr'].forEach(x=>document.getElementById(x).value='');
+  closeRegistro();
   toast(`✅ Evento de pecera guardado — ${r.tipo}`);
   refresh();
 };
@@ -1848,6 +1893,7 @@ window.saveSis = async () => {
   const id=+document.getElementById('es').value, s=S.sistemas.find(x=>x.id===id);
   [s.nombre,s.inicioC,s.finC,s.inicioE,s.notas] = ['en','ei','ef','ee','eno'].map(x=>document.getElementById(x).value);
   sv(); await fbSave('sistemas',id,s); sheetSync('sistema', s); poblarSels();
+  closeRegistro();
   toast(`✅ Sistema ${id} guardado`);
   refresh();
 };
@@ -1865,9 +1911,7 @@ window.addSis = async () => {
   S.sistemas.push(s); sv(); await fbSave('sistemas',nid,s);
   poblarSels(); renderSist();
   // Cambiar al formulario de edición del nuevo sistema
-  go('reg');
-  document.getElementById('es').value = nid;
-  loadSis();
+  openRegistro('fc-sisEdit', {sistema:nid});
   toast(`Sistema ${nid} agregado — completá sus datos`);
 };
 window.delSis = async (id, e) => {
@@ -1890,7 +1934,7 @@ window.delRev = async (id, e) => {
 // ════ NAVEGACIÓN ════
 let cur = 'hoy';
 const TABS   = ['hoy','comp','pla','hue','cli'];
-const TITLES = {hoy:'Hoy',comp:'Compost',pla:'Plantas',hue:'Huerta',cli:'Clima',fito:'Fitosanitario',reg:'Registrar'};
+const TITLES = {hoy:'Hoy',comp:'Compost',pla:'Plantas',hue:'Huerta',cli:'Clima',fito:'Fitosanitario'};
 // ids viejos → nueva ubicación (openSis/openPla/etc. todavía los usan)
 const LEGACY = { dash:{tab:'hoy'}, sist:{tab:'comp',seg:'sist'}, rev:{tab:'comp',seg:'rev'}, pec:{tab:'pla',seg:'pec'} };
 const renderTab = t => {
@@ -1916,16 +1960,32 @@ window.go = t => {
   document.getElementById('pages').scrollTop = 0;
   const ttEl = document.getElementById('tb-title'); if (ttEl) ttEl.textContent = TITLES[t] || '';
   if (TABS.includes(t)) { try { localStorage.setItem('compost_tab', t); } catch(e) {} }
-  if (t === 'reg') {
-    loadSis();
-    if(!document.getElementById('rf').value) document.getElementById('rf').value=fISO(TODAY);
-    if(!document.getElementById('pf').value) document.getElementById('pf').value=fISO(TODAY);
-    if(!document.getElementById('kf').value) document.getElementById('kf').value=fISO(TODAY);
-    loadPecera();
-    actualizarProblemaSel();
-  } else if (seg) setSeg(t, seg);
-  else refresh();
+  if (seg) setSeg(t, seg); else refresh();
 };
+
+// ════ HOJA DE REGISTRO ════
+const REG_TITLES = { 'fc-rev':'Nueva revolcada', 'fc-sisEdit':'Editar sistema', 'fc-plaEvt':'Actividad de planta', 'fc-plaEdit':'Editar planta', 'fc-pecEvt':'Evento de pecera', 'fc-pecData':'Datos de la pecera' };
+window.openRegistro = (fc, pre = {}) => {
+  const hoy = fISO(TODAY);
+  ['rf','pf','kf'].forEach(id => { document.getElementById(id).value = hoy; });
+  if (fc === 'fc-rev' && pre.sistema) document.getElementById('rs').value = pre.sistema;
+  if (fc === 'fc-sisEdit') { if (pre.sistema) document.getElementById('es').value = pre.sistema; loadSis(); }
+  if (fc === 'fc-plaEvt' && pre.planta) document.getElementById('pv').value = pre.planta;
+  if (fc === 'fc-plaEvt' && pre.tipo) document.getElementById('pt').value = pre.tipo;
+  if (fc === 'fc-plaEdit') { if (pre.planta) document.getElementById('epv').value = pre.planta; loadPlanta(); }
+  if (fc === 'fc-pecEvt' && pre.tipo) document.getElementById('kt').value = pre.tipo;
+  if (fc === 'fc-pecData') loadPecera();
+  actualizarProblemaSel();
+  document.getElementById('reg-menu').style.display = fc ? 'none' : '';
+  Object.keys(REG_TITLES).forEach(id => document.getElementById(id).classList.toggle('on', id === fc));
+  document.getElementById('reg-title').textContent = fc ? REG_TITLES[fc] : 'Registrar';
+  document.getElementById('reg-back').style.visibility = fc ? 'visible' : 'hidden';
+  // Sugerir primero lo de la pestaña actual (Compost → revolcada, Plantas → plantas)
+  document.querySelectorAll('.reg-item').forEach(b => { b.style.order = b.dataset.ctx === cur ? '-1' : '0'; });
+  const sheet = document.getElementById('pg-reg');
+  sheet.classList.add('on'); sheet.scrollTop = 0;
+};
+window.closeRegistro = () => document.getElementById('pg-reg').classList.remove('on');
 
 // ════ SYNC ════
 window.doSync = async () => {
