@@ -2,9 +2,12 @@
 // index.html y lo prueba scripts/test-huerta.mjs en Node.
 // Cada vez que se cambie este archivo hay que subir la versión de CACHE en sw.js.
 
-// ── Fuentes (referencia general de huerta familiar; confirmar con la etiqueta de cada producto):
-//   INTA (manejo de huerta, zona pampeana) y Pro-Huerta (calendarios de siembra).
-//   Los números son orientativos y editables por cultivo desde la app.
+// ── Fuentes y alcance: los valores son orientativos y solo parcialmente contrastados.
+//   Los meses de siembra y los días a cosecha se verificaron contra las tablas de
+//   Pro-Huerta/INTA en 16 de las 24 especies (sin verificar: cilantro, menta, orégano,
+//   romero, tomillo, frutilla, rúcula). Riego, fertilización, `diasPlagas` y todos los
+//   productos y dosis de plagas son referencias generales, no contrastadas: confirmar
+//   con la etiqueta del producto. Todo es editable por cultivo desde la app.
 
 // Problemas frecuentes, reutilizados en varias especies.
 const PB = {

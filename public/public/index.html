@@ -1844,7 +1844,9 @@ const prepararCultivo = id => {
   set('hc-dt', p ? p.diasATrasplante : ''); set('hc-dc', p ? p.diasACosecha : '');
   set('hc-notas', p ? p.notas : '');
 };
+let guardandoCultivo = false;   // evita que un doble toque cree el cultivo dos veces
 window.guardarCultivo = async () => {
+  if (guardandoCultivo) return;
   const v = id => document.getElementById(id).value;
   const num = id => { const x = parseFloat(v(id)); return isNaN(x) ? null : x; };
   const id = v('hc-id') ? +v('hc-id') : null;
@@ -1859,23 +1861,26 @@ window.guardarCultivo = async () => {
   const p = id ? S.plantas.find(x => x.id === id)
                : { id: S.plantas.length ? Math.max(...S.plantas.map(x => x.id)) + 1 : 1, variedad:'', exposicion:'Sol pleno', suelo:'Tierra directa', estadoCultivo:'activo' };
   if (!p) return;
-  const perenne = v('hc-ciclo') === 'perenne';
-  Object.assign(p, {
-    categoria:'huerta', cultivo:clave, nombre, especie:nombre, ciclo:v('hc-ciclo'),
-    fechaP:v('hc-fechaP'), fechaTrasplante:v('hc-fechaT'), ubicacion:v('hc-ubic'), notas:v('hc-notas'),
-    riegoVerano:rv, riegoInvierno:ri, diasFert:fert, diasPlagas:plagas,
-    diasATrasplante:num('hc-dt'), diasACosecha: perenne ? null : num('hc-dc'),
-  });
-  if (!id) S.plantas.push(p);
-  sv(); sheetSync('planta', p); await fbSave('plantas', p.id, p);   // sheetSync antes de esperar a Firestore
-  poblarSels(); closeRegistro();
-  toast(`✅ ${nombre} ${id ? 'guardado' : 'agregado a la huerta'}`);
-  go('hue');
+  guardandoCultivo = true;
+  try {
+    const perenne = v('hc-ciclo') === 'perenne';
+    Object.assign(p, {
+      categoria:'huerta', cultivo:clave, nombre, especie:nombre, ciclo:v('hc-ciclo'),
+      fechaP:v('hc-fechaP'), fechaTrasplante:v('hc-fechaT'), ubicacion:v('hc-ubic'), notas:v('hc-notas'),
+      riegoVerano:rv, riegoInvierno:ri, diasFert:fert, diasPlagas:plagas,
+      diasATrasplante:num('hc-dt'), diasACosecha: perenne ? null : num('hc-dc'),
+    });
+    if (!id) S.plantas.push(p);
+    sv(); sheetSync('planta', p); await fbSave('plantas', p.id, p);   // sheetSync antes de esperar a Firestore
+    poblarSels(); closeRegistro();
+    toast(`✅ ${nombre} ${id ? 'guardado' : 'agregado a la huerta'}`);
+    go('hue');
+  } finally { guardandoCultivo = false; }
 };
 
 // ── Cierre de un cultivo ───────────────────────────────────────────────
 window.cerrarCultivo = async (id, estado) => {
-  const p = S.plantas.find(x => x.id === id); if (!p) return;
+  const p = S.plantas.find(x => x.id === id); if (!p || !esCultivo(p)) return;
   const cosechado = estado === 'cosechado';
   if (!confirm(cosechado ? `¿Marcar "${pLbl(p)}" como cosechado? Se cierra el cultivo y pasa al historial.` : `¿Terminar "${pLbl(p)}"? Se cierra el cultivo y pasa al historial.`)) return;
   p.estadoCultivo = estado; p.fechaCierre = fISO(TODAY);
@@ -2028,7 +2033,7 @@ const fitoHTML = p => {
       <thead><tr><th>Problema</th><th>Qué vas a ver</th><th>Producto / Dosis</th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>
-    <div style="font-size:12px;color:var(--ink3);font-style:italic;margin-top:10px">Referencia general — confirmá contra la etiqueta de tu producto, las concentraciones varían entre marcas. Para plagas persistentes o graves, conviene un diagnóstico específico antes de tratar.</div>
+    <div style="font-size:12px;color:var(--ink3);font-style:italic;margin-top:10px">Referencia general — confirmá contra la etiqueta de tu producto, las concentraciones varían entre marcas. Para plagas persistentes o graves, conviene un diagnóstico específico antes de tratar.${esCultivo(p) ? ' Respetá el tiempo de carencia que indica la etiqueta antes de cosechar y probá el producto en pocas hojas antes de tratar toda la planta (el azufre puede quemar zapallitos, zapallos y pepinos).' : ''}</div>
   </details>`;
 };
 

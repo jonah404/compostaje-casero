@@ -1,5 +1,7 @@
-// Los módulos same-origin se sirven cache-first: cada cambio en huerta-catalogo.js
-// (o en cualquier archivo del shell) exige subir esta versión.
+// Los módulos JS same-origin (p. ej. huerta-catalogo.js) van network-first: la caché
+// es solo respaldo sin conexión, así que un deploy no deja a index.html con un módulo viejo.
+// El resto de los archivos del shell (manifest, íconos, etc.) siguen cache-first:
+// si cambian, hay que subir esta versión.
 const CACHE = 'compost-tracker-v3';
 const APP_SHELL = [
   '/',
@@ -51,6 +53,17 @@ self.addEventListener('fetch', event => {
         caches.open(CACHE).then(cache => cache.put('/index.html', res.clone()));
         return res;
       }).catch(() => caches.match('/index.html'))
+    );
+    return;
+  }
+
+  if (url.pathname.endsWith('.js')) {
+    event.respondWith(
+      fetch(req).then(res => {
+        const copia = res.clone();
+        caches.open(CACHE).then(c => c.put(req, copia));
+        return res;
+      }).catch(() => caches.match(req))
     );
     return;
   }
