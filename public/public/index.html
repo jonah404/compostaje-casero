@@ -704,7 +704,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/fireba
 import {
   getFirestore, collection, doc,
   setDoc, getDocs, addDoc, deleteDoc,
-  query, orderBy, serverTimestamp
+  query, orderBy, limit, startAfter, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // ════ FIREBASE CONFIG ════
@@ -718,6 +718,8 @@ const firebaseConfig = {
 };
 // URL del Apps Script desplegado como Web App (Extensions > Apps Script > Deploy > New deployment > Web app).
 const SHEET_SYNC_URL = "https://script.google.com/macros/s/AKfycbzCWQBqlaII2vayl6q5Vl2WwP_y9GVHxkkUcXAQiy46h6DSoRB9z5RPb3QE8lFOiBtX/exec";
+const CLIMA_DIAS_FIRESTORE = 90;  // solo el clima se limita al cargar; el resto se trae completo
+const CLIMA_DIAS_INICIAL = 14;    // filas que muestra el historial hasta tocar "Ver más"
 // ?dry=1 → las funciones de escritura (Firestore/Sheet) solo loguean; sirve para
 // probar la UI en el navegador sin tocar datos reales.
 const DRY = new URLSearchParams(location.search).has('dry');
@@ -869,7 +871,7 @@ const fbLoad = async () => {
     sd.forEach(d => { const x=d.data(); const i=S.sistemas.findIndex(s=>s.id===x.id); i>=0?(S.sistemas[i]={...S.sistemas[i],...x}):S.sistemas.push(x); });
     const rd = await getDocs(query(collection(db,'revolcadas'),orderBy('fecha','desc')));
     if (rd.docs.length) S.revolcadas = rd.docs.map(d=>({id:d.id,...d.data()}));
-    const cd = await getDocs(query(collection(db,'clima'),orderBy('fecha','desc')));
+    const cd = await getDocs(query(collection(db,'clima'),orderBy('fecha','desc'),limit(CLIMA_DIAS_FIRESTORE)));
     if (cd.docs.length) upsertCli(cd.docs.map(d=>({id:d.id,...d.data()})));
     const pd = await getDocs(collection(db,'plantas'));
     pd.forEach(d => { const x=d.data(); const i=S.plantas.findIndex(p=>p.id===x.id); i>=0?(S.plantas[i]={...S.plantas[i],...x}):S.plantas.push(x); });
@@ -1737,9 +1739,23 @@ const climaHeadHTML = () => {
 };
 
 // ════ RENDER CLIMA ════
+let climaVerTodo = false;
+// Muestra todo lo que hay en el dispositivo y, si Firestore tiene días anteriores, trae otro bloque.
+window.climaMas = async () => {
+  climaVerTodo = true;
+  const viejo = [...S.clima].sort((a,b) => a.fecha < b.fecha ? -1 : 1)[0];
+  if (useFirebase && viejo) {
+    try {
+      const cd = await getDocs(query(collection(db,'clima'),orderBy('fecha','desc'),startAfter(viejo.fecha),limit(CLIMA_DIAS_FIRESTORE)));
+      if (cd.docs.length) { upsertCli(cd.docs.map(d => ({id:d.id,...d.data()}))); sv(); }
+    } catch(e) {}
+  }
+  renderCli();
+};
 const renderCli = () => {
   const an = analisis();
   const sorted = [...S.clima].sort((a,b)=>a.fecha>b.fecha?-1:1);
+  const shown = climaVerTodo ? sorted : sorted.slice(0, CLIMA_DIAS_INICIAL);
   const hoy = fISO(TODAY);
   document.getElementById('fetch-bar').classList.add('hide');
 
@@ -1759,7 +1775,7 @@ const renderCli = () => {
     </div>`;
 
   // Tabla heatmap (sin columna UV)
-  const tableHTML = sorted.length ? `
+  const tableHTML = shown.length ? `
     <div class="tbl-wrap"><div class="tbl-scroll">
       <table class="ctbl">
         <thead><tr>
@@ -1770,7 +1786,7 @@ const renderCli = () => {
           <th>Evapo</th><th>Sol (h)</th><th>Notas</th>
         </tr></thead>
         <tbody>
-          ${sorted.map(c => {
+          ${shown.map(c => {
             const isHoy = c.fecha === hoy;
             // lluvia cell
             const llovioCell = c.lluvia==='si'||+c.mm>0
@@ -1800,8 +1816,9 @@ const renderCli = () => {
   document.getElementById('cli-c').innerHTML =
     climaHeadHTML() +
     `<div class="sh">Resumen <span class="sh-sub">análisis climatico</span></div>${statsHTML}` +
-    `<div class="sh">Historial <span class="sh-sub">${sorted.length} días — colores por valor</span></div>` +
-    tableHTML;
+    `<div class="sh">Historial <span class="sh-sub">${shown.length} de ${sorted.length} días — colores por valor</span></div>` +
+    tableHTML +
+    (!climaVerTodo ? `<button class="btn-o" style="margin-top:6px" onclick="climaMas()">Ver más días</button>` : '');
 };
 
 // ════ MODAL SISTEMA ════
