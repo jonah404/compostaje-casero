@@ -39,6 +39,11 @@ const cargar = (hojas, extra = {}) => {
     CalendarApp: { EventColor: new Proxy({}, { get: (_, k) => String(k) }) },
     SpreadsheetApp: { getActiveSpreadsheet: () => ({ getSheetByName: n => hojas[n] || null }) },
     UrlFetchApp: extra.UrlFetchApp || { fetch: () => ({ getResponseCode: () => 200, getContentText: () => '' }) },
+    ContentService: {
+      MimeType: { JSON: 'JSON' },
+      createTextOutput: s => ({ texto: s, setMimeType() { return this; } }),
+    },
+    LockService: extra.LockService || { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
   };
   vm.createContext(ctx);
   vm.runInContext(src, ctx);
@@ -116,6 +121,64 @@ console.log('verificarEventosHuerta');
     const reg = hoja([['id', 'n', 'fecha', 'tipo'], [2, 'Lechuga', hace(1), '🍂 Cosecha']]);
     const g2 = cargar({ Plantas: hoja(filas), 'Registro Plantas': reg });
     assert.equal(g2.verificarEventosHuerta().find(e => e.titulo.indexOf('Cosechar') >= 0), undefined);
+  });
+}
+
+console.log('verificarEventosHuerta: compuertas de fase (espejo de faseCultivo)');
+{
+  const base = { categoria: 'huerta', cultivo: 'tomate', ciclo: 'anual', ultimoRiego: hace(1), proxFert: hace(-5), proxPlagas: hace(-5), rv: 2, ri: 4, fert: 20, plagas: 7 };
+  const evs = filas => cargar({ Plantas: hoja([ENC, ...filas]) }).verificarEventosHuerta();
+  const tiene = (e, pref) => e.some(x => x.titulo.indexOf(pref) >= 0);
+  t('(a) tomate sin trasplantar pasado de diasACosecha: Trasplantar y NO Cosechar', () => {
+    const e = evs([fila({ ...base, id: 1, nombre: 'Tomate', siembra: hace(120), dt: 40, dc: 100 })]);
+    assert.ok(tiene(e, 'Trasplantar')); assert.ok(!tiene(e, 'Cosechar'));
+  });
+  t('(b) perenne con diasATrasplante: sin Trasplantar', () => {
+    const e = evs([fila({ ...base, id: 1, nombre: 'Romero', ciclo: 'perenne', siembra: hace(400), dt: 40, dc: 100 })]);
+    assert.ok(!tiene(e, 'Trasplantar')); assert.ok(!tiene(e, 'Cosechar'));
+  });
+  t('(c) diasATrasplante = 0: sin Trasplantar (y sí Cosechar si ya llegó)', () => {
+    const e = evs([fila({ ...base, id: 1, nombre: 'Rabanito', siembra: hace(50), dt: 0, dc: 30 })]);
+    assert.ok(!tiene(e, 'Trasplantar')); assert.ok(tiene(e, 'Cosechar'));
+  });
+  t('(d) anual sin diasACosecha: ni Trasplantar ni Cosechar', () => {
+    const e = evs([fila({ ...base, id: 1, nombre: 'Tomate', siembra: hace(200), dt: 40 })]);
+    assert.ok(!tiene(e, 'Trasplantar')); assert.ok(!tiene(e, 'Cosechar'));
+  });
+  t('fechaTrasplante solo espacios cuenta como vacía', () => {
+    const e = evs([fila({ ...base, id: 1, nombre: 'Tomate', siembra: hace(45), dt: 40, dc: 100, fechaTrasplante: '  ' })]);
+    assert.ok(tiene(e, 'Trasplantar'));
+  });
+  t('(e) silencio: cosecha hace 3 días NO silencia; hace 2 sí', () => {
+    const f = [fila({ ...base, id: 2, nombre: 'Lechuga', siembra: hace(70), fechaTrasplante: hace(40), dt: 25, dc: 60 })];
+    const con = d => cargar({ Plantas: hoja([ENC, ...f]), 'Registro Plantas': hoja([['id', 'n', 'fecha', 'tipo'], [2, 'Lechuga', hace(d), '🍂 Cosecha']]) }).verificarEventosHuerta();
+    assert.ok(tiene(con(3), 'Cosechar'));
+    assert.ok(!tiene(con(2), 'Cosechar'));
+  });
+}
+
+console.log('doPost: serializa con el lock del script');
+{
+  const log = [];
+  const LockService = { getScriptLock: () => ({ waitLock: ms => log.push('wait' + ms), releaseLock: () => log.push('release') }) };
+  const g = cargar({ Plantas: hoja([ENC]) }, { LockService });
+  t('toma el lock antes de procesar y lo suelta después', () => {
+    log.length = 0;
+    const r = g.doPost({ postData: { contents: JSON.stringify({ tipo: 'noexiste', data: {} }) } });
+    assert.deepEqual(Array.from(log), ['wait30000', 'release']);
+    assert.equal(JSON.parse(r.texto).ok, true);
+  });
+  t('lo suelta aunque el handler lance', () => {
+    log.length = 0;
+    const r = g.doPost({ postData: { contents: '{no es json' } });
+    assert.deepEqual(Array.from(log), ['wait30000', 'release']);
+    assert.equal(JSON.parse(r.texto).ok, false);
+  });
+  t('si waitLock falla: responde ok:false y no suelta un lock que no tiene', () => {
+    const log2 = [];
+    const g2 = cargar({}, { LockService: { getScriptLock: () => ({ waitLock() { throw new Error('timeout'); }, releaseLock: () => log2.push('release') }) } });
+    const r = g2.doPost({ postData: { contents: '{}' } });
+    assert.equal(JSON.parse(r.texto).ok, false); assert.equal(log2.length, 0);
   });
 }
 

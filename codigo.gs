@@ -1352,7 +1352,13 @@ function diagnosticar() {
 }
 
 function doPost(e) {
+  // Serializa las escrituras: el riego agrupado manda varios POST a la vez y
+  // sin lock dos ejecuciones calculan la misma "última fila + 1".
+  var lock = LockService.getScriptLock();
+  var conLock = false;
   try {
+    lock.waitLock(30000);
+    conLock = true;
     var body = JSON.parse(e.postData.contents);
     var tipo = body.tipo, data = body.data;
     if      (tipo === 'revolcada')     guardarRevolcadaSheet(data);
@@ -1366,6 +1372,8 @@ function doPost(e) {
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ok:false, error:String(err)}))
       .setMimeType(ContentService.MimeType.JSON);
+  } finally {
+    if (conLock) lock.releaseLock();
   }
 }
 
@@ -2957,15 +2965,23 @@ function verificarEventosHuerta() {
       }
     }
 
-    // Trasplante pendiente.
+    // Fase del cultivo: mismas compuertas que faseCultivo (huerta-catalogo.js).
+    // Perenne o sin diasACosecha: siempre "crecimiento" (ni trasplante ni cosecha).
+    // Con diasATrasplante > 0 y sin trasplante registrado: antes del trasplante
+    // no hay tarea; desde ahí solo "Trasplantar" (la cosecha espera al trasplante).
     var diasATrasplante = numOVacio_(p[28]);
-    if (diasATrasplante !== '' && !p[23] && diasDesdeSiembra !== null && diasDesdeSiembra >= diasATrasplante) {
+    var diasACosecha = numOVacio_(p[29]);
+    var esPerenne = String(p[22]).toLowerCase().trim() === 'perenne';
+    var sinTrasplante = String(p[23]).trim() === '';
+    var conFase = !esPerenne && diasACosecha !== '' && diasDesdeSiembra !== null;
+    var pideTrasplante = conFase && diasATrasplante !== '' && diasATrasplante > 0 && sinTrasplante;
+
+    if (pideTrasplante && diasDesdeSiembra >= diasATrasplante) {
       g.trasplante.push({ nombre: nombre, dias: diasDesdeSiembra });
     }
 
-    // Cosecha (solo anuales); se silencia 3 días tras un evento de cosecha.
-    var diasACosecha = numOVacio_(p[29]);
-    if (String(p[22]) !== 'perenne' && diasACosecha !== '' && diasDesdeSiembra !== null && diasDesdeSiembra >= diasACosecha) {
+    // Cosecha (solo anuales ya trasplantadas o sin trasplante); se silencia 3 días tras un evento de cosecha.
+    if (conFase && !pideTrasplante && diasDesdeSiembra >= diasACosecha) {
       var ultCosecha = obtenerUltimoEventoPlanta_(p[0], 'Cosecha');
       var silenciada = false;
       if (ultCosecha) {
