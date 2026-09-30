@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#efe8d7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#3c3325" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -184,32 +184,28 @@ html, body { height: 100%; background: var(--cream); color: var(--ink); font-fam
 .mob-title { font-family: var(--serif); font-size: 16px; color: var(--ink); }
 .mob-sync { background: none; border: none; cursor: pointer; color: var(--ink3); font-size: 17px; display: flex; align-items: center; padding: 4px; }
 
-.mob-tabs {
-  display: none;
-  background: var(--side-bg);
-  border-bottom: 1px solid rgba(255,255,255,.05);
-  flex-shrink: 0;
-}
-.mob-tabs-inner { display: flex; overflow-x: auto; scrollbar-width: none; }
-.mob-tabs-inner::-webkit-scrollbar { display: none; }
-.mt {
-  flex: 0 0 auto;
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-  padding: 8px 16px 9px; border: none; background: none; cursor: pointer;
-  font-size: 9px; font-weight: 700; color: var(--ink3);
-  letter-spacing: .4px; text-transform: uppercase;
-  border-bottom: 2px solid transparent;
-}
-.mt i { font-size: 18px; }
-.mt.on { color: var(--sage); border-bottom-color: var(--side-on); }
-.mt.on i { color: var(--side-on); }
+/* segmented control (Compost: Sistemas/Revolcadas · Plantas: Plantas/Pecera) */
+.seg { display: flex; gap: 4px; padding: 4px; background: var(--paper2); border-radius: var(--rl); margin-bottom: 14px; position: sticky; top: 0; z-index: 5; }
+.seg button { flex: 1; min-height: 44px; border: none; background: none; border-radius: var(--r); font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--ink3); cursor: pointer; }
+.seg button.on { background: var(--paper); color: var(--sage); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.seg-pane { display: none; }
+.seg-pane.on { display: block; }
+
+/* barra inferior (mobile) */
+.bnav { display: none; position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; background: var(--side-bg); border-top: 1px solid var(--rule2); padding-bottom: env(safe-area-inset-bottom); }
+.bnav-in { display: grid; grid-template-columns: repeat(5, 1fr); }
+.bt { min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: none; background: none; cursor: pointer; font-family: var(--sans); font-size: 12px; font-weight: 600; color: var(--ink3); }
+.bt i { font-size: 22px; }
+.bt.on { color: var(--side-act); }
+.bt.on i { color: var(--side-on); }
 
 @media (max-width: 767px) {
   .sidebar { display: none; }
   .mob-hdr { display: flex; }
-  .mob-tabs { display: block; }
+  .bnav { display: block; }
   .topbar { display: none; }
-  .pages { padding: 14px 14px 80px; }
+  .pages { padding: 14px 14px calc(150px + env(safe-area-inset-bottom)); }
+  .toast { bottom: calc(140px + env(safe-area-inset-bottom)); }
 }
 
 /* ═══════════════════════════════════════════
@@ -424,14 +420,11 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
     <div class="sb-date" id="sb-date"></div>
   </div>
   <nav class="sb-nav">
-    <button class="sn on"  onclick="go('dash')"><i class="ti ti-layout-dashboard"></i>Inicio</button>
-    <button class="sn"     onclick="go('sist')"><i class="ti ti-box-multiple"></i>Sistemas</button>
-    <button class="sn"     onclick="go('rev')"> <i class="ti ti-history"></i>Revolcadas</button>
-    <button class="sn"     onclick="go('cli')"> <i class="ti ti-cloud"></i>Clima</button>
-    <button class="sn"     onclick="go('pla')"> <i class="ti ti-leaf"></i>Plantas</button>
-    <button class="sn"     onclick="go('pec')"> <i class="ti ti-fish"></i>Pecera</button>
-    <button class="sn"     onclick="go('fito')"><i class="ti ti-bug"></i>Fitosanitario</button>
-    <button class="sn"     onclick="go('reg')"> <i class="ti ti-circle-plus"></i>Registrar</button>
+    <button class="sn on" data-tab="hoy"  onclick="go('hoy')"><i class="ti ti-home"></i>Hoy</button>
+    <button class="sn"    data-tab="comp" onclick="go('comp')"><i class="ti ti-recycle"></i>Compost</button>
+    <button class="sn"    data-tab="pla"  onclick="go('pla')"><i class="ti ti-leaf"></i>Plantas</button>
+    <button class="sn"    data-tab="hue"  onclick="go('hue')"><i class="ti ti-plant-2"></i>Huerta</button>
+    <button class="sn"    data-tab="cli"  onclick="go('cli')"><i class="ti ti-cloud"></i>Clima</button>
   </nav>
   <div class="sb-foot">
     <button class="sync-side" onclick="doSync()">
@@ -453,38 +446,52 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
     </div>
     <button class="mob-sync" onclick="doSync()"><i class="ti ti-refresh" id="sync-i-mob"></i></button>
   </div>
-  <div class="mob-tabs">
-    <div class="mob-tabs-inner">
-      <button class="mt on" onclick="go('dash')"><i class="ti ti-layout-dashboard"></i>Inicio</button>
-      <button class="mt"    onclick="go('sist')"><i class="ti ti-box-multiple"></i>Sistemas</button>
-      <button class="mt"    onclick="go('rev')"> <i class="ti ti-history"></i>Revolcadas</button>
-      <button class="mt"    onclick="go('cli')"> <i class="ti ti-cloud"></i>Clima</button>
-      <button class="mt"    onclick="go('pla')"> <i class="ti ti-leaf"></i>Plantas</button>
-      <button class="mt"    onclick="go('pec')"> <i class="ti ti-fish"></i>Pecera</button>
-      <button class="mt"    onclick="go('fito')"><i class="ti ti-bug"></i>Fitosanitario</button>
-      <button class="mt"    onclick="go('reg')"> <i class="ti ti-circle-plus"></i>Registrar</button>
-    </div>
-  </div>
 
   <div class="pages" id="pages">
 
-    <!-- INICIO -->
-    <div class="pg on" id="pg-dash"><div id="dash-c"></div></div>
+    <!-- HOY -->
+    <div class="pg on" id="pg-hoy"><div id="dash-c"></div></div>
 
-    <!-- SISTEMAS -->
-    <div class="pg" id="pg-sist">
-      <div id="sist-c"></div>
-      <button class="add-btn" onclick="addSis()"><i class="ti ti-plus"></i> Agregar sistema</button>
+    <!-- COMPOST -->
+    <div class="pg" id="pg-comp">
+      <div class="seg" id="seg-comp">
+        <button class="on" data-s="sist" onclick="setSeg('comp','sist')">Sistemas</button>
+        <button data-s="rev" onclick="setSeg('comp','rev')">Revolcadas</button>
+      </div>
+      <div class="seg-pane on" id="pane-sist">
+        <div id="sist-c"></div>
+        <button class="add-btn" onclick="addSis()"><i class="ti ti-plus"></i> Agregar sistema</button>
+      </div>
+      <div class="seg-pane" id="pane-rev">
+        <div style="max-width:260px;margin-bottom:14px">
+          <div class="f"><select id="hf" onchange="renderRev()">
+            <option value="todos">Todos los sistemas</option>
+          </select></div>
+        </div>
+        <div class="tbl-wrap"><div class="tbl-scroll"><div id="rev-c"></div></div></div>
+      </div>
     </div>
 
-    <!-- REVOLCADAS -->
-    <div class="pg" id="pg-rev">
-      <div style="max-width:260px;margin-bottom:14px">
-        <div class="f"><select id="hf" onchange="renderRev()">
-          <option value="todos">Todos los sistemas</option>
-        </select></div>
+    <!-- PLANTAS -->
+    <div class="pg" id="pg-pla">
+      <div class="seg" id="seg-pla">
+        <button class="on" data-s="pla" onclick="setSeg('pla','pla')">Plantas</button>
+        <button data-s="pec" onclick="setSeg('pla','pec')">Pecera</button>
       </div>
-      <div class="tbl-wrap"><div class="tbl-scroll"><div id="rev-c"></div></div></div>
+      <div class="seg-pane on" id="pane-pla">
+        <div id="pla-c"></div>
+        <button class="add-btn" onclick="addPlanta()"><i class="ti ti-plus"></i> Agregar planta</button>
+      </div>
+      <div class="seg-pane" id="pane-pec"><div id="pec-c"></div></div>
+    </div>
+
+    <!-- HUERTA -->
+    <div class="pg" id="pg-hue">
+      <div class="card" style="text-align:center;padding:40px 20px">
+        <div style="font-size:40px">🥬</div>
+        <div style="font-family:var(--serif);font-size:20px;margin:8px 0">Huerta</div>
+        <div style="font-size:13px;color:var(--ink3)">Próximamente: hortalizas y aromáticas con su seguimiento.</div>
+      </div>
     </div>
 
     <!-- CLIMA -->
@@ -493,18 +500,7 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
       <div id="cli-c"></div>
     </div>
 
-    <!-- PLANTAS -->
-    <div class="pg" id="pg-pla">
-      <div id="pla-c"></div>
-      <button class="add-btn" onclick="addPlanta()"><i class="ti ti-plus"></i> Agregar planta</button>
-    </div>
-
-    <!-- PECERA -->
-    <div class="pg" id="pg-pec">
-      <div id="pec-c"></div>
-    </div>
-
-    <!-- FITOSANITARIO -->
+    <!-- FITOSANITARIO (se elimina en la Tarea 6) -->
     <div class="pg" id="pg-fito">
       <div id="fito-c"></div>
     </div>
@@ -637,6 +633,13 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
     <div class="mbody" id="mbody"></div>
   </div>
 </div>
+<nav class="bnav"><div class="bnav-in">
+  <button class="bt on" data-tab="hoy"  onclick="go('hoy')"><i class="ti ti-home"></i>Hoy</button>
+  <button class="bt"    data-tab="comp" onclick="go('comp')"><i class="ti ti-recycle"></i>Compost</button>
+  <button class="bt"    data-tab="pla"  onclick="go('pla')"><i class="ti ti-leaf"></i>Plantas</button>
+  <button class="bt"    data-tab="hue"  onclick="go('hue')"><i class="ti ti-plant-2"></i>Huerta</button>
+  <button class="bt"    data-tab="cli"  onclick="go('cli')"><i class="ti ti-cloud"></i>Clima</button>
+</div></nav>
 <div class="toast h" id="toast"></div>
 
 <script type="module">
@@ -1742,7 +1745,7 @@ window.saveRev = async () => {
   sheetSync('revolcada', r);
   document.getElementById('ro').value = '';
   toast(`✅ Revolcada guardada — Sistema ${si}`);
-  if(cur==='dash') renderDash(); if(cur==='rev') renderRev();
+  refresh();
 };
 
 window.loadPlanta = () => {
@@ -1768,7 +1771,7 @@ window.savePlanta = async () => {
   p.notas = document.getElementById('epno').value;
   sv(); await fbSave('plantas', id, p); sheetSync('planta', p); poblarSels();
   toast(`✅ ${pLbl(p)} guardada`);
-  if(cur==='dash')renderDash(); if(cur==='pla')renderPla();
+  refresh();
 };
 window.addPlanta = async () => {
   const nid = S.plantas.length ? Math.max(...S.plantas.map(p=>p.id))+1 : 1;
@@ -1795,7 +1798,7 @@ window.saveEventoPlanta = async () => {
   sheetSync('plantaEvento', r);
   ['pd','pp','pr'].forEach(x=>document.getElementById(x).value='');
   toast(`✅ Evento guardado — ${pLbl(S.plantas.find(p=>p.id===pid))}`);
-  if(cur==='dash') renderDash(); if(cur==='pla') renderPla();
+  refresh();
 };
 
 window.loadPecera = () => {
@@ -1811,7 +1814,7 @@ window.savePecera = async () => {
   p.notas = document.getElementById('kn').value;
   sv(); await fbSave('pecera', 'main', p); sheetSync('pecera', p);
   toast('✅ Datos de la pecera guardados');
-  if(cur==='dash') renderDash(); if(cur==='pec') renderPec();
+  refresh();
 };
 window.saveEventoPecera = async () => {
   const f = document.getElementById('kf').value;
@@ -1827,7 +1830,7 @@ window.saveEventoPecera = async () => {
   sheetSync('peceraEvento', r);
   ['kd','kr'].forEach(x=>document.getElementById(x).value='');
   toast(`✅ Evento de pecera guardado — ${r.tipo}`);
-  if(cur==='dash') renderDash(); if(cur==='pec') renderPec();
+  refresh();
 };
 window.delEventoPecera = async (id, e) => {
   e.stopPropagation();
@@ -1846,7 +1849,7 @@ window.saveSis = async () => {
   [s.nombre,s.inicioC,s.finC,s.inicioE,s.notas] = ['en','ei','ef','ee','eno'].map(x=>document.getElementById(x).value);
   sv(); await fbSave('sistemas',id,s); sheetSync('sistema', s); poblarSels();
   toast(`✅ Sistema ${id} guardado`);
-  if(cur==='dash')renderDash(); if(cur==='sist')renderSist();
+  refresh();
 };
 window.clearSis = async () => {
   const id=+document.getElementById('es').value;
@@ -1873,7 +1876,7 @@ window.delSis = async (id, e) => {
   await fbDel('sistemas', id);
   S.sistemas = S.sistemas.filter(s=>s.id!=id); sv();
   poblarSels(); renderSist();
-  if(cur==='dash') renderDash();
+  refresh();
   toast(`Sistema ${id} eliminado`);
 };
 window.delRev = async (id, e) => {
@@ -1885,31 +1888,43 @@ window.delRev = async (id, e) => {
 };
 
 // ════ NAVEGACIÓN ════
-let cur = 'dash';
-const NAVT = ['dash','sist','rev','cli','pla','pec','fito','reg'];
-const TITLES = {dash:'Inicio',sist:'Sistemas',rev:'Revolcadas',cli:'Clima',pla:'Plantas',pec:'Pecera',fito:'Fitosanitario',reg:'Registrar'};
+let cur = 'hoy';
+const TABS   = ['hoy','comp','pla','hue','cli'];
+const TITLES = {hoy:'Hoy',comp:'Compost',pla:'Plantas',hue:'Huerta',cli:'Clima',fito:'Fitosanitario',reg:'Registrar'};
+// ids viejos → nueva ubicación (openSis/openPla/etc. todavía los usan)
+const LEGACY = { dash:{tab:'hoy'}, sist:{tab:'comp',seg:'sist'}, rev:{tab:'comp',seg:'rev'}, pec:{tab:'pla',seg:'pec'} };
+const renderTab = t => {
+  if (t==='hoy')  renderDash();
+  if (t==='comp') { renderSist(); renderRev(); }
+  if (t==='pla')  { renderPla(); renderPec(); }
+  if (t==='cli')  renderCli();
+  if (t==='fito') renderFito();
+};
+window.refresh = () => renderTab(cur);
+window.setSeg = (tab, s) => {
+  document.querySelectorAll(`#seg-${tab} button`).forEach(b => b.classList.toggle('on', b.dataset.s === s));
+  document.querySelectorAll(`#pg-${tab} .seg-pane`).forEach(p => p.classList.toggle('on', p.id === 'pane-'+s));
+  refresh();
+};
 window.go = t => {
+  let seg = null;
+  if (LEGACY[t]) { seg = LEGACY[t].seg || null; t = LEGACY[t].tab; }
   cur = t;
-  document.querySelectorAll('.sn').forEach((b,i)=>b.classList.toggle('on',NAVT[i]===t));
-  document.querySelectorAll('.mt').forEach((b,i)=>b.classList.toggle('on',NAVT[i]===t));
-  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.sn,.bt').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  document.querySelectorAll('.pg').forEach(p => p.classList.remove('on'));
   document.getElementById('pg-'+t).classList.add('on');
-  const ttEl=document.getElementById('tb-title'); if(ttEl) ttEl.textContent=TITLES[t]||'';
-  if(t==='dash') renderDash();
-  if(t==='sist') renderSist();
-  if(t==='rev')  renderRev();
-  if(t==='cli')  renderCli();
-  if(t==='pla')  renderPla();
-  if(t==='pec')  renderPec();
-  if(t==='fito') renderFito();
-  if(t==='reg')  {
+  document.getElementById('pages').scrollTop = 0;
+  const ttEl = document.getElementById('tb-title'); if (ttEl) ttEl.textContent = TITLES[t] || '';
+  if (TABS.includes(t)) { try { localStorage.setItem('compost_tab', t); } catch(e) {} }
+  if (t === 'reg') {
     loadSis();
     if(!document.getElementById('rf').value) document.getElementById('rf').value=fISO(TODAY);
     if(!document.getElementById('pf').value) document.getElementById('pf').value=fISO(TODAY);
     if(!document.getElementById('kf').value) document.getElementById('kf').value=fISO(TODAY);
     loadPecera();
     actualizarProblemaSel();
-  }
+  } else if (seg) setSeg(t, seg);
+  else refresh();
 };
 
 // ════ SYNC ════
@@ -1922,9 +1937,7 @@ window.doSync = async () => {
   const ok = await autoFetch(true);
   icons.forEach(i=>{if(i) i.classList.remove('spin')});
   if(fb) fb.classList.add('hide');
-  if(cur==='dash') renderDash();
-  if(cur==='cli')  renderCli();
-  if(cur==='rev')  renderRev();
+  refresh();
   toast(ok?'✅ Clima actualizado (Open-Meteo)': useFirebase?'✅ Sincronizado con Firebase':'⚠️ Modo local (Firebase no configurado)');
 };
 
@@ -1977,17 +1990,19 @@ const init = async () => {
   poblarSels();
   document.getElementById('rf').value = fISO(TODAY);
   loadSis();
-  renderDash();
+  let t0 = 'hoy';
+  try { const g = localStorage.getItem('compost_tab'); if (TABS.includes(g)) t0 = g; } catch(e) {}
+  go(t0);
 
   // Auto-fetch en background si no se hizo hoy
   if (S.climaLastFetch !== todayISO()) {
     document.getElementById('fetch-bar').classList.remove('hide');
     autoFetch(false).then(ok=>{
       document.getElementById('fetch-bar').classList.add('hide');
-      if(ok){ if(cur==='dash')renderDash(); if(cur==='cli')renderCli(); if(cur==='rev')renderRev(); }
+      if(ok){ refresh(); }
     });
   }
-  fbLoad().then(()=>{ poblarSels(); if(cur==='dash')renderDash(); if(cur==='rev')renderRev(); });
+  fbLoad().then(()=>{ poblarSels(); refresh(); });
 };
 
 init();
