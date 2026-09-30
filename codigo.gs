@@ -2533,6 +2533,13 @@ function sincronizarClimaAFirestore() {
     if (!row[0]) return;
     var fecha = row[0] instanceof Date ? Utilities.formatDate(row[0], CFG.tz, 'yyyy-MM-dd') : String(row[0]).substring(0, 10);
     if (!fecha) return;
+    // Filas con fecha imposible (1969-1971, año 0, etc.) no se envían: en
+    // sep-2026 se colaron 407 así desde la hoja y Firestore las volvía a crear
+    // después de borrarlas. La app arranca en 2026, así que 2020 es un piso seguro.
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha) || fecha < '2020-01-01') {
+      Logger.log('[SKIP] Clima con fecha inválida: ' + fecha);
+      return;
+    }
 
     var humMax = row[4], humMin = row[5];
     var humProm = row[6] !== '' && row[6] != null ? row[6]
