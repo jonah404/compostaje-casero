@@ -658,6 +658,9 @@ const firebaseConfig = {
 };
 // URL del Apps Script desplegado como Web App (Extensions > Apps Script > Deploy > New deployment > Web app).
 const SHEET_SYNC_URL = "https://script.google.com/macros/s/AKfycbzCWQBqlaII2vayl6q5Vl2WwP_y9GVHxkkUcXAQiy46h6DSoRB9z5RPb3QE8lFOiBtX/exec";
+// ?dry=1 → las funciones de escritura (Firestore/Sheet) solo loguean; sirve para
+// probar la UI en el navegador sin tocar datos reales.
+const DRY = new URLSearchParams(location.search).has('dry');
 let db, useFirebase = false;
 try {
   const a = initializeApp(firebaseConfig);
@@ -796,9 +799,9 @@ async function autoFetch(force = false) {
 }
 
 // ════ FIREBASE OPS ════
-const fbSave = async (col, id, data) => { if (!useFirebase) return; try { await setDoc(doc(db,col,String(id)),{...data,_ts:serverTimestamp()}); } catch(e){} };
-const fbAdd  = async (col, data) => { if (!useFirebase) return null; try { const r=await addDoc(collection(db,col),{...data,_ts:serverTimestamp()}); return r.id; } catch(e){ return null; } };
-const fbDel  = async (col, id)   => { if (!useFirebase) return; try { await deleteDoc(doc(db,col,String(id))); } catch(e){} };
+const fbSave = async (col, id, data) => { if (DRY) { console.info('[dry] fbSave', col, id); return; } if (!useFirebase) return; try { await setDoc(doc(db,col,String(id)),{...data,_ts:serverTimestamp()}); } catch(e){} };
+const fbAdd  = async (col, data) => { if (DRY) { console.info('[dry] fbAdd', col, data); return null; } if (!useFirebase) return null; try { const r=await addDoc(collection(db,col),{...data,_ts:serverTimestamp()}); return r.id; } catch(e){ return null; } };
+const fbDel  = async (col, id)   => { if (DRY) { console.info('[dry] fbDel', col, id); return; } if (!useFirebase) return; try { await deleteDoc(doc(db,col,String(id))); } catch(e){} };
 const fbLoad = async () => {
   if (!useFirebase) return;
   try {
@@ -825,8 +828,9 @@ const fbLoad = async () => {
 // que el Web App de Apps Script no maneja. Es "fire and forget".
 const sheetSync = (tipo, data) => {
   if (!SHEET_SYNC_URL) return;
+  if (DRY) { console.info('[dry] sheetSync', tipo, data); return; }
   fetch(SHEET_SYNC_URL, {
-    method: 'POST', mode: 'no-cors',
+    method: 'POST', mode: 'no-cors', keepalive: true,
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify({ tipo, data })
   }).catch(()=>{});
