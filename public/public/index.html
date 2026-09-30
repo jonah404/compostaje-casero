@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#efe8d7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#3c3325" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -122,8 +122,8 @@ html, body { height: 100%; background: var(--cream); color: var(--ink); font-fam
   font-size: 20px; flex-shrink: 0;
 }
 .sb-wordmark { font-family: var(--serif); font-size: 18px; color: var(--ink); line-height: 1.1; }
-.sb-sub { font-size: 11px; color: var(--side-txt); letter-spacing: .3px; margin-top: 1px; }
-.sb-date { font-size: 11px; color: var(--ink3); margin-top: 6px; }
+.sb-sub { font-size: 12px; color: var(--side-txt); letter-spacing: .3px; margin-top: 1px; }
+.sb-date { font-size: 12px; color: var(--ink3); margin-top: 6px; }
 
 .sb-nav { flex: 1; padding: 10px 10px; overflow-y: auto; }
 .sn {
@@ -184,32 +184,28 @@ html, body { height: 100%; background: var(--cream); color: var(--ink); font-fam
 .mob-title { font-family: var(--serif); font-size: 16px; color: var(--ink); }
 .mob-sync { background: none; border: none; cursor: pointer; color: var(--ink3); font-size: 17px; display: flex; align-items: center; padding: 4px; }
 
-.mob-tabs {
-  display: none;
-  background: var(--side-bg);
-  border-bottom: 1px solid rgba(255,255,255,.05);
-  flex-shrink: 0;
-}
-.mob-tabs-inner { display: flex; overflow-x: auto; scrollbar-width: none; }
-.mob-tabs-inner::-webkit-scrollbar { display: none; }
-.mt {
-  flex: 0 0 auto;
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-  padding: 8px 16px 9px; border: none; background: none; cursor: pointer;
-  font-size: 9px; font-weight: 700; color: var(--ink3);
-  letter-spacing: .4px; text-transform: uppercase;
-  border-bottom: 2px solid transparent;
-}
-.mt i { font-size: 18px; }
-.mt.on { color: var(--sage); border-bottom-color: var(--side-on); }
-.mt.on i { color: var(--side-on); }
+/* segmented control (Compost: Sistemas/Revolcadas · Plantas: Plantas/Pecera) */
+.seg { display: flex; gap: 4px; padding: 4px; background: var(--paper2); border-radius: var(--rl); margin-bottom: 14px; position: sticky; top: 0; z-index: 5; }
+.seg button { flex: 1; min-height: 44px; border: none; background: none; border-radius: var(--r); font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--ink3); cursor: pointer; }
+.seg button.on { background: var(--paper); color: var(--sage); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.seg-pane { display: none; }
+.seg-pane.on { display: block; }
+
+/* barra inferior (mobile) */
+.bnav { display: none; position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; background: var(--side-bg); border-top: 1px solid var(--rule2); padding-bottom: env(safe-area-inset-bottom); }
+.bnav-in { display: grid; grid-template-columns: repeat(5, 1fr); }
+.bt { min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: none; background: none; cursor: pointer; font-family: var(--sans); font-size: 12px; font-weight: 600; color: var(--ink3); }
+.bt i { font-size: 22px; }
+.bt.on { color: var(--side-act); }
+.bt.on i { color: var(--side-on); }
 
 @media (max-width: 767px) {
   .sidebar { display: none; }
   .mob-hdr { display: flex; }
-  .mob-tabs { display: block; }
+  .bnav { display: block; }
   .topbar { display: none; }
-  .pages { padding: 14px 14px 80px; }
+  .pages { padding: 14px 14px calc(150px + env(safe-area-inset-bottom)); }
+  .toast { bottom: calc(140px + env(safe-area-inset-bottom)); }
 }
 
 /* ═══════════════════════════════════════════
@@ -242,9 +238,9 @@ html, body { height: 100%; background: var(--cream); color: var(--ink); font-fam
   border-radius: var(--rl);
   padding: 14px 16px;
 }
-.stat-l { font-size: 10px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--ink3); margin-bottom: 4px; }
+.stat-l { font-size: 12px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--ink3); margin-bottom: 4px; }
 .stat-v { font-family: var(--serif); font-size: 30px; color: var(--ink); line-height: 1; letter-spacing: -.5px; }
-.stat-s { font-size: 11px; color: var(--ink3); margin-top: 3px; }
+.stat-s { font-size: 12px; color: var(--ink3); margin-top: 3px; }
 
 /* donut / ring charts */
 .donut-wrap { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
@@ -254,14 +250,14 @@ html, body { height: 100%; background: var(--cream); color: var(--ink); font-fam
 .donut-dot { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
 .ring-row { display: flex; gap: 14px; }
 .ring-tile { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; background: var(--paper); border: 1px solid var(--rule); border-radius: var(--rl); padding: 14px 10px; }
-.ring-tile-l { font-size: 10px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--ink3); }
-.ring-tile-s { font-size: 11px; color: var(--ink3); }
+.ring-tile-l { font-size: 12px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--ink3); }
+.ring-tile-s { font-size: 12px; color: var(--ink3); }
 
 /* card */
 .card { background: var(--paper); border: 1px solid var(--rule); border-radius: var(--rl); padding: 16px 18px; margin-bottom: 10px; }
 
 /* badge */
-.badge { display: inline-flex; align-items: center; font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 20px; letter-spacing: .2px; white-space: nowrap; }
+.badge { display: inline-flex; align-items: center; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 20px; letter-spacing: .2px; white-space: nowrap; }
 .bv { background: var(--paper3); color: var(--ink3); }
 .bc { background: var(--sage-bg); color: var(--sage); }
 .bs { background: var(--sky-bg); color: var(--sky); }
@@ -289,7 +285,7 @@ html, body { height: 100%; background: var(--cream); color: var(--ink); font-fam
 .sysc-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
 .sysc-name { font-family: var(--serif); font-size: 18px; color: var(--ink); }
 .sysc-meta { font-size: 12px; color: var(--ink3); line-height: 1.7; }
-.rev-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 5px 11px; border-radius: var(--r); margin-top: 8px; }
+.rev-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; padding: 5px 11px; border-radius: var(--r); margin-top: 8px; }
 .rph { background: var(--rust-bg); color: var(--rust); }
 .rpp { background: var(--umber-bg); color: var(--umber); }
 .rpo { background: var(--paper3); color: var(--ink3); }
@@ -298,7 +294,7 @@ html, body { height: 100%; background: var(--cream); color: var(--ink); font-fam
 .prog { height: 5px; background: var(--paper3); border-radius: 3px; overflow: hidden; margin: 8px 0 3px; }
 .pf { height: 100%; border-radius: 3px; transition: width .5s ease; }
 .pfb { background: var(--chart-2); } .pfa { background: var(--chart-3); } .pfg { background: var(--chart-1); }
-.prog-lb { display: flex; justify-content: space-between; font-size: 10px; color: var(--ink3); }
+.prog-lb { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink3); }
 
 /* clima hero */
 .clhero { background: var(--paper); border: 1px solid var(--rule); border-radius: var(--rl); padding: 18px; margin-bottom: 12px; }
@@ -308,13 +304,13 @@ html, body { height: 100%; background: var(--cream); color: var(--ink); font-fam
 .clh-right { text-align: right; }
 .clh-hum { font-family: var(--serif); font-size: 28px; color: var(--ink); }
 .clh-hum span { font-family: var(--sans); font-size: 14px; font-weight: 400; color: var(--ink3); }
-.clh-mini { font-size: 11px; color: var(--ink3); margin-top: 2px; }
+.clh-mini { font-size: 12px; color: var(--ink3); margin-top: 2px; }
 .clg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 @media (max-width: 480px) { .clg { grid-template-columns: repeat(2, 1fr); } }
 .cli { background: var(--paper2); border-radius: var(--r); padding: 10px 12px; }
-.cli-l { font-size: 9px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--ink3); margin-bottom: 3px; }
+.cli-l { font-size: 12px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--ink3); margin-bottom: 3px; }
 .cli-v { font-family: var(--serif); font-size: 18px; color: var(--ink); }
-.cli-u { font-family: var(--sans); font-size: 10px; color: var(--ink3); }
+.cli-u { font-family: var(--sans); font-size: 12px; color: var(--ink3); }
 
 /* condicion */
 .cond { background: var(--paper); border: 1px solid var(--rule); border-radius: var(--rl); padding: 16px 18px; margin-bottom: 12px; }
@@ -324,11 +320,8 @@ html, body { height: 100%; background: var(--cream); color: var(--ink); font-fam
 .cond-bar { height: 8px; background: var(--paper3); border-radius: 4px; overflow: hidden; margin-bottom: 6px; }
 .cond-f { height: 100%; border-radius: 4px; transition: width .6s ease; }
 .pills { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
-.pill { font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 20px; letter-spacing: .2px; }
+.pill { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 20px; letter-spacing: .2px; }
 
-/* dash grid */
-.dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
-@media (max-width: 900px) { .dash-grid { grid-template-columns: 1fr; } }
 
 /* ── TABLA CLIMA CON HEATMAP ── */
 .tbl-wrap { background: var(--paper); border: 1px solid var(--rule); border-radius: var(--rl); overflow: hidden; margin-bottom: 12px; }
@@ -336,7 +329,7 @@ html, body { height: 100%; background: var(--cream); color: var(--ink); font-fam
 table.ctbl { width: 100%; border-collapse: collapse; font-size: 12px; }
 table.ctbl th {
   background: var(--paper2); color: var(--ink3);
-  font-size: 9px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase;
+  font-size: 12px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase;
   padding: 10px 10px; white-space: nowrap;
   border-bottom: 1px solid var(--rule); text-align: center;
   position: sticky; top: 0; z-index: 2;
@@ -345,12 +338,12 @@ table.ctbl th:first-child { text-align: left; background: var(--paper2); }
 table.ctbl td { padding: 7px 10px; border-bottom: 1px solid var(--rule); color: var(--ink); text-align: center; white-space: nowrap; font-size: 12px; font-weight: 500; transition: opacity .1s; }
 table.ctbl tr:last-child td { border-bottom: none; }
 table.ctbl tr.hoy td { outline: 2px solid var(--sage-mid); outline-offset: -1px; }
-table.ctbl td:first-child { text-align: left; background: var(--paper2) !important; font-weight: 600; font-size: 11px; }
+table.ctbl td:first-child { text-align: left; background: var(--paper2) !important; font-weight: 600; font-size: 12px; }
 table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
 
 /* revolcadas tabla */
 .rtbl { width: 100%; border-collapse: collapse; font-size: 13px; }
-.rtbl th { background: var(--paper2); color: var(--ink3); font-size: 9px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; padding: 9px 13px; border-bottom: 1px solid var(--rule); text-align: left; }
+.rtbl th { background: var(--paper2); color: var(--ink3); font-size: 12px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; padding: 9px 13px; border-bottom: 1px solid var(--rule); text-align: left; }
 .rtbl td { padding: 11px 13px; border-bottom: 1px solid var(--rule); color: var(--ink); vertical-align: middle; }
 .rtbl tr:last-child td { border-bottom: none; }
 .rtbl tr:hover td { background: var(--paper2); }
@@ -362,7 +355,7 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
 .fc h3 { font-family: var(--serif); font-size: 19px; color: var(--ink); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
 .fc h3 i { font-size: 18px; color: var(--sage-mid); }
 .f { margin-bottom: 12px; }
-.f label { display: block; font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--ink3); margin-bottom: 5px; }
+.f label { display: block; font-size: 12px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--ink3); margin-bottom: 5px; }
 .f input, .f select, .f textarea {
   width: 100%; padding: 10px 13px;
   background: var(--cream); border: 1px solid var(--rule2);
@@ -373,7 +366,7 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
 .f input:focus, .f select:focus, .f textarea:focus { border-color: var(--sage-mid); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sage-mid) 16%, transparent); }
 .f textarea { height: 72px; resize: none; }
 .f select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='7'%3E%3Cpath d='M1 1l4.5 4.5L10 1' stroke='%239c9282' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 13px center; padding-right: 34px; }
-.fhint { font-size: 10px; color: var(--ink3); margin-top: 4px; }
+.fhint { font-size: 12px; color: var(--ink3); margin-top: 4px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 600px) { .form-row { grid-template-columns: 1fr; } }
 .btn-g { width: 100%; padding: 13px; border-radius: var(--r); font-size: 14px; font-weight: 700; cursor: pointer; border: none; background: var(--sage); color: #fff; margin-bottom: 8px; font-family: var(--sans); transition: background .15s, transform .1s; }
@@ -406,6 +399,55 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
 
 /* divider */
 .sep { height: 1px; background: var(--rule); margin: 20px 0; }
+
+/* hoja de registro + botón flotante */
+.regsheet { position: fixed; inset: 0; z-index: 60; background: var(--cream); overflow-y: auto; overscroll-behavior: contain; padding: 0 14px calc(24px + env(safe-area-inset-bottom)); }
+.regsheet > * { max-width: 560px; margin-left: auto; margin-right: auto; }
+.regsheet .form-row { display: block; margin-top: 0 !important; }
+.regsheet .fc { display: none; }
+.regsheet .fc.on { display: block; }
+.reg-hdr { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px; padding: 14px 0; background: var(--cream); }
+.reg-hdr h2 { flex: 1; font-family: var(--serif); font-size: 20px; color: var(--ink); }
+.reg-hdr .mclose { width: 44px; height: 44px; font-size: 18px; }
+.reg-grp { font-size: 12px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--ink3); margin: 18px 0 8px; }
+.reg-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.reg-item { min-height: 72px; border: 1px solid var(--rule2); background: var(--paper); border-radius: var(--rl); font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--ink); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+.reg-item span { font-size: 24px; }
+.fab { position: fixed; right: 18px; bottom: 24px; width: 56px; height: 56px; border-radius: 50%; border: none; background: var(--sage); color: #fff; font-size: 26px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.3); z-index: 41; }
+.fab:active { transform: scale(.94); }
+@media (max-width: 767px) { .fab { bottom: calc(56px + env(safe-area-inset-bottom) + 16px); } }
+/* HOY */
+.hoy-date { font-family: var(--serif); font-size: 22px; color: var(--ink); margin-bottom: 10px; }
+.hoy-date::first-letter { text-transform: uppercase; }
+.chips { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 14px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex: 0 0 auto; min-height: 44px; padding: 0 14px; border: 1px solid var(--rule2); background: var(--paper); color: var(--ink); border-radius: 22px; font-family: var(--sans); font-size: 13px; font-weight: 600; cursor: pointer; }
+.tk-grp { font-size: 12px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--ink3); margin: 16px 0 6px; }
+.tk { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 8px 8px 8px 14px; margin-bottom: 8px; background: var(--paper); border: 1px solid var(--rule); border-left: 3px solid var(--umber-mid); border-radius: var(--r); }
+.tk-late { border-left-color: var(--rust-mid); }
+.tk-body { flex: 1; min-width: 0; }
+.tk-t { font-size: 14px; font-weight: 600; color: var(--ink); }
+.tk-d { font-size: 12px; color: var(--ink3); margin-top: 2px; }
+.tk-btn { flex: 0 0 auto; min-width: 48px; min-height: 48px; border: none; border-radius: var(--r); background: var(--sage); color: #fff; font-size: 20px; font-weight: 700; font-family: var(--sans); cursor: pointer; }
+.tk-undo { background: var(--paper2); color: var(--ink); font-size: 13px; padding: 0 14px; }
+.tk-done { opacity: .75; border-left-color: var(--sage-mid); }
+.tk-done .tk-t { text-decoration: line-through; }
+.tk-empty { text-align: center; font-family: var(--serif); font-size: 18px; padding: 24px 16px; }
+.tk-empty .tk-d { font-family: var(--sans); }
+/* objetivos táctiles ≥ 44px */
+.f input, .f select { min-height: 44px; }
+.btn-g, .btn-o { min-height: 44px; }
+.mclose { width: 44px; height: 44px; font-size: 18px; }
+.mob-sync { min-width: 44px; min-height: 44px; justify-content: center; }
+.del-btn { min-width: 44px; min-height: 44px; }
+.add-btn { min-height: 48px; }
+/* cabeceras de tablas densas: 11px (excepción a los 12px) */
+.ctbl th, .rtbl th { font-size: 11px; }
+/* esqueleto de carga */
+.skel { height: 56px; border-radius: var(--r); background: linear-gradient(90deg, var(--paper2), var(--paper), var(--paper2)); background-size: 200% 100%; animation: shim 1.2s linear infinite; margin-bottom: 8px; }
+@keyframes shim { to { background-position: -200% 0; } }
+.fold { margin-top: 12px; }
+.fold summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-size: 13px; font-weight: 700; color: var(--ink2); }
 </style>
 </head>
 <body>
@@ -424,14 +466,11 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
     <div class="sb-date" id="sb-date"></div>
   </div>
   <nav class="sb-nav">
-    <button class="sn on"  onclick="go('dash')"><i class="ti ti-layout-dashboard"></i>Inicio</button>
-    <button class="sn"     onclick="go('sist')"><i class="ti ti-box-multiple"></i>Sistemas</button>
-    <button class="sn"     onclick="go('rev')"> <i class="ti ti-history"></i>Revolcadas</button>
-    <button class="sn"     onclick="go('cli')"> <i class="ti ti-cloud"></i>Clima</button>
-    <button class="sn"     onclick="go('pla')"> <i class="ti ti-leaf"></i>Plantas</button>
-    <button class="sn"     onclick="go('pec')"> <i class="ti ti-fish"></i>Pecera</button>
-    <button class="sn"     onclick="go('fito')"><i class="ti ti-bug"></i>Fitosanitario</button>
-    <button class="sn"     onclick="go('reg')"> <i class="ti ti-circle-plus"></i>Registrar</button>
+    <button class="sn on" data-tab="hoy"  onclick="go('hoy')"><i class="ti ti-home"></i>Hoy</button>
+    <button class="sn"    data-tab="comp" onclick="go('comp')"><i class="ti ti-recycle"></i>Compost</button>
+    <button class="sn"    data-tab="pla"  onclick="go('pla')"><i class="ti ti-leaf"></i>Plantas</button>
+    <button class="sn"    data-tab="hue"  onclick="go('hue')"><i class="ti ti-plant-2"></i>Huerta</button>
+    <button class="sn"    data-tab="cli"  onclick="go('cli')"><i class="ti ti-cloud"></i>Clima</button>
   </nav>
   <div class="sb-foot">
     <button class="sync-side" onclick="doSync()">
@@ -453,38 +492,54 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
     </div>
     <button class="mob-sync" onclick="doSync()"><i class="ti ti-refresh" id="sync-i-mob"></i></button>
   </div>
-  <div class="mob-tabs">
-    <div class="mob-tabs-inner">
-      <button class="mt on" onclick="go('dash')"><i class="ti ti-layout-dashboard"></i>Inicio</button>
-      <button class="mt"    onclick="go('sist')"><i class="ti ti-box-multiple"></i>Sistemas</button>
-      <button class="mt"    onclick="go('rev')"> <i class="ti ti-history"></i>Revolcadas</button>
-      <button class="mt"    onclick="go('cli')"> <i class="ti ti-cloud"></i>Clima</button>
-      <button class="mt"    onclick="go('pla')"> <i class="ti ti-leaf"></i>Plantas</button>
-      <button class="mt"    onclick="go('pec')"> <i class="ti ti-fish"></i>Pecera</button>
-      <button class="mt"    onclick="go('fito')"><i class="ti ti-bug"></i>Fitosanitario</button>
-      <button class="mt"    onclick="go('reg')"> <i class="ti ti-circle-plus"></i>Registrar</button>
-    </div>
-  </div>
 
   <div class="pages" id="pages">
 
-    <!-- INICIO -->
-    <div class="pg on" id="pg-dash"><div id="dash-c"></div></div>
+    <!-- HOY -->
+    <div class="pg on" id="pg-hoy"><div id="hoy-c"><div class="skel" style="height:28px;width:60%"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div></div></div>
 
-    <!-- SISTEMAS -->
-    <div class="pg" id="pg-sist">
-      <div id="sist-c"></div>
-      <button class="add-btn" onclick="addSis()"><i class="ti ti-plus"></i> Agregar sistema</button>
+    <!-- COMPOST -->
+    <div class="pg" id="pg-comp">
+      <div class="seg" id="seg-comp">
+        <button class="on" data-s="sist" onclick="setSeg('comp','sist')">Sistemas</button>
+        <button data-s="rev" onclick="setSeg('comp','rev')">Revolcadas</button>
+      </div>
+      <div class="seg-pane on" id="pane-sist">
+        <div id="comp-resumen"></div>
+        <div id="sist-c"></div>
+        <button class="add-btn" onclick="addSis()"><i class="ti ti-plus"></i> Agregar sistema</button>
+      </div>
+      <div class="seg-pane" id="pane-rev">
+        <div style="max-width:260px;margin-bottom:14px">
+          <div class="f"><select id="hf" onchange="renderRev()">
+            <option value="todos">Todos los sistemas</option>
+          </select></div>
+        </div>
+        <div class="tbl-wrap"><div class="tbl-scroll"><div id="rev-c"></div></div></div>
+      </div>
     </div>
 
-    <!-- REVOLCADAS -->
-    <div class="pg" id="pg-rev">
-      <div style="max-width:260px;margin-bottom:14px">
-        <div class="f"><select id="hf" onchange="renderRev()">
-          <option value="todos">Todos los sistemas</option>
-        </select></div>
+    <!-- PLANTAS -->
+    <div class="pg" id="pg-pla">
+      <div class="seg" id="seg-pla">
+        <button class="on" data-s="pla" onclick="setSeg('pla','pla')">Plantas</button>
+        <button data-s="pec" onclick="setSeg('pla','pec')">Pecera</button>
       </div>
-      <div class="tbl-wrap"><div class="tbl-scroll"><div id="rev-c"></div></div></div>
+      <div class="seg-pane on" id="pane-pla">
+        <div id="pla-resumen"></div>
+        <div id="pla-c"></div>
+        <button class="add-btn" onclick="addPlanta()"><i class="ti ti-plus"></i> Agregar planta</button>
+      </div>
+      <div class="seg-pane" id="pane-pec"><div id="pec-c"></div></div>
+    </div>
+
+    <!-- HUERTA -->
+    <div class="pg" id="pg-hue">
+      <div class="card" style="text-align:center;padding:40px 20px">
+        <div style="font-size:40px">🥬</div>
+        <div style="font-family:var(--serif);font-size:20px;margin:8px 0">Huerta</div>
+        <div style="font-size:13px;color:var(--ink3)">Próximamente: hortalizas y aromáticas con su seguimiento.</div>
+      </div>
     </div>
 
     <!-- CLIMA -->
@@ -493,37 +548,45 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
       <div id="cli-c"></div>
     </div>
 
-    <!-- PLANTAS -->
-    <div class="pg" id="pg-pla">
-      <div id="pla-c"></div>
-      <button class="add-btn" onclick="addPlanta()"><i class="ti ti-plus"></i> Agregar planta</button>
-    </div>
-
-    <!-- PECERA -->
-    <div class="pg" id="pg-pec">
-      <div id="pec-c"></div>
-    </div>
-
-    <!-- FITOSANITARIO -->
-    <div class="pg" id="pg-fito">
-      <div id="fito-c"></div>
-    </div>
-
     <!-- REGISTRAR -->
-    <div class="pg" id="pg-reg">
+    <div class="pg regsheet" id="pg-reg">
+      <div class="reg-hdr">
+        <button class="mclose" id="reg-back" onclick="openRegistro()" aria-label="Volver">‹</button>
+        <h2 id="reg-title">Registrar</h2>
+        <button class="mclose" onclick="closeRegistro()" aria-label="Cerrar">✕</button>
+      </div>
+      <div id="reg-menu">
+        <div class="reg-grp">Registrar</div>
+        <div class="reg-grid">
+          <button class="reg-item" data-ctx="pla"  onclick="openRegistro('fc-plaEvt',{tipo:'💧 Riego'})"><span>💧</span>Regar</button>
+          <button class="reg-item" data-ctx="pla"  onclick="openRegistro('fc-plaEvt',{tipo:'🌿 Fertilización'})"><span>🌿</span>Fertilizar</button>
+          <button class="reg-item" data-ctx="pla"  onclick="openRegistro('fc-plaEvt',{tipo:'🐛 Revisión plagas'})"><span>🐛</span>Plagas</button>
+          <button class="reg-item" data-ctx="pla"  onclick="openRegistro('fc-plaEvt',{tipo:'✂️ Poda'})"><span>✂️</span>Poda</button>
+          <button class="reg-item" data-ctx="pla"  onclick="openRegistro('fc-plaEvt',{tipo:'🍂 Cosecha'})"><span>🍂</span>Cosecha</button>
+          <button class="reg-item" data-ctx="comp" onclick="openRegistro('fc-rev')"><span>🔄</span>Revolcada</button>
+          <button class="reg-item" data-ctx="pla"  onclick="openRegistro('fc-pecEvt',{tipo:'💧 Cambio de agua parcial'})"><span>🐟</span>Cambio de agua</button>
+          <button class="reg-item" data-ctx="pla"  onclick="openRegistro('fc-pecEvt',{tipo:'📝 Otro'})"><span>🐠</span>Otro de pecera</button>
+        </div>
+        <div class="reg-grp">Editar</div>
+        <div class="reg-grid">
+          <button class="reg-item" data-ctx="comp" onclick="openRegistro('fc-sisEdit')"><span>⚙️</span>Sistema</button>
+          <button class="reg-item" data-ctx="pla"  onclick="openRegistro('fc-plaEdit')"><span>⚙️</span>Planta</button>
+          <button class="reg-item" data-ctx="pla"  onclick="openRegistro('fc-pecData')"><span>⚙️</span>Datos de pecera</button>
+        </div>
+      </div>
       <div class="form-row" style="align-items:start">
         <div>
-          <div class="fc">
+          <div class="fc" id="fc-rev">
             <h3><i class="ti ti-refresh"></i>Nueva revolcada</h3>
             <div class="f"><label>Sistema</label><select id="rs"></select></div>
             <div class="f"><label>Fecha</label><input type="date" id="rf"></div>
             <div class="f"><label>Observaciones</label><textarea id="ro" placeholder="Notas opcionales..."></textarea></div>
             <button class="btn-g" onclick="saveRev()">Guardar revolcada</button>
-            <div style="font-size:11px;color:var(--ink3);text-align:center;margin-top:4px">El clima del día se completa automáticamente</div>
+            <div style="font-size:12px;color:var(--ink3);text-align:center;margin-top:4px">El clima del día se completa automáticamente</div>
           </div>
         </div>
         <div>
-          <div class="fc">
+          <div class="fc" id="fc-sisEdit">
             <h3><i class="ti ti-settings"></i>Editar sistema</h3>
             <div class="f"><label>Sistema</label><select id="es" onchange="loadSis()"></select></div>
             <div class="f"><label>Nombre (opcional)</label><input type="text" id="en" placeholder="ej: Compost Norte"></div>
@@ -545,7 +608,7 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
 
       <div class="form-row" style="align-items:start;margin-top:20px">
         <div>
-          <div class="fc">
+          <div class="fc" id="fc-plaEvt">
             <h3><i class="ti ti-leaf"></i>Nueva actividad de planta</h3>
             <div class="f"><label>Planta</label><select id="pv" onchange="actualizarProblemaSel()"></select></div>
             <div class="f"><label>Tipo de evento</label>
@@ -570,7 +633,7 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
           </div>
         </div>
         <div>
-          <div class="fc">
+          <div class="fc" id="fc-plaEdit">
             <h3><i class="ti ti-settings"></i>Editar planta</h3>
             <div class="f"><label>Planta</label><select id="epv" onchange="loadPlanta()"></select></div>
             <div class="f"><label>Nombre</label><input type="text" id="epn"></div>
@@ -594,7 +657,7 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
 
       <div class="form-row" style="align-items:start;margin-top:20px">
         <div>
-          <div class="fc">
+          <div class="fc" id="fc-pecEvt">
             <h3><i class="ti ti-fish"></i>Nuevo evento de pecera</h3>
             <div class="f"><label>Tipo de evento</label>
               <select id="kt">
@@ -613,7 +676,7 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
           </div>
         </div>
         <div>
-          <div class="fc">
+          <div class="fc" id="fc-pecData">
             <h3><i class="ti ti-settings"></i>Datos de la pecera</h3>
             <div class="form-row" style="margin-bottom:0">
               <div class="f"><label>Litros</label><input type="number" id="kl"></div>
@@ -637,6 +700,14 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
     <div class="mbody" id="mbody"></div>
   </div>
 </div>
+<button class="fab" onclick="openRegistro()" aria-label="Registrar"><i class="ti ti-plus"></i></button>
+<nav class="bnav"><div class="bnav-in">
+  <button class="bt on" data-tab="hoy"  onclick="go('hoy')"><i class="ti ti-home"></i>Hoy</button>
+  <button class="bt"    data-tab="comp" onclick="go('comp')"><i class="ti ti-recycle"></i>Compost</button>
+  <button class="bt"    data-tab="pla"  onclick="go('pla')"><i class="ti ti-leaf"></i>Plantas</button>
+  <button class="bt"    data-tab="hue"  onclick="go('hue')"><i class="ti ti-plant-2"></i>Huerta</button>
+  <button class="bt"    data-tab="cli"  onclick="go('cli')"><i class="ti ti-cloud"></i>Clima</button>
+</div></nav>
 <div class="toast h" id="toast"></div>
 
 <script type="module">
@@ -644,7 +715,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/fireba
 import {
   getFirestore, collection, doc,
   setDoc, getDocs, addDoc, deleteDoc,
-  query, orderBy, serverTimestamp
+  query, orderBy, limit, startAfter, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // ════ FIREBASE CONFIG ════
@@ -658,6 +729,11 @@ const firebaseConfig = {
 };
 // URL del Apps Script desplegado como Web App (Extensions > Apps Script > Deploy > New deployment > Web app).
 const SHEET_SYNC_URL = "https://script.google.com/macros/s/AKfycbzCWQBqlaII2vayl6q5Vl2WwP_y9GVHxkkUcXAQiy46h6DSoRB9z5RPb3QE8lFOiBtX/exec";
+const CLIMA_DIAS_FIRESTORE = 90;  // solo el clima se limita al cargar; el resto se trae completo
+const CLIMA_DIAS_INICIAL = 14;    // filas que muestra el historial hasta tocar "Ver más"
+// ?dry=1 → las funciones de escritura (Firestore/Sheet) solo loguean; sirve para
+// probar la UI en el navegador sin tocar datos reales.
+const DRY = new URLSearchParams(location.search).has('dry');
 let db, useFirebase = false;
 try {
   const a = initializeApp(firebaseConfig);
@@ -796,26 +872,40 @@ async function autoFetch(force = false) {
 }
 
 // ════ FIREBASE OPS ════
-const fbSave = async (col, id, data) => { if (!useFirebase) return; try { await setDoc(doc(db,col,String(id)),{...data,_ts:serverTimestamp()}); } catch(e){} };
-const fbAdd  = async (col, data) => { if (!useFirebase) return null; try { const r=await addDoc(collection(db,col),{...data,_ts:serverTimestamp()}); return r.id; } catch(e){ return null; } };
-const fbDel  = async (col, id)   => { if (!useFirebase) return; try { await deleteDoc(doc(db,col,String(id))); } catch(e){} };
+const fbSave = async (col, id, data) => { if (DRY) { console.info('[dry] fbSave', col, id); return; } if (!useFirebase) return; try { await setDoc(doc(db,col,String(id)),{...data,_ts:serverTimestamp()}); } catch(e){} };
+const fbAdd  = async (col, data) => { if (DRY) { console.info('[dry] fbAdd', col, data); return null; } if (!useFirebase) return null; try { const r=await addDoc(collection(db,col),{...data,_ts:serverTimestamp()}); return r.id; } catch(e){ return null; } };
+const fbDel  = async (col, id)   => { if (DRY) { console.info('[dry] fbDel', col, id); return; } if (!useFirebase) return; try { await deleteDoc(doc(db,col,String(id))); } catch(e){} };
+// Al reemplazar una colección con lo que trae Firestore, conserva los registros
+// locales pendientes (_pend + id generado en el dispositivo) que todavía no tienen
+// su par allá: los guardados mientras la consulta estaba en curso o que nunca
+// llegaron. Hace falta _pend porque muchos documentos de Firestore también tienen
+// ids con formato local (vienen del Sheet); sin él, lo borrado o editado en otro
+// lado reaparecería. No se re-envían a Firestore/Sheet (duplicaría).
+const conservarLocales = (antes, ahora, esLocalId, claveFn) => {
+  const claves = new Set(ahora.map(claveFn));
+  return ahora.concat((antes || []).filter(r => r && r._pend && esLocalId(String(r.id)) && !claves.has(claveFn(r))));
+};
+const ID_LOCAL_REV = id => /^\d{13}$/.test(id);
+const ID_LOCAL_PLA = id => /^ev\d/.test(id);
+const ID_LOCAL_PEC = id => /^kv\d/.test(id);
+let climaCursor = null;   // fecha del clima más viejo traído de Firestore (para "Ver más")
 const fbLoad = async () => {
   if (!useFirebase) return;
   try {
     const sd = await getDocs(collection(db,'sistemas'));
     sd.forEach(d => { const x=d.data(); const i=S.sistemas.findIndex(s=>s.id===x.id); i>=0?(S.sistemas[i]={...S.sistemas[i],...x}):S.sistemas.push(x); });
     const rd = await getDocs(query(collection(db,'revolcadas'),orderBy('fecha','desc')));
-    if (rd.docs.length) S.revolcadas = rd.docs.map(d=>({id:d.id,...d.data()}));
-    const cd = await getDocs(query(collection(db,'clima'),orderBy('fecha','desc')));
-    if (cd.docs.length) upsertCli(cd.docs.map(d=>({id:d.id,...d.data()})));
+    if (rd.docs.length) S.revolcadas = conservarLocales(S.revolcadas, rd.docs.map(d=>({id:d.id,...d.data()})), ID_LOCAL_REV, r => r.sistema+'|'+r.fecha);
+    const cd = await getDocs(query(collection(db,'clima'),orderBy('fecha','desc'),limit(CLIMA_DIAS_FIRESTORE)));
+    if (cd.docs.length) { upsertCli(cd.docs.map(d=>({id:d.id,...d.data()}))); climaCursor = cd.docs[cd.docs.length-1].data().fecha; }
     const pd = await getDocs(collection(db,'plantas'));
     pd.forEach(d => { const x=d.data(); const i=S.plantas.findIndex(p=>p.id===x.id); i>=0?(S.plantas[i]={...S.plantas[i],...x}):S.plantas.push(x); });
     const prd = await getDocs(query(collection(db,'registroPlantas'),orderBy('fecha','desc')));
-    if (prd.docs.length) S.registroPlantas = prd.docs.map(d=>({id:d.id,...d.data()}));
+    if (prd.docs.length) S.registroPlantas = conservarLocales(S.registroPlantas, prd.docs.map(d=>({id:d.id,...d.data()})), ID_LOCAL_PLA, r => r.planta+'|'+r.fecha+'|'+r.tipo);
     const kd = await getDocs(collection(db,'pecera'));
     kd.forEach(d => { if (d.id==='main') S.pecera = {...S.pecera, ...d.data()}; });
     const krd = await getDocs(query(collection(db,'registroPecera'),orderBy('fecha','desc')));
-    if (krd.docs.length) S.registroPecera = krd.docs.map(d=>({id:d.id,...d.data()}));
+    if (krd.docs.length) S.registroPecera = conservarLocales(S.registroPecera, krd.docs.map(d=>({id:d.id,...d.data()})), ID_LOCAL_PEC, r => r.fecha+'|'+r.tipo);
     sv();
   } catch(e) {}
 };
@@ -825,8 +915,9 @@ const fbLoad = async () => {
 // que el Web App de Apps Script no maneja. Es "fire and forget".
 const sheetSync = (tipo, data) => {
   if (!SHEET_SYNC_URL) return;
+  if (DRY) { console.info('[dry] sheetSync', tipo, data); return; }
   fetch(SHEET_SYNC_URL, {
-    method: 'POST', mode: 'no-cors',
+    method: 'POST', mode: 'no-cors', keepalive: true,
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify({ tipo, data })
   }).catch(()=>{});
@@ -1041,7 +1132,7 @@ const estPlanta = p => {
     diasSinAgua, limite, agua,
     riegoUrg: diasSinAgua!=null && diasSinAgua>=limite,
     riegoProx: diasSinAgua!=null && diasSinAgua>=limite*0.7 && diasSinAgua<limite,
-    proximaFert: fert.proxima, diasParaFert: fert.dias, fertUrg: !fueraDeTemporadaFert && fert.dias!=null && fert.dias<=0,
+    proximaFert: fert.proxima, diasParaFert: fert.dias, fertEnTemporada: !fueraDeTemporadaFert, fertUrg: !fueraDeTemporadaFert && fert.dias!=null && fert.dias<=0,
     proximaPlagas: plagas.proxima, diasParaPlagas: plagas.dias, plagasUrg: plagas.dias!=null && plagas.dias<=0,
     proximaPoda: poda.proxima, diasParaPoda: poda.dias, podaProx: poda.dias!=null && poda.dias<=30 && poda.dias>=0,
   };
@@ -1228,7 +1319,7 @@ const climaSparkSVG = (dias=21) => {
       <polyline points="${pts}" fill="none" stroke="var(--chart-3)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
       ${dots}
     </svg>
-    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--ink3);margin-top:2px">
+    <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink3);margin-top:2px">
       <span>${fmt(datos[0].fecha)}</span>
       <span style="color:var(--chart-3);font-weight:600">— temp (${n1(tMin)}°–${n1(tMax)}°)</span>
       <span style="color:var(--chart-2);font-weight:600">▮ lluvia</span>
@@ -1279,185 +1370,228 @@ const ringSVG = (pct, color, size=76, thickness=8) => {
   </svg>`;
 };
 
-// Tarjeta de stat con acento de color arriba
-const statTile = (colorVar, label, value, sub) => `
-  <div class="stat" style="border-top:3px solid var(${colorVar})">
-    <div class="stat-l">${label}</div>
-    <div class="stat-v">${value}</div>
-    <div class="stat-s">${sub}</div>
-  </div>`;
+// ════ HOY ════
+// Une lo que ya calculan estPlanta/proxRev/estPecera en una lista de tareas.
+// Mismos criterios que el evento "Tareas de hoy" del calendario (codigo.gs).
+const ETQ      = { riego:'regar', fert:'fertilizar', plagas:'revisar plagas', poda:'poda', revolcada:'revolver' };
+const TIPO_EVT = { riego:'💧 Riego', fert:'🌿 Fertilización', plagas:'🐛 Revisión plagas', poda:'✂️ Poda' };
+const AREAS_HOY = [ {id:'compost', t:'🌱 Compost'}, {id:'plantas', t:'🪴 Plantas'}, {id:'pecera', t:'🐠 Pecera'} ];
+const TEMP_CALOR = 38, TEMP_HELADA = 2, TEMP_HELADA_SEVERA = -2;
+const diferidos = new Map();   // id de tarea → { timer, commit } (ver "marcar hecho")
+let TAREAS = new Map();
 
-// ════ RENDER DASHBOARD ════
-const renderDash = () => {
-  const an      = analisis();
-  const ax      = analisisExtra();
-  const nCarga = S.sistemas.filter(s=>s.inicioC && est(s).fase==='c').length;
-  const nEstanque = S.sistemas.filter(s=>s.inicioC && est(s).fase==='s').length;
-  const nCasi = S.sistemas.filter(s=>s.inicioC && est(s).fase==='q').length;
-  const nListo = S.sistemas.filter(s=>s.inicioC && est(s).fase==='l').length;
-  const sisEstadoDonut = donutSVG([
-    {value: nCarga, color:'var(--chart-1)'},
-    {value: nEstanque, color:'var(--chart-2)'},
-    {value: nCasi, color:'var(--chart-3)'},
-    {value: nListo, color:'var(--chart-5)'},
-  ]);
-  const sisEstadoLegend = [
-    {n:'En carga', v:nCarga, c:'var(--chart-1)'},
-    {n:'En estanque', v:nEstanque, c:'var(--chart-2)'},
-    {n:'Casi listo', v:nCasi, c:'var(--chart-3)'},
-    {n:'Listo', v:nListo, c:'var(--chart-5)'},
-  ];
-  const nRiegoOk = S.plantas.filter(p=>!estPlanta(p).riegoUrg && !estPlanta(p).riegoProx).length;
-  const nRiegoProx = S.plantas.filter(p=>estPlanta(p).riegoProx).length;
-  const nRiegoUrg = S.plantas.filter(p=>estPlanta(p).riegoUrg).length;
-  const riegoDonut = donutSVG([
-    {value: nRiegoOk, color:'var(--chart-1)'},
-    {value: nRiegoProx, color:'var(--chart-3)'},
-    {value: nRiegoUrg, color:'var(--chart-4)'},
-  ], 112, 15, 'plantas');
-  const riegoLegend = [
-    {n:'Al día', v:nRiegoOk, c:'var(--chart-1)'},
-    {n:'Riego pronto', v:nRiegoProx, c:'var(--chart-3)'},
-    {n:'Regar ahora', v:nRiegoUrg, c:'var(--chart-4)'},
-  ];
-  const revBarMax = Math.max(1, ...S.sistemas.map(s=>S.revolcadas.filter(r=>r.sistema===s.id).length));
-  const als     = [];
-  S.sistemas.forEach(s=>{
-    const p=proxRev(s); if(!p)return; const d=dd(TODAY,p);
-    if(d<0) als.push({c:'al-r',t:`${sLbl(s)} — atrasado ${-d}d`,b:'Hacerlo cuanto antes'});
-    else if(d===0) als.push({c:'al-r',t:`${sLbl(s)} — revolver HOY`,b:'Se cumplen 7 días desde la última revolcada'});
-    else if(d<=2)  als.push({c:'al-w',t:`${sLbl(s)} — en ${d}d`,b:`Próximo: ${fmt(fISO(p))}`});
+const armarTareasHoy = () => {
+  const hoy = [], prox = [];
+  S.sistemas.forEach(s => {
+    const p = proxRev(s); if (!p) return;
+    const d = dd(TODAY, p);
+    const base = { id:`revolcada-${s.id}`, area:'compost', tipo:'revolcada', ref:s.id, titulo:`${sLbl(s)} · revolver`, modo:'uno' };
+    if (d <= 0) hoy.push({ ...base, detalle: d < 0 ? `atrasado ${-d} d` : 'toca hoy', atraso: -d });
+    else if (d <= 3) prox.push({ ...base, detalle:`en ${d} d`, atraso: -d });
   });
-  S.sistemas.filter(s=>est(s).fase==='q').forEach(s=>als.push({c:'al-w',t:`${sLbl(s)} — casi listo`,b:`${est(s).d}d en estanque`}));
-  S.sistemas.filter(s=>est(s).fase==='l').forEach(s=>als.push({c:'al-ok',t:`${sLbl(s)} — ¡listo!`,b:'Más de 180 días en estanque'}));
-  S.plantas.forEach(p=>{
+  S.plantas.forEach(p => {
     const e = estPlanta(p);
-    if (e.riegoUrg) als.push({c:'al-r',t:`${pLbl(p)} — regar`,b:`${e.diasSinAgua} días sin agua (límite ${e.limite})`});
-    else if (e.riegoProx) als.push({c:'al-w',t:`${pLbl(p)} — riego pronto`,b:`${e.diasSinAgua} días sin agua`});
-    if (e.fertUrg) als.push({c:'al-w',t:`${pLbl(p)} — fertilizar`,b: e.diasParaFert<0 ? `${-e.diasParaFert} días de atraso` : 'toca hoy'});
-    if (e.plagasUrg) als.push({c:'al-w',t:`${pLbl(p)} — revisar plagas`,b: e.diasParaPlagas<0 ? `${-e.diasParaPlagas} días de atraso` : 'toca hoy'});
+    const base = (tipo, modo) => ({ id:`${tipo}-${p.id}`, area:'plantas', tipo, ref:p.id, titulo:`${pLbl(p)} · ${ETQ[tipo]}`, modo });
+    if (e.riegoUrg) hoy.push({ ...base('riego','uno'), detalle:`${e.diasSinAgua} días sin agua (límite ${e.limite})`, atraso: e.diasSinAgua - e.limite });
+    else if (e.riegoProx) prox.push({ ...base('riego','uno'), detalle:`${e.diasSinAgua} días sin agua`, atraso: 0 });
+    [ { tipo:'fert', dias:e.diasParaFert, activo:e.fertEnTemporada }, { tipo:'plagas', dias:e.diasParaPlagas, activo:true } ].forEach(c => {
+      if (!c.activo || c.dias == null) return;
+      if (c.dias <= 0) hoy.push({ ...base(c.tipo,'form'), detalle: c.dias < 0 ? `${-c.dias} días de atraso` : 'toca hoy', atraso: -c.dias });
+      else if (c.dias <= 3) prox.push({ ...base(c.tipo,'form'), detalle:`en ${c.dias} d`, atraso: -c.dias });
+    });
+    // Igual que "poda se acerca" del calendario: solo de 0 a 30 días antes.
+    if (e.diasParaPoda != null && e.diasParaPoda >= 0 && e.diasParaPoda <= 30) {
+      prox.push({ ...base('poda','form'), detalle: e.diasParaPoda === 0 ? 'toca hoy' : `en ${e.diasParaPoda} d`, atraso: -e.diasParaPoda });
+    }
   });
   const ep = estPecera();
-  if (ep.cambioUrg) als.push({c:'al-r',t:'Pecera — cambio de agua',b:`${ep.diasSinCambio} días sin cambio (objetivo cada ${ep.limiteCambio}d)`});
-  if (ep.limpiezaUrg) als.push({c:'al-w',t:'Pecera — limpiar filtro/esponja',b:`${ep.diasSinLimpieza} días sin limpiar`});
-  if(!als.length) als.push({c:'al-ok',t:'Todo en orden 👍',b:'Sin alertas pendientes'});
-  const ch = cdDia(fISO(TODAY)) || [...S.clima].sort((a,b)=>a.fecha>b.fecha?-1:1)[0];
+  const pec = (tipo, titulo, modo) => ({ id:`pec-${tipo}`, area:'pecera', tipo, ref:null, titulo, modo });
+  if (ep.cambioUrg) hoy.push({ ...pec('cambio-agua','Cambio de agua','uno'), detalle:`${ep.diasSinCambio} días sin cambio (objetivo cada ${ep.limiteCambio} d)`, atraso: ep.diasSinCambio - ep.limiteCambio });
+  else if (ep.diasSinCambio != null && ep.limiteCambio - ep.diasSinCambio <= 3) prox.push({ ...pec('cambio-agua','Cambio de agua','uno'), detalle:`en ${ep.limiteCambio - ep.diasSinCambio} d`, atraso: 0 });
+  if (ep.limpiezaUrg) hoy.push({ ...pec('filtro','Limpiar filtro/esponja','form'), detalle:`${ep.diasSinLimpieza} días sin limpiar`, atraso: ep.diasSinLimpieza - CFG_PEC.diasLimpiezaFiltro });
+  return { hoy, prox };
+};
+window.armarTareasHoy = armarTareasHoy;
 
-  document.getElementById('dash-c').innerHTML = `
-    <div class="sh">Análisis <span class="sh-sub">con los datos acumulados hasta ahora</span></div>
-    <div class="dash-grid">
-      <div class="card">
-        <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:8px">Temperatura y lluvia — últimos 21 días</div>
-        ${climaSparkSVG(21)}
-        <div class="sep"></div>
-        <div class="g3">
-          <div style="font-size:12px;color:var(--ink3)">Lluvia 30d<br><b style="font-family:var(--serif);font-size:20px;color:var(--ink)">${n1(an.ll30)}</b> mm</div>
-          <div style="font-size:12px;color:var(--ink3)">Sin lluvia<br><b style="font-family:var(--serif);font-size:20px;color:var(--ink)">${an.sl}</b> días</div>
-          <div style="font-size:12px;color:var(--ink3)">Registros<br><b style="font-family:var(--serif);font-size:20px;color:var(--ink)">${S.clima.length}</b> días</div>
-        </div>
-        <div class="sep"></div>
-        <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:10px">Clima reciente <span class="sh-sub">${ch?fmt(ch.fecha):''}</span></div>
-        ${ch?`<div>
-          <div class="clh-row">
-            <div><div class="clh-temp">${n1(ch.temp)}°</div><div class="clh-sub">${ch.lluvia==='si'?'☔ Llovió':'Sin lluvia'}${+ch.mm>0?' — '+n1(ch.mm)+' mm':''}</div></div>
-            <div class="clh-right"><div class="clh-hum">${n0(ch.hum)}<span>%</span></div><div class="clh-mini">humedad relativa</div></div>
-          </div>
-          <div class="clg">
-            <div class="cli"><div class="cli-l">Máx</div><div class="cli-v">${n1(ch.tmax)}<span class="cli-u">°C</span></div></div>
-            <div class="cli"><div class="cli-l">Mín</div><div class="cli-v">${n1(ch.tmin)}<span class="cli-u">°C</span></div></div>
-            <div class="cli"><div class="cli-l">Viento</div><div class="cli-v">${n1(ch.viento)}<span class="cli-u"> km/h</span></div></div>
-            <div class="cli"><div class="cli-l">Evapo</div><div class="cli-v">${n1(ch.evapo)}<span class="cli-u"> mm</span></div></div>
-          </div>
-        </div>`:`<div style="font-size:13px;color:var(--ink3)">Sin datos. Pulsá Sincronizar.</div>`}
-      </div>
-      <div>
-        <div class="card">
-          <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:10px">Estado de sistemas</div>
-          <div class="donut-wrap">
-            ${sisEstadoDonut}
-            <div class="donut-legend">
-              ${sisEstadoLegend.map(l=>`<div class="donut-legend-item"><span style="display:flex;align-items:center;gap:7px"><span class="donut-dot" style="background:${l.c}"></span>${l.n}</span><b>${l.v}</b></div>`).join('')}
-            </div>
-          </div>
-        </div>
-        <div class="ring-row">
-          <div class="ring-tile">
-            ${ringSVG(ax.pctRevolcadas, ax.pctRevolcadas==null?'var(--ink3)':ax.pctRevolcadas>=80?'var(--chart-1)':ax.pctRevolcadas>=50?'var(--chart-3)':'var(--chart-4)')}
-            <div class="ring-tile-l">Revolcadas en tiempo</div>
-            <div class="ring-tile-s">${ax.totalPares?ax.totalPares+' intervalos':'sin datos'}</div>
-          </div>
-          <div class="ring-tile">
-            ${ringSVG(ax.pctPlantas, ax.pctPlantas==null?'var(--ink3)':ax.pctPlantas>=80?'var(--chart-1)':ax.pctPlantas>=50?'var(--chart-3)':'var(--chart-4)')}
-            <div class="ring-tile-l">Plantas al día</div>
-            <div class="ring-tile-s">${ax.totalPlantas} plantas</div>
-          </div>
-        </div>
-        <div class="sh" style="margin-top:20px">Alertas</div>
-        ${als.map(a=>`<div class="al ${a.c}"><div class="al-t">${a.t}</div>${a.b?`<div class="al-b">${a.b}</div>`:''}</div>`).join('')}
-      </div>
-    </div>
-    <div class="dash-grid" style="margin-top:10px">
-      <div class="card">
-        <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:10px">Riego de plantas</div>
-        ${S.plantas.length?`<div class="donut-wrap">
-          ${riegoDonut}
-          <div class="donut-legend">
-            ${riegoLegend.map(l=>`<div class="donut-legend-item"><span style="display:flex;align-items:center;gap:7px"><span class="donut-dot" style="background:${l.c}"></span>${l.n}</span><b>${l.v}</b></div>`).join('')}
-          </div>
-        </div>`:`<div style="font-size:13px;color:var(--ink3)">Sin plantas registradas.</div>`}
-      </div>
-      <div class="card">
-        <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:10px">Revolcadas por sistema</div>
-        ${S.sistemas.some(s=>s.inicioC)?hbarSVG(
-          S.sistemas.filter(s=>s.inicioC).map((s,i)=>({
-            label: sLbl(s),
-            value: S.revolcadas.filter(r=>r.sistema===s.id).length,
-            color: [`var(--chart-1)`,`var(--chart-2)`,`var(--chart-3)`,`var(--chart-5)`,`var(--chart-4)`][i%5]
-          })), revBarMax
-        ):`<div style="font-size:13px;color:var(--ink3)">Sin sistemas activos.</div>`}
-      </div>
-    </div>
+// Lo ya registrado hoy (de los mismos tipos que generan tareas).
+const hechasHoy = () => {
+  const hoyISO = fISO(TODAY), out = [];
+  S.revolcadas.filter(r => r.fecha === hoyISO).forEach(r => {
+    const s = S.sistemas.find(x => x.id === r.sistema);
+    out.push({ titulo:`${s ? sLbl(s) : 'Sistema '+r.sistema} · revolcada` });
+  });
+  S.registroPlantas.filter(r => r.fecha === hoyISO && /Riego|Fertiliz|plagas|Poda/.test(r.tipo)).forEach(r => {
+    const p = S.plantas.find(x => x.id === r.planta);
+    out.push({ titulo:`${p ? pLbl(p) : 'Planta'} · ${r.tipo.replace(/^\S+\s/, '')}` });
+  });
+  S.registroPecera.filter(r => r.fecha === hoyISO && /Cambio de agua|Limpieza/.test(r.tipo)).forEach(r => {
+    out.push({ titulo:`Pecera · ${r.tipo.replace(/^\S+\s/, '')}` });
+  });
+  return out;
+};
 
-    <div class="dash-grid">
-      <div>
-        <div class="sh">Condición <span class="sh-sub">últimos 7 días</span></div>
-        <div class="cond">
-          <div class="cond-hdr">
-            <span class="cond-t">Índice de condición</span>
-            <span class="cond-s" style="color:${an.ic}">${an.idx}/100</span>
-          </div>
-          <div class="cond-bar"><div class="cond-f" style="width:${an.idx}%;background:${an.ic}"></div></div>
-          <div style="font-size:13px;color:${an.ic};font-weight:700;margin-bottom:10px">${an.il2}</div>
-          <div class="pills">
-            <span class="pill" style="background:${an.cr?'var(--sage-bg)':'var(--umber-bg)'};color:${an.cr?'var(--sage)':'var(--umber)'}">🔄 ${an.cr?'Conviene revolver':'Esperar para revolver'}</span>
-            <span class="pill" style="background:${an.nr?'var(--umber-bg)':'var(--sage-bg)'};color:${an.nr?'var(--umber)':'var(--sage)'}">💧 ${an.nr?'Necesita riego':'Riego OK'}</span>
-            ${an.df?`<span class="pill" style="background:var(--sky-bg);color:var(--sky)">❄️ ${an.df}d de frío</span>`:''}
-          </div>
-          <div class="sep"></div>
-          <div class="g2">
-            <div style="font-size:12px;color:var(--ink3)">Lluvia 7d<br><b style="font-family:var(--serif);font-size:20px;color:var(--ink)">${n1(an.ll7)}</b> mm</div>
-            <div style="font-size:12px;color:var(--ink3)">Lluvia 30d<br><b style="font-family:var(--serif);font-size:20px;color:var(--ink)">${n1(an.ll30)}</b> mm</div>
-            <div style="font-size:12px;color:var(--ink3)">Temp prom<br><b style="font-family:var(--serif);font-size:20px;color:var(--ink)">${n1(an.tp7)}</b> °C</div>
-            <div style="font-size:12px;color:var(--ink3)">Sin lluvia<br><b style="font-family:var(--serif);font-size:20px;color:var(--ink)">${an.sl}</b> días</div>
-          </div>
-        </div>
-      </div>
-      <div>
-        <div class="sh">Sistemas activos</div>
-        ${S.sistemas.filter(s=>s.inicioC).map(s=>sysHTML(s)).join('')||'<div style="font-size:13px;color:var(--ink3)">Sin sistemas activos.</div>'}
-      </div>
-    </div>
+// Urgentes: helada, frío en interior, calor extremo, compost listo (mismos umbrales que codigo.gs).
+const urgentesHoy = () => {
+  const out = [];
+  const ult = [...S.clima].sort((a,b) => a.fecha > b.fecha ? -1 : 1)[0];
+  const esInt = p => { const pf = perfilEspecie(p.especie || p.nombre); return !!(pf && pf.tipo === 'Interior'); };
+  if (ult && ult.tmin != null && ult.tmin !== '') {
+    const tmin = +ult.tmin;
+    if (S.plantas.some(p => !esInt(p)) && tmin <= TEMP_HELADA) {
+      const sev = tmin <= TEMP_HELADA_SEVERA;
+      out.push({ c: sev ? 'al-r' : 'al-w', t: (sev ? '🧊 Helada severa' : '❄️ Helada') + ' — proteger plantas de exterior', b:`Mínima registrada: ${n1(tmin)}°C` });
+    }
+    const frias = S.plantas.filter(p => { const pf = esInt(p) && perfilEspecie(p.especie || p.nombre); return pf && pf.tempMin != null && tmin <= pf.tempMin + 2; });
+    if (frias.length) out.push({ c:'al-w', t:'🥶 Frío — alejar de la ventana', b: frias.map(pLbl).join(', ') });
+  }
+  if (ult && ult.tmax != null && ult.tmax !== '' && +ult.tmax >= TEMP_CALOR) out.push({ c:'al-r', t:'🔥 Calor extremo — revisar humedad del compost', b:`Máxima registrada: ${n1(ult.tmax)}°C` });
+  S.sistemas.filter(s => est(s).fase === 'l').forEach(s => out.push({ c:'al-ok', t:`🎉 ${sLbl(s)} — listo para cosechar`, b:'Más de 180 días en estanque' }));
+  return out;
+};
 
-    <div class="g3" style="margin-top:24px">
-      ${statTile(ep.cambioUrg?'--rust':'--sage', 'Pecera — agua', ep.diasSinCambio!=null?ep.diasSinCambio+'d':'—', `objetivo cada ${ep.limiteCambio}d`)}
-      ${statTile(ep.limpiezaUrg?'--umber':'--sage', 'Pecera — filtro', ep.diasSinLimpieza!=null?ep.diasSinLimpieza+'d':'—', ep.puedeLimpiar?`objetivo cada ${CFG_PEC.diasLimpiezaFiltro}d`:'aún no tocar')}
-      ${statTile('--sky', 'Pecera — fase', ep.enCiclado?'Ciclado':'Establecida', ep.diasArmado!=null?`día ${ep.diasArmado}`:'')}
-    </div>`;
+const filaTarea = (t, enEspera = false) => `<div class="tk ${enEspera ? 'tk-done' : (t.atraso > 0 ? 'tk-late' : '')}">
+  <div class="tk-body"><div class="tk-t">${t.titulo}</div><div class="tk-d">${enEspera ? 'Registrado — se guarda en unos segundos' : t.detalle}</div></div>
+  ${enEspera
+    ? `<button class="tk-btn tk-undo" onclick="deshacerTarea('${t.id}')">Deshacer</button>`
+    : `<button class="tk-btn" aria-label="${t.modo === 'uno' ? 'Marcar hecha' : 'Registrar'}" onclick="tareaTap('${t.id}')">${t.modo === 'uno' ? '✓' : '›'}</button>`}
+</div>`;
+
+const renderHoy = () => {
+  const { hoy, prox } = armarTareasHoy();
+  TAREAS = new Map([...hoy, ...prox].map(t => [t.id, t]));
+  const pend  = hoy.filter(t => !diferidos.has(t.id));
+  const hechas = hechasHoy();
+  const urg   = urgentesHoy();
+  const ch    = cdDia(fISO(TODAY)) || [...S.clima].sort((a,b) => a.fecha > b.fecha ? -1 : 1)[0];
+  const nC = pend.filter(t => t.area === 'compost').length, nP = pend.filter(t => t.area === 'plantas').length;
+  const seccion = a => {
+    const l = hoy.filter(t => t.area === a.id).sort((x,y) => y.atraso - x.atraso);
+    return l.length ? `<div class="tk-grp">${a.t}</div>${l.map(t => filaTarea(t, diferidos.has(t.id))).join('')}` : '';
+  };
+  document.getElementById('hoy-c').innerHTML = `
+    <div class="hoy-date">${TODAY.toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'})}</div>
+    <div class="chips">
+      <button class="chip" onclick="go('cli')">${ch ? `🌡 ${n1(ch.temp)}${n1(ch.temp) !== '—' ? '°' : ''}${+ch.mm > 0 ? ` · ☔ ${n1(ch.mm)} mm` : ''}` : '🌡 —'}</button>
+      <button class="chip" onclick="go('comp')">🌱 Compost · ${nC}</button>
+      <button class="chip" onclick="go('pla')">🪴 Plantas · ${nP}</button>
+    </div>
+    ${urg.map(a => `<div class="al ${a.c}"><div class="al-t">${a.t}</div>${a.b ? `<div class="al-b">${a.b}</div>` : ''}</div>`).join('')}
+    <div class="sh">Tareas de hoy <span class="sh-sub">${pend.length}</span></div>
+    ${hoy.length
+      ? AREAS_HOY.map(seccion).join('')
+      : `<div class="card tk-empty">Todo al día 🌿${prox[0] ? `<div class="tk-d">Próximo: ${prox[0].titulo} — ${prox[0].detalle}</div>` : ''}</div>`}
+    ${hechas.length ? `<details class="fold"><summary>Hechas hoy · ${hechas.length}</summary>${hechas.map(h => `<div class="tk tk-done"><div class="tk-body"><div class="tk-t">${h.titulo}</div></div></div>`).join('')}</details>` : ''}
+    ${prox.length ? `<details class="fold"><summary>Próximos · ${prox.length}</summary>${prox.map(t => `<div class="tk"><div class="tk-body"><div class="tk-t">${t.titulo}</div><div class="tk-d">${t.detalle}</div></div></div>`).join('')}</details>` : ''}`;
+};
+window.renderHoy = renderHoy;
+
+// ── Marcar como hecho ────────────────────────────────────────────────
+// El guardado real se demora DEMORA_DESHACER ms: si se toca "Deshacer" antes,
+// nunca se escribe nada. No se escribe-y-luego-borra porque la sincronización
+// diaria del Sheet puede resucitar documentos borrados de Firestore.
+const DEMORA_DESHACER = 5000;
+const ejecutarTarea = t => {
+  const hoy = fISO(TODAY);
+  if (t.tipo === 'revolcada')   return registrarRevolcada(t.ref, hoy);
+  if (t.tipo === 'riego')       return registrarEventoPlanta(t.ref, hoy, TIPO_EVT.riego);
+  if (t.tipo === 'cambio-agua') return registrarEventoPecera(hoy, '💧 Cambio de agua parcial');
+};
+const marcarHecha = t => {
+  if (diferidos.has(t.id)) return;
+  const commit = async () => {
+    const d = diferidos.get(t.id); if (!d) return;
+    clearTimeout(d.timer); diferidos.delete(t.id);
+    // La parte síncrona de ejecutarTarea ya deja el registro en S: se re-renderiza
+    // enseguida para que "Deshacer" no quede visible sin efecto durante la escritura.
+    const p = ejecutarTarea(t);
+    renderHoy();
+    try { await p; toast(`✅ Registrado — ${t.titulo}`); }
+    finally { refresh(); }
+  };
+  diferidos.set(t.id, { timer: setTimeout(commit, DEMORA_DESHACER), commit });
+  renderHoy();
+};
+window.deshacerTarea = id => {
+  const d = diferidos.get(id); if (!d) return;
+  clearTimeout(d.timer); diferidos.delete(id);
+  renderHoy();
+};
+// Si la app se cierra o pasa a segundo plano dentro de la demora, se guarda ya.
+const vaciarDiferidos = () => [...diferidos.values()].forEach(d => d.commit());
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') vaciarDiferidos(); });
+// TODAY se fija al cargar: si la PWA vuelve a primer plano en otro día, se recarga
+// (los toques pendientes ya se guardaron al pasar a segundo plano).
+const DIA_CARGA = new Date().toDateString();
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && new Date().toDateString() !== DIA_CARGA) location.reload();
+});
+window.addEventListener('pagehide', vaciarDiferidos);
+
+window.tareaTap = id => {
+  const t = TAREAS.get(id); if (!t) return;
+  if (t.modo === 'uno') { marcarHecha(t); return; }
+  if (t.tipo === 'filtro') openRegistro('fc-pecEvt', { tipo:'🧽 Limpieza de filtro/esponja' });
+  else openRegistro('fc-plaEvt', { planta:t.ref, tipo:TIPO_EVT[t.tipo] });
 };
 
 // ════ RENDER SISTEMAS ════
 const renderSist = () => {
   document.getElementById('sist-c').innerHTML = S.sistemas.map(s=>sysHTML(s)).join('');
+};
+
+// ════ RESUMEN DE COMPOST (antes en Inicio) ════
+const renderCompostResumen = () => {
+  const an = analisis(), ax = analisisExtra();
+  const cnt = f => S.sistemas.filter(s => s.inicioC && est(s).fase === f).length;
+  const n = { c:cnt('c'), s:cnt('s'), q:cnt('q'), l:cnt('l') };
+  const donut = donutSVG([
+    {value:n.c, color:'var(--chart-1)'}, {value:n.s, color:'var(--chart-2)'},
+    {value:n.q, color:'var(--chart-3)'}, {value:n.l, color:'var(--chart-5)'},
+  ]);
+  const legend = [
+    {n:'En carga', v:n.c, c:'var(--chart-1)'}, {n:'En estanque', v:n.s, c:'var(--chart-2)'},
+    {n:'Casi listo', v:n.q, c:'var(--chart-3)'}, {n:'Listo', v:n.l, c:'var(--chart-5)'},
+  ];
+  const revBarMax = Math.max(1, ...S.sistemas.map(s => S.revolcadas.filter(r => r.sistema === s.id).length));
+  const colorPct = p => p == null ? 'var(--ink3)' : p >= 80 ? 'var(--chart-1)' : p >= 50 ? 'var(--chart-3)' : 'var(--chart-4)';
+  document.getElementById('comp-resumen').innerHTML = `
+    <div class="card">
+      <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:10px">Estado de sistemas</div>
+      <div class="donut-wrap">
+        ${donut}
+        <div class="donut-legend">
+          ${legend.map(l => `<div class="donut-legend-item"><span style="display:flex;align-items:center;gap:7px"><span class="donut-dot" style="background:${l.c}"></span>${l.n}</span><b>${l.v}</b></div>`).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="ring-row">
+      <div class="ring-tile">
+        ${ringSVG(ax.pctRevolcadas, colorPct(ax.pctRevolcadas))}
+        <div class="ring-tile-l">Revolcadas en tiempo</div>
+        <div class="ring-tile-s">${ax.totalPares ? ax.totalPares+' intervalos' : 'sin datos'}</div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:10px">Revolcadas por sistema</div>
+      ${S.sistemas.some(s => s.inicioC) ? hbarSVG(
+        S.sistemas.filter(s => s.inicioC).map((s,i) => ({
+          label: sLbl(s),
+          value: S.revolcadas.filter(r => r.sistema === s.id).length,
+          color: ['var(--chart-1)','var(--chart-2)','var(--chart-3)','var(--chart-5)','var(--chart-4)'][i%5]
+        })), revBarMax
+      ) : `<div style="font-size:13px;color:var(--ink3)">Sin sistemas activos.</div>`}
+    </div>
+    <div class="cond">
+      <div class="cond-hdr"><span class="cond-t">Índice de condición</span><span class="cond-s" style="color:${an.ic}">${an.idx}/100</span></div>
+      <div class="cond-bar"><div class="cond-f" style="width:${an.idx}%;background:${an.ic}"></div></div>
+      <div style="font-size:13px;color:${an.ic};font-weight:700;margin-bottom:10px">${an.il2}</div>
+      <div class="pills">
+        <span class="pill" style="background:${an.cr?'var(--sage-bg)':'var(--umber-bg)'};color:${an.cr?'var(--sage)':'var(--umber)'}">🔄 ${an.cr?'Conviene revolver':'Esperar para revolver'}</span>
+        <span class="pill" style="background:${an.nr?'var(--umber-bg)':'var(--sage-bg)'};color:${an.nr?'var(--umber)':'var(--sage)'}">💧 ${an.nr?'Necesita riego':'Riego OK'}</span>
+        ${an.df ? `<span class="pill" style="background:var(--sky-bg);color:var(--sky)">❄️ ${an.df}d de frío</span>` : ''}
+      </div>
+    </div>
+    <div class="sh">Sistemas</div>`;
 };
 
 // ════ RENDER PLANTAS ════
@@ -1484,6 +1618,37 @@ const renderPla = () => {
   document.getElementById('pla-c').innerHTML = S.plantas.map(p=>plantHTML(p)).join('') || '<div style="font-size:13px;color:var(--ink3)">Sin plantas registradas.</div>';
 };
 
+// ════ RESUMEN DE PLANTAS (antes en Inicio) ════
+const renderPlaResumen = () => {
+  const ax = analisisExtra();
+  const ests = S.plantas.map(estPlanta);
+  const nUrg = ests.filter(e => e.riegoUrg).length;
+  const nProx = ests.filter(e => e.riegoProx).length;
+  const nOk = ests.length - nUrg - nProx;
+  const donut = donutSVG([
+    {value:nOk, color:'var(--chart-1)'}, {value:nProx, color:'var(--chart-3)'}, {value:nUrg, color:'var(--chart-4)'},
+  ], 112, 15, 'plantas');
+  const legend = [ {n:'Al día', v:nOk, c:'var(--chart-1)'}, {n:'Riego pronto', v:nProx, c:'var(--chart-3)'}, {n:'Regar ahora', v:nUrg, c:'var(--chart-4)'} ];
+  document.getElementById('pla-resumen').innerHTML = S.plantas.length ? `
+    <div class="card">
+      <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:10px">Riego de plantas</div>
+      <div class="donut-wrap">
+        ${donut}
+        <div class="donut-legend">
+          ${legend.map(l => `<div class="donut-legend-item"><span style="display:flex;align-items:center;gap:7px"><span class="donut-dot" style="background:${l.c}"></span>${l.n}</span><b>${l.v}</b></div>`).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="ring-row">
+      <div class="ring-tile">
+        ${ringSVG(ax.pctPlantas, ax.pctPlantas == null ? 'var(--ink3)' : ax.pctPlantas >= 80 ? 'var(--chart-1)' : ax.pctPlantas >= 50 ? 'var(--chart-3)' : 'var(--chart-4)')}
+        <div class="ring-tile-l">Plantas al día</div>
+        <div class="ring-tile-s">${ax.totalPlantas} plantas</div>
+      </div>
+    </div>
+    <div class="sh">Plantas</div>` : '';
+};
+
 // ════ RENDER REVOLCADAS ════
 const renderRev = () => {
   const f = document.getElementById('hf').value;
@@ -1503,7 +1668,7 @@ const renderRev = () => {
       <td>${fmt(r.fecha)}</td>
       <td style="text-align:center">${diasAnt!==null?diasAnt:'—'}</td>
       <td>${ok}</td>
-      <td style="font-size:11px;color:var(--ink3)">${c?`${n1(c.temp)}°C · ${n0(c.hum)}% · ${c.lluvia==='si'?'☔ '+n1(c.mm)+'mm':'sin lluvia'} · ${n0(c.viento)} km/h`:'Sin datos de clima'}</td>
+      <td style="font-size:12px;color:var(--ink3)">${c?`${n1(c.temp)}°C · ${n0(c.hum)}% · ${c.lluvia==='si'?'☔ '+n1(c.mm)+'mm':'sin lluvia'} · ${n0(c.viento)} km/h`:'Sin datos de clima'}</td>
       <td style="font-size:12px;color:var(--ink3);font-style:italic">${r.obs||''}</td>
       <td><button class="del-btn" onclick="delRev('${r.id}',event)"><i class="ti ti-x"></i></button></td>
     </tr>`;
@@ -1562,40 +1727,71 @@ const renderPec = () => {
 };
 window.renderPec = renderPec;
 
-// ════ RENDER FITOSANITARIO ════
-const renderFito = () => {
-  const mes = TODAY.getMonth()+1;
-  const cards = S.plantas.map(p => {
-    const ficha = fichaFito(p.nombre); // por nombre, no por especie (ver nota en Task 2)
-    if (!ficha) return '';
-    const nivel = nivelVigilancia(ficha, mes);
-    const rows = ficha.problemas.map(pr => `<tr>
-        <td>${pr.nombre}</td>
-        <td style="font-size:12px;color:var(--ink3)">${pr.sintoma}</td>
-        <td style="font-size:12px"><b>${pr.producto}</b><br><span style="color:var(--ink3)">${pr.dosis}</span></td>
-      </tr>`).join('');
-    return `<div class="fc" style="margin-bottom:16px">
-      <h3><i class="ti ti-bug"></i>${pLbl(p)}
-        <span class="badge" style="background:var(--sky-bg);color:var(--sky);margin-left:8px">${nivel} ${NIVEL_LABEL[nivel]}</span>
-      </h3>
-      <div style="font-size:12px;color:var(--ink3);margin-bottom:10px"><b>Momento crítico:</b> ${ficha.momentoCritico}</div>
-      <div style="font-size:12px;color:var(--ink3);margin-bottom:14px"><b>Qué monitorear:</b> ${ficha.monitoreo}</div>
-      <div class="tbl-wrap"><div class="tbl-scroll"><table class="rtbl">
-        <thead><tr><th>Problema</th><th>Qué vas a ver</th><th>Producto / Dosis</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table></div></div>
-      <div style="font-size:11px;color:var(--ink3);font-style:italic;margin-top:10px">Referencia general — confirmá contra la etiqueta de tu producto, las concentraciones varían entre marcas. Para plagas persistentes o graves, conviene un diagnóstico específico antes de tratar.</div>
-      <button class="btn-o" style="margin-top:12px" onclick="openPla(${p.id})">Ver planta</button>
-    </div>`;
-  }).filter(Boolean).join('');
-  document.getElementById('fito-c').innerHTML = cards || `<div style="font-size:13px;color:var(--ink3);padding:24px;text-align:center">Sin fichas fitosanitarias cargadas</div>`;
+// ════ FITOSANITARIO (sección de la ficha de cada planta) ════
+const fitoHTML = p => {
+  const ficha = fichaFito(p.nombre); // por nombre, no por especie (ver nota en Task 2 del plan fitosanitario)
+  if (!ficha) return '';
+  const nivel = nivelVigilancia(ficha, TODAY.getMonth()+1);
+  const rows = ficha.problemas.map(pr => `<tr>
+      <td>${pr.nombre}</td>
+      <td style="font-size:12px;color:var(--ink3)">${pr.sintoma}</td>
+      <td style="font-size:12px"><b>${pr.producto}</b><br><span style="color:var(--ink3)">${pr.dosis}</span></td>
+    </tr>`).join('');
+  return `<details class="fold" open>
+    <summary>🐛 Fitosanitario · ${nivel} ${NIVEL_LABEL[nivel]}</summary>
+    <div style="font-size:12px;color:var(--ink3);margin:6px 0"><b>Momento crítico:</b> ${ficha.momentoCritico}</div>
+    <div style="font-size:12px;color:var(--ink3);margin-bottom:10px"><b>Qué monitorear:</b> ${ficha.monitoreo}</div>
+    <div style="overflow-x:auto"><table class="rtbl" style="width:100%">
+      <thead><tr><th>Problema</th><th>Qué vas a ver</th><th>Producto / Dosis</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+    <div style="font-size:12px;color:var(--ink3);font-style:italic;margin-top:10px">Referencia general — confirmá contra la etiqueta de tu producto, las concentraciones varían entre marcas. Para plagas persistentes o graves, conviene un diagnóstico específico antes de tratar.</div>
+  </details>`;
 };
-window.renderFito = renderFito;
+
+// ════ CABECERA DE CLIMA (antes en Inicio): gráfico de 21 días + clima reciente ════
+const climaHeadHTML = () => {
+  const ch = cdDia(fISO(TODAY)) || [...S.clima].sort((a,b) => a.fecha > b.fecha ? -1 : 1)[0];
+  return `<div class="card">
+    <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:8px">Temperatura y lluvia — últimos 21 días</div>
+    ${climaSparkSVG(21)}
+    <div class="sep"></div>
+    <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:10px">Clima reciente <span class="sh-sub">${ch ? fmt(ch.fecha) : ''}</span></div>
+    ${ch ? `<div>
+      <div class="clh-row">
+        <div><div class="clh-temp">${n1(ch.temp)}°</div><div class="clh-sub">${ch.lluvia==='si' ? '☔ Llovió' : 'Sin lluvia'}${+ch.mm>0 ? ' — '+n1(ch.mm)+' mm' : ''}</div></div>
+        <div class="clh-right"><div class="clh-hum">${n0(ch.hum)}<span>%</span></div><div class="clh-mini">humedad relativa</div></div>
+      </div>
+      <div class="clg">
+        <div class="cli"><div class="cli-l">Máx</div><div class="cli-v">${n1(ch.tmax)}<span class="cli-u">°C</span></div></div>
+        <div class="cli"><div class="cli-l">Mín</div><div class="cli-v">${n1(ch.tmin)}<span class="cli-u">°C</span></div></div>
+        <div class="cli"><div class="cli-l">Viento</div><div class="cli-v">${n1(ch.viento)}<span class="cli-u"> km/h</span></div></div>
+        <div class="cli"><div class="cli-l">Evapo</div><div class="cli-v">${n1(ch.evapo)}<span class="cli-u"> mm</span></div></div>
+      </div>
+    </div>` : `<div style="font-size:13px;color:var(--ink3)">Sin datos. Pulsá Sincronizar.</div>`}
+  </div>`;
+};
 
 // ════ RENDER CLIMA ════
+let climaVerTodo = false;
+// Muestra todo lo que hay en el dispositivo y, si Firestore tiene días anteriores, trae otro bloque.
+window.climaMas = async () => {
+  climaVerTodo = true;
+  // Cursor: el día más viejo que trajo Firestore (no el local, que en un
+  // dispositivo nuevo es el seed y dejaría un hueco sin traer).
+  const cursor = climaCursor || [...S.clima].sort((a,b) => a.fecha < b.fecha ? -1 : 1)[0]?.fecha;
+  if (useFirebase && cursor) {
+    try {
+      const cd = await getDocs(query(collection(db,'clima'),orderBy('fecha','desc'),startAfter(cursor),limit(CLIMA_DIAS_FIRESTORE)));
+      if (cd.docs.length) { upsertCli(cd.docs.map(d => ({id:d.id,...d.data()}))); climaCursor = cd.docs[cd.docs.length-1].data().fecha; sv(); }
+    } catch(e) {}
+  }
+  renderCli();
+};
 const renderCli = () => {
   const an = analisis();
   const sorted = [...S.clima].sort((a,b)=>a.fecha>b.fecha?-1:1);
+  const shown = climaVerTodo ? sorted : sorted.slice(0, CLIMA_DIAS_INICIAL);
   const hoy = fISO(TODAY);
   document.getElementById('fetch-bar').classList.add('hide');
 
@@ -1615,7 +1811,7 @@ const renderCli = () => {
     </div>`;
 
   // Tabla heatmap (sin columna UV)
-  const tableHTML = sorted.length ? `
+  const tableHTML = shown.length ? `
     <div class="tbl-wrap"><div class="tbl-scroll">
       <table class="ctbl">
         <thead><tr>
@@ -1626,7 +1822,7 @@ const renderCli = () => {
           <th>Evapo</th><th>Sol (h)</th><th>Notas</th>
         </tr></thead>
         <tbody>
-          ${sorted.map(c => {
+          ${shown.map(c => {
             const isHoy = c.fecha === hoy;
             // lluvia cell
             const llovioCell = c.lluvia==='si'||+c.mm>0
@@ -1643,10 +1839,10 @@ const renderCli = () => {
               ${heatCell(c.hsLluvia, 'hsLluvia')}
               ${heatCell(c.viento,'viento')}
               ${heatCell(c.rafaga,'viento')}
-              <td style="text-align:left;font-size:11px;color:var(--ink2)">${c.dir||'—'}</td>
+              <td style="text-align:left;font-size:12px;color:var(--ink2)">${c.dir||'—'}</td>
               ${heatCell(c.evapo, 'evapo')}
               ${heatCell(c.sol,   'sol')}
-              <td style="text-align:left;font-size:11px;color:var(--ink3)">${c.notas||''}</td>
+              <td style="text-align:left;font-size:12px;color:var(--ink3)">${c.notas||''}</td>
             </tr>`;
           }).join('')}
         </tbody>
@@ -1654,9 +1850,11 @@ const renderCli = () => {
     </div></div>` : `<div style="font-size:13px;color:var(--ink3);text-align:center;padding:32px">Sin datos. Pulsá Sincronizar.</div>`;
 
   document.getElementById('cli-c').innerHTML =
+    climaHeadHTML() +
     `<div class="sh">Resumen <span class="sh-sub">análisis climatico</span></div>${statsHTML}` +
-    `<div class="sh">Historial <span class="sh-sub">${sorted.length} días — colores por valor</span></div>` +
-    tableHTML;
+    `<div class="sh">Historial <span class="sh-sub">${shown.length} de ${sorted.length} días — colores por valor</span></div>` +
+    tableHTML +
+    (!climaVerTodo ? `<button class="btn-o" style="margin-top:6px" onclick="climaMas()">Ver más días</button>` : '');
 };
 
 // ════ MODAL SISTEMA ════
@@ -1666,7 +1864,7 @@ window.openSis = id => {
   const revs = S.revolcadas.filter(r=>r.sistema===id).sort((a,b)=>a.fecha>b.fecha?-1:1);
   document.getElementById('mtitle').textContent = sLbl(s);
   document.getElementById('mbody').innerHTML = `
-    <div style="margin-bottom:14px"><span class="badge ${e.cls}" style="font-size:11px;padding:5px 12px">${e.label}${e.d?' · '+e.d+' días':''}</span></div>
+    <div style="margin-bottom:14px"><span class="badge ${e.cls}" style="font-size:12px;padding:5px 12px">${e.label}${e.d?' · '+e.d+' días':''}</span></div>
     ${(e.fase==='s'||e.fase==='q'||e.fase==='l')?`<div class="prog" style="height:6px;margin-bottom:4px"><div class="pf ${e.fase==='l'?'pfg':e.fase==='q'?'pfa':'pfb'}" style="width:${Math.min(100,Math.round(e.d/180*100))}%"></div></div><div class="prog-lb" style="margin-bottom:14px"><span>${e.d} días</span><span>meta 180 días</span></div>`:``}
     <table class="mt-tbl">
       <tr><td>Inicio carga</td><td>${fmt(s.inicioC)}</td></tr>
@@ -1681,15 +1879,15 @@ window.openSis = id => {
       <thead><tr><th>Fecha</th><th>Clima del día</th><th>Observaciones</th></tr></thead>
       <tbody>${revs.map(r=>{const c=cdDia(r.fecha);return`<tr>
         <td><b>${fmt(r.fecha)}</b></td>
-        <td style="font-size:11px">${c?`${n1(c.temp)}°C · ${n0(c.hum)}% · ${c.lluvia==='si'?'☔':''}`:'—'}</td>
-        <td style="font-size:11px;color:var(--ink3);font-style:italic">${r.obs||''}</td>
+        <td style="font-size:12px">${c?`${n1(c.temp)}°C · ${n0(c.hum)}% · ${c.lluvia==='si'?'☔':''}`:'—'}</td>
+        <td style="font-size:12px;color:var(--ink3);font-style:italic">${r.obs||''}</td>
       </tr>`;}).join('')}</tbody>
     </table></div>`:
     `<div style="font-size:13px;color:var(--ink3)">Sin revolcadas registradas</div>`}
     <div style="height:14px"></div>
-    <button class="btn-g" onclick="closeMod();go('reg');document.getElementById('rs').value=${id}">Registrar revolcada</button>
+    <button class="btn-g" onclick="closeMod();openRegistro('fc-rev',{sistema:${id}})">Registrar revolcada</button>
     <div style="height:7px"></div>
-    <button class="btn-o" onclick="closeMod();go('reg');document.getElementById('es').value=${id};loadSis()">Editar sistema</button>`;
+    <button class="btn-o" onclick="closeMod();openRegistro('fc-sisEdit',{sistema:${id}})">Editar sistema</button>`;
   document.getElementById('mwrap').classList.add('on');
 };
 window.openPla = id => {
@@ -1709,36 +1907,53 @@ window.openPla = id => {
       <tr><td>Próxima poda</td><td>${e.proximaPoda?fmt(fISO(e.proximaPoda)):'—'}</td></tr>
     </table>
     ${p.notas?`<div style="font-size:12px;color:var(--ink2);background:var(--paper2);padding:11px;border-radius:var(--r);margin:14px 0">${p.notas}</div>`:''}
+    ${fitoHTML(p)}
     <div style="font-family:var(--serif);font-size:17px;color:var(--ink);margin:18px 0 10px">Historial</div>
     ${eventos.length?`<div style="overflow-x:auto"><table class="rtbl" style="width:100%">
       <thead><tr><th>Fecha</th><th>Evento</th><th>Detalle</th><th>Resultado</th></tr></thead>
       <tbody>${eventos.map(r=>`<tr>
         <td><b>${fmt(r.fecha)}</b></td>
         <td>${r.tipo}</td>
-        <td style="font-size:11px;color:var(--ink3)">${r.detalle||''}${r.producto?' — '+r.producto:''}</td>
-        <td style="font-size:11px;color:var(--ink3);font-style:italic">${r.resultado||''}</td>
+        <td style="font-size:12px;color:var(--ink3)">${r.detalle||''}${r.producto?' — '+r.producto:''}</td>
+        <td style="font-size:12px;color:var(--ink3);font-style:italic">${r.resultado||''}</td>
       </tr>`).join('')}</tbody>
     </table></div>`:`<div style="font-size:13px;color:var(--ink3)">Sin eventos registrados</div>`}
     <div style="height:14px"></div>
-    <button class="btn-g" onclick="closeMod();go('reg');document.getElementById('pv').value=${id};actualizarProblemaSel()">Registrar evento</button>
+    <button class="btn-g" onclick="closeMod();openRegistro('fc-plaEvt',{planta:${id}})">Registrar evento</button>
     <div style="height:7px"></div>
-    <button class="btn-o" onclick="closeMod();go('reg');document.getElementById('epv').value=${id};loadPlanta()">Editar planta</button>`;
+    <button class="btn-o" onclick="closeMod();openRegistro('fc-plaEdit',{planta:${id}})">Editar planta</button>`;
   document.getElementById('mwrap').classList.add('on');
 };
 window.onMClick = e => { if(e.target===document.getElementById('mwrap')) closeMod(); };
 window.closeMod = () => document.getElementById('mwrap').classList.remove('on');
 
 // ════ ACCIONES ════
+// Escritura compartida entre los formularios y los toques de "Hoy".
+// sheetSync va ANTES de esperar a Firestore: addDoc solo resuelve con el ack del
+// servidor, y si la app se cierra en el medio el POST (keepalive) nunca saldría.
+// _pend (solo local, no viaja a Firestore/Sheet) marca lo que aún no tiene ack de
+// Firestore: fbLoad lo conserva (ver conservarLocales).
+const registrarLocal = async (lista, col, tipoSheet, datos) => {
+  const r = { ...datos, _pend:true };
+  lista.push(r); sv();
+  sheetSync(tipoSheet, datos);
+  const fbId = await fbAdd(col, datos); if (fbId) { r.id = fbId; delete r._pend; sv(); }
+  return r;
+};
+const registrarRevolcada = (sistema, fecha, obs = '') =>
+  registrarLocal(S.revolcadas, 'revolcadas', 'revolcada', { id:Date.now().toString(), sistema, fecha, obs });
+const registrarEventoPlanta = (planta, fecha, tipo, detalle = '', producto = '', resultado = '') =>
+  registrarLocal(S.registroPlantas, 'registroPlantas', 'plantaEvento', { id:'ev'+Date.now(), planta, fecha, tipo, detalle, producto, resultado });
+const registrarEventoPecera = (fecha, tipo, detalle = '', resultado = '') =>
+  registrarLocal(S.registroPecera, 'registroPecera', 'peceraEvento', { id:'kv'+Date.now(), fecha, tipo, detalle, resultado });
 window.saveRev = async () => {
   const f=document.getElementById('rf').value, si=+document.getElementById('rs').value;
   if(!f){ toast('Completá la fecha'); return; }
-  const r = {id:Date.now().toString(), sistema:si, fecha:f, obs:document.getElementById('ro').value};
-  S.revolcadas.push(r); sv();
-  const fbId = await fbAdd('revolcadas', r); if(fbId){r.id=fbId;sv();}
-  sheetSync('revolcada', r);
+  await registrarRevolcada(si, f, document.getElementById('ro').value);
   document.getElementById('ro').value = '';
+  closeRegistro();
   toast(`✅ Revolcada guardada — Sistema ${si}`);
-  if(cur==='dash') renderDash(); if(cur==='rev') renderRev();
+  refresh();
 };
 
 window.loadPlanta = () => {
@@ -1763,35 +1978,26 @@ window.savePlanta = async () => {
   p.suelo = document.getElementById('eps').value;
   p.notas = document.getElementById('epno').value;
   sv(); await fbSave('plantas', id, p); sheetSync('planta', p); poblarSels();
+  closeRegistro();
   toast(`✅ ${pLbl(p)} guardada`);
-  if(cur==='dash')renderDash(); if(cur==='pla')renderPla();
+  refresh();
 };
 window.addPlanta = async () => {
   const nid = S.plantas.length ? Math.max(...S.plantas.map(p=>p.id))+1 : 1;
   const p = {id:nid, nombre:'', variedad:'', especie:'', fechaP:fISO(TODAY), ubicacion:'', exposicion:'', suelo:'', notas:''};
   S.plantas.push(p); sv(); await fbSave('plantas', nid, p); sheetSync('planta', p);
   poblarSels(); renderPla();
-  go('reg');
-  document.getElementById('epv').value = nid;
-  loadPlanta();
+  openRegistro('fc-plaEdit', {planta:nid});
   toast(`Planta ${nid} agregada — completá sus datos`);
 };
 window.saveEventoPlanta = async () => {
   const pid=+document.getElementById('pv').value, f=document.getElementById('pf').value;
   if(!f){ toast('Completá la fecha'); return; }
-  const r = {
-    id:'ev'+Date.now(), planta:pid, fecha:f,
-    tipo:document.getElementById('pt').value,
-    detalle:document.getElementById('pd').value,
-    producto:document.getElementById('pp').value,
-    resultado:document.getElementById('pr').value,
-  };
-  S.registroPlantas.push(r); sv();
-  const fbId = await fbAdd('registroPlantas', r); if(fbId){r.id=fbId;sv();}
-  sheetSync('plantaEvento', r);
+  await registrarEventoPlanta(pid, f, document.getElementById('pt').value, document.getElementById('pd').value, document.getElementById('pp').value, document.getElementById('pr').value);
   ['pd','pp','pr'].forEach(x=>document.getElementById(x).value='');
+  closeRegistro();
   toast(`✅ Evento guardado — ${pLbl(S.plantas.find(p=>p.id===pid))}`);
-  if(cur==='dash') renderDash(); if(cur==='pla') renderPla();
+  refresh();
 };
 
 window.loadPecera = () => {
@@ -1806,24 +2012,19 @@ window.savePecera = async () => {
   p.fechaArmado = document.getElementById('ka').value || p.fechaArmado;
   p.notas = document.getElementById('kn').value;
   sv(); await fbSave('pecera', 'main', p); sheetSync('pecera', p);
+  closeRegistro();
   toast('✅ Datos de la pecera guardados');
-  if(cur==='dash') renderDash(); if(cur==='pec') renderPec();
+  refresh();
 };
 window.saveEventoPecera = async () => {
   const f = document.getElementById('kf').value;
   if(!f){ toast('Completá la fecha'); return; }
-  const r = {
-    id:'kv'+Date.now(), fecha:f,
-    tipo:document.getElementById('kt').value,
-    detalle:document.getElementById('kd').value,
-    resultado:document.getElementById('kr').value,
-  };
-  S.registroPecera.push(r); sv();
-  const fbId = await fbAdd('registroPecera', r); if(fbId){r.id=fbId;sv();}
-  sheetSync('peceraEvento', r);
+  const tipo = document.getElementById('kt').value;
+  await registrarEventoPecera(f, tipo, document.getElementById('kd').value, document.getElementById('kr').value);
   ['kd','kr'].forEach(x=>document.getElementById(x).value='');
-  toast(`✅ Evento de pecera guardado — ${r.tipo}`);
-  if(cur==='dash') renderDash(); if(cur==='pec') renderPec();
+  closeRegistro();
+  toast(`✅ Evento de pecera guardado — ${tipo}`);
+  refresh();
 };
 window.delEventoPecera = async (id, e) => {
   e.stopPropagation();
@@ -1841,8 +2042,9 @@ window.saveSis = async () => {
   const id=+document.getElementById('es').value, s=S.sistemas.find(x=>x.id===id);
   [s.nombre,s.inicioC,s.finC,s.inicioE,s.notas] = ['en','ei','ef','ee','eno'].map(x=>document.getElementById(x).value);
   sv(); await fbSave('sistemas',id,s); sheetSync('sistema', s); poblarSels();
+  closeRegistro();
   toast(`✅ Sistema ${id} guardado`);
-  if(cur==='dash')renderDash(); if(cur==='sist')renderSist();
+  refresh();
 };
 window.clearSis = async () => {
   const id=+document.getElementById('es').value;
@@ -1858,9 +2060,7 @@ window.addSis = async () => {
   S.sistemas.push(s); sv(); await fbSave('sistemas',nid,s);
   poblarSels(); renderSist();
   // Cambiar al formulario de edición del nuevo sistema
-  go('reg');
-  document.getElementById('es').value = nid;
-  loadSis();
+  openRegistro('fc-sisEdit', {sistema:nid});
   toast(`Sistema ${nid} agregado — completá sus datos`);
 };
 window.delSis = async (id, e) => {
@@ -1869,7 +2069,7 @@ window.delSis = async (id, e) => {
   await fbDel('sistemas', id);
   S.sistemas = S.sistemas.filter(s=>s.id!=id); sv();
   poblarSels(); renderSist();
-  if(cur==='dash') renderDash();
+  refresh();
   toast(`Sistema ${id} eliminado`);
 };
 window.delRev = async (id, e) => {
@@ -1881,32 +2081,60 @@ window.delRev = async (id, e) => {
 };
 
 // ════ NAVEGACIÓN ════
-let cur = 'dash';
-const NAVT = ['dash','sist','rev','cli','pla','pec','fito','reg'];
-const TITLES = {dash:'Inicio',sist:'Sistemas',rev:'Revolcadas',cli:'Clima',pla:'Plantas',pec:'Pecera',fito:'Fitosanitario',reg:'Registrar'};
-window.go = t => {
-  cur = t;
-  document.querySelectorAll('.sn').forEach((b,i)=>b.classList.toggle('on',NAVT[i]===t));
-  document.querySelectorAll('.mt').forEach((b,i)=>b.classList.toggle('on',NAVT[i]===t));
-  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
-  document.getElementById('pg-'+t).classList.add('on');
-  const ttEl=document.getElementById('tb-title'); if(ttEl) ttEl.textContent=TITLES[t]||'';
-  if(t==='dash') renderDash();
-  if(t==='sist') renderSist();
-  if(t==='rev')  renderRev();
-  if(t==='cli')  renderCli();
-  if(t==='pla')  renderPla();
-  if(t==='pec')  renderPec();
-  if(t==='fito') renderFito();
-  if(t==='reg')  {
-    loadSis();
-    if(!document.getElementById('rf').value) document.getElementById('rf').value=fISO(TODAY);
-    if(!document.getElementById('pf').value) document.getElementById('pf').value=fISO(TODAY);
-    if(!document.getElementById('kf').value) document.getElementById('kf').value=fISO(TODAY);
-    loadPecera();
-    actualizarProblemaSel();
-  }
+let cur = 'hoy';
+const TABS   = ['hoy','comp','pla','hue','cli'];
+const TITLES = {hoy:'Hoy',comp:'Compost',pla:'Plantas',hue:'Huerta',cli:'Clima'};
+// ids viejos → nueva ubicación (openSis/openPla/etc. todavía los usan)
+const LEGACY = { dash:{tab:'hoy'}, sist:{tab:'comp',seg:'sist'}, rev:{tab:'comp',seg:'rev'}, pec:{tab:'pla',seg:'pec'}, fito:{tab:'pla',seg:'pla'} };
+const renderTab = t => {
+  if (t==='hoy')  renderHoy();
+  if (t==='comp') { renderCompostResumen(); renderSist(); renderRev(); }
+  if (t==='pla')  { renderPlaResumen(); renderPla(); renderPec(); }
+  if (t==='cli')  renderCli();
 };
+window.refresh = () => renderTab(cur);
+window.setSeg = (tab, s) => {
+  document.querySelectorAll(`#seg-${tab} button`).forEach(b => b.classList.toggle('on', b.dataset.s === s));
+  document.querySelectorAll(`#pg-${tab} .seg-pane`).forEach(p => p.classList.toggle('on', p.id === 'pane-'+s));
+  refresh();
+};
+window.go = t => {
+  let seg = null;
+  if (LEGACY[t]) { seg = LEGACY[t].seg || null; t = LEGACY[t].tab; }
+  cur = t;
+  document.querySelectorAll('.sn,.bt').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  document.querySelectorAll('.pg').forEach(p => p.classList.remove('on'));
+  document.getElementById('pg-'+t).classList.add('on');
+  document.getElementById('pages').scrollTop = 0;
+  const ttEl = document.getElementById('tb-title'); if (ttEl) ttEl.textContent = TITLES[t] || '';
+  if (TABS.includes(t)) { try { localStorage.setItem('compost_tab', t); } catch(e) {} }
+  if (seg) setSeg(t, seg); else refresh();
+};
+
+// ════ HOJA DE REGISTRO ════
+const REG_TITLES = { 'fc-rev':'Nueva revolcada', 'fc-sisEdit':'Editar sistema', 'fc-plaEvt':'Actividad de planta', 'fc-plaEdit':'Editar planta', 'fc-pecEvt':'Evento de pecera', 'fc-pecData':'Datos de la pecera' };
+window.openRegistro = (fc, pre = {}) => {
+  if (fc && !REG_TITLES[fc]) fc = undefined;
+  const hoy = fISO(TODAY);
+  ['rf','pf','kf'].forEach(id => { document.getElementById(id).value = hoy; });
+  if (fc === 'fc-rev' && pre.sistema) document.getElementById('rs').value = pre.sistema;
+  if (fc === 'fc-sisEdit') { if (pre.sistema) document.getElementById('es').value = pre.sistema; loadSis(); }
+  if (fc === 'fc-plaEvt' && pre.planta) document.getElementById('pv').value = pre.planta;
+  if (fc === 'fc-plaEvt') { const s = document.getElementById('pt'); s.value = pre.tipo || (s.options[0] && s.options[0].value); }
+  if (fc === 'fc-plaEdit') { if (pre.planta) document.getElementById('epv').value = pre.planta; loadPlanta(); }
+  if (fc === 'fc-pecEvt') { const s = document.getElementById('kt'); s.value = pre.tipo || (s.options[0] && s.options[0].value); }
+  if (fc === 'fc-pecData') loadPecera();
+  actualizarProblemaSel();
+  document.getElementById('reg-menu').style.display = fc ? 'none' : '';
+  Object.keys(REG_TITLES).forEach(id => document.getElementById(id).classList.toggle('on', id === fc));
+  document.getElementById('reg-title').textContent = fc ? REG_TITLES[fc] : 'Registrar';
+  document.getElementById('reg-back').style.visibility = fc ? 'visible' : 'hidden';
+  // Sugerir primero lo de la pestaña actual (Compost → revolcada, Plantas → plantas)
+  document.querySelectorAll('.reg-item').forEach(b => { b.style.order = b.dataset.ctx === cur ? '-1' : '0'; });
+  const sheet = document.getElementById('pg-reg');
+  sheet.classList.add('on'); sheet.scrollTop = 0;
+};
+window.closeRegistro = () => document.getElementById('pg-reg').classList.remove('on');
 
 // ════ SYNC ════
 window.doSync = async () => {
@@ -1918,9 +2146,7 @@ window.doSync = async () => {
   const ok = await autoFetch(true);
   icons.forEach(i=>{if(i) i.classList.remove('spin')});
   if(fb) fb.classList.add('hide');
-  if(cur==='dash') renderDash();
-  if(cur==='cli')  renderCli();
-  if(cur==='rev')  renderRev();
+  refresh();
   toast(ok?'✅ Clima actualizado (Open-Meteo)': useFirebase?'✅ Sincronizado con Firebase':'⚠️ Modo local (Firebase no configurado)');
 };
 
@@ -1973,17 +2199,19 @@ const init = async () => {
   poblarSels();
   document.getElementById('rf').value = fISO(TODAY);
   loadSis();
-  renderDash();
+  let t0 = 'hoy';
+  try { const g = localStorage.getItem('compost_tab'); if (TABS.includes(g)) t0 = g; } catch(e) {}
+  go(t0);
 
   // Auto-fetch en background si no se hizo hoy
   if (S.climaLastFetch !== todayISO()) {
     document.getElementById('fetch-bar').classList.remove('hide');
     autoFetch(false).then(ok=>{
       document.getElementById('fetch-bar').classList.add('hide');
-      if(ok){ if(cur==='dash')renderDash(); if(cur==='cli')renderCli(); if(cur==='rev')renderRev(); }
+      if(ok){ refresh(); }
     });
   }
-  fbLoad().then(()=>{ poblarSels(); if(cur==='dash')renderDash(); if(cur==='rev')renderRev(); });
+  fbLoad().then(()=>{ poblarSels(); refresh(); });
 };
 
 init();
