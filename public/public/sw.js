@@ -2,7 +2,10 @@
 // es solo respaldo sin conexión, así que un deploy no deja a index.html con un módulo viejo.
 // El resto de los archivos del shell (manifest, íconos, etc.) siguen cache-first:
 // si cambian, hay que subir esta versión.
-const CACHE = 'compost-tracker-v3';
+// Hosting sirve html/js con "Cache-Control: no-cache" (firebase.json) y acá se piden con
+// cache:'no-cache'/'reload' para que la caché HTTP del navegador no deje a index.html con
+// un huerta-catalogo.js de otra versión (la app queda en blanco si faltan exports).
+const CACHE = 'compost-tracker-v4';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -16,7 +19,7 @@ const EXTERNAL_CACHE = ['fonts.googleapis.com', 'fonts.gstatic.com', 'cdn.jsdeli
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE).then(cache => cache.addAll(APP_SHELL)).then(() => self.skipWaiting())
+    caches.open(CACHE).then(cache => cache.addAll(APP_SHELL.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting())
   );
 });
 
@@ -59,7 +62,7 @@ self.addEventListener('fetch', event => {
 
   if (url.pathname.endsWith('.js')) {
     event.respondWith(
-      fetch(req).then(res => {
+      fetch(req, { cache: 'no-cache' }).then(res => {
         const copia = res.clone();
         caches.open(CACHE).then(c => c.put(req, copia));
         return res;
