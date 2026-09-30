@@ -4,7 +4,7 @@
 
 // ── Fuentes y alcance: los valores son orientativos y solo parcialmente contrastados.
 //   Los meses de siembra y los días a cosecha se verificaron contra las tablas de
-//   Pro-Huerta/INTA en 16 de las 24 especies (sin verificar: cilantro, menta, orégano,
+//   Pro-Huerta/INTA en 17 de las 24 especies (sin verificar: cilantro, menta, orégano,
 //   romero, tomillo, frutilla, rúcula). Riego, fertilización, `diasPlagas` y todos los
 //   productos y dosis de plagas son referencias generales, no contrastadas: confirmar
 //   con la etiqueta del producto. Todo es editable por cultivo desde la app.
