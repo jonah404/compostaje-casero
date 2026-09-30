@@ -933,7 +933,8 @@ function verificarYCrearEventos() {
       titulo: "🔥 COMPOST: Calor extremo hoy - revisar humedad",
       desc: "Temperatura máxima registrada ayer: " + tempMax + "°C\n" +
             "Acción para hoy: revisá humedad del compost y regá si es necesario.",
-      color: CalendarApp.EventColor.RED
+      color: CalendarApp.EventColor.RED,
+      urgente: true
     });
   }
   if (diasSinLluvia >= CFG.diasSinLluvia && humHoy !== null && humHoy < CFG.humedadBajaUmbral) {
@@ -1047,7 +1048,8 @@ function verificarYCrearEventos() {
       }).join("\n") + "\n\n" +
         "Ya cumplieron 6 meses. Aspecto esperado: tierra oscura, olor a tierra húmeda.\n" +
         "Acción: cosechar y preparar para el próximo ciclo.",
-      color: CalendarApp.EventColor.GREEN
+      color: CalendarApp.EventColor.GREEN,
+      urgente: true
     });
   }
 
@@ -1063,36 +1065,158 @@ function verificarYCrearEventos() {
     });
   }
 
+  // Cada área etiqueta sus eventos para poder agruparlos en el evento único.
+  eventos.forEach(function(ev) { ev.area = "compost"; });
+
   // ── ALERTAS DE PLANTAS ──────────────────────────────────────────
   var eventosPlantas = verificarEventosPlantas(cal, diaObjetivo);
-  if (eventosPlantas) eventos = eventos.concat(eventosPlantas);
+  if (eventosPlantas) {
+    eventosPlantas.forEach(function(ev) { ev.area = "plantas"; });
+    eventos = eventos.concat(eventosPlantas);
+  }
 
   // ── ALERTAS DE PECERA ────────────────────────────────────────────
   var eventosPecera = verificarEventosPecera();
-  if (eventosPecera) eventos = eventos.concat(eventosPecera);
+  if (eventosPecera) {
+    eventosPecera.forEach(function(ev) { ev.area = "pecera"; });
+    eventos = eventos.concat(eventosPecera);
+  }
 
   if (eventos.length === 0) {
     Logger.log("[OK] Sin eventos para crear hoy");
     return;
   }
 
-  // Verificar duplicados en el día de hoy
-  var ini = new Date(diaObjetivo); ini.setHours(0,0,0,0);
-  var fin = new Date(diaObjetivo); fin.setHours(23,59,59,999);
-  var titulosExistentes = cal.getEvents(ini, fin).map(function(e){ return e.getTitle(); });
+  var resultado = armarEventoUnico_(eventos);
+  var hechos = publicarEventosDia_(cal, diaObjetivo, resultado);
+  Logger.log("[OK] Eventos creados/actualizados: " + hechos + " (tareas: " +
+    resultado.cantidadTareas + ", urgentes: " + resultado.urgentes.length + ")");
+}
 
-  var creados = 0;
-  eventos.forEach(function(ev) {
-    if (titulosExistentes.indexOf(ev.titulo) >= 0) {
-      Logger.log("[SKIP] Ya existe: " + ev.titulo);
-      return;
-    }
-    var evento = cal.createAllDayEvent(ev.titulo, diaObjetivo, { description: ev.desc });
-    try { evento.setColor(ev.color); } catch(e) {}
-    Logger.log("[CAL] Creado para " + Utilities.formatDate(diaObjetivo, CFG.tz, "dd/MM") + ": " + ev.titulo);
-    creados++;
+// ====================================================================
+//  EVENTO ÚNICO DIARIO
+//  Todas las tareas del día (compost, plantas, pecera) van en UN solo
+//  evento "Tareas de hoy · N" con una sección por área. Sólo las
+//  urgencias (helada, calor extremo, frío en interior, compost listo)
+//  quedan como evento aparte, con hora y recordatorio emergente, para que
+//  no se pierdan dentro de una descripción larga.
+// ====================================================================
+
+var EVENTO_UNICO = {
+  prefijoTitulo: "🌿 Tareas de hoy",
+  horaUrgente:   8,    // 08:00
+  duracionMin:   30,
+  areas: [
+    { id: "compost", encabezado: "🌱 COMPOST" },
+    { id: "plantas", encabezado: "🪴 PLANTAS" },
+    { id: "pecera",  encabezado: "🐠 PECERA"  }
+  ]
+};
+
+// Recibe la lista de eventos etiquetados ({titulo, desc, color, area, urgente}).
+// Devuelve { tareas: {titulo, desc}|null, cantidadTareas, urgentes: [ev...] }.
+// No toca el calendario: es pura, para poder probarla con testEventoUnico().
+function armarEventoUnico_(eventos) {
+  var urgentes = [];
+  var porArea  = {};
+  var cantidad = 0;
+
+  (eventos || []).forEach(function(ev) {
+    if (ev.urgente) { urgentes.push(ev); return; }
+    var id = ev.area || "compost";
+    if (!porArea[id]) porArea[id] = [];
+    porArea[id].push(ev);
+    cantidad++;
   });
-  Logger.log("[OK] Eventos creados: " + creados + " / " + eventos.length);
+
+  if (cantidad === 0) return { tareas: null, cantidadTareas: 0, urgentes: urgentes };
+
+  var secciones = [];
+  EVENTO_UNICO.areas.forEach(function(area) {
+    var lista = porArea[area.id];
+    if (!lista || !lista.length) return;
+    var lineas = [area.encabezado, "────────────"];
+    lista.forEach(function(ev) {
+      // El prefijo "COMPOST:"/"PECERA:" es redundante dentro de su sección.
+      var titulo = String(ev.titulo).replace(/\s(COMPOST|PECERA):\s*/, " ");
+      lineas.push("▸ " + titulo);
+      String(ev.desc || "").split("\n").forEach(function(l) {
+        lineas.push(l === "" ? "" : "   " + l);
+      });
+      lineas.push("");
+    });
+    secciones.push(lineas.join("\n"));
+  });
+
+  return {
+    tareas: {
+      titulo: EVENTO_UNICO.prefijoTitulo + " · " + cantidad,
+      desc:   secciones.join("\n")
+    },
+    cantidadTareas: cantidad,
+    urgentes: urgentes
+  };
+}
+
+// Crea/actualiza en el calendario lo que armó armarEventoUnico_. Devuelve
+// cuántos eventos se crearon o actualizaron.
+function publicarEventosDia_(cal, dia, resultado) {
+  var ini = new Date(dia); ini.setHours(0,0,0,0);
+  var fin = new Date(dia); fin.setHours(23,59,59,999);
+  var existentes = cal.getEvents(ini, fin);
+  var hechos = 0;
+
+  if (resultado.tareas) {
+    var previo = null;
+    existentes.forEach(function(e) {
+      if (!previo && e.getTitle().indexOf(EVENTO_UNICO.prefijoTitulo) === 0) previo = e;
+    });
+    if (previo) {
+      // Se actualiza en vez de duplicar: el título lleva un contador que
+      // cambia si se vuelve a correr con datos nuevos el mismo día.
+      previo.setTitle(resultado.tareas.titulo);
+      previo.setDescription(resultado.tareas.desc);
+      Logger.log("[CAL] Actualizado: " + resultado.tareas.titulo);
+    } else {
+      var nuevo = cal.createAllDayEvent(resultado.tareas.titulo, dia, { description: resultado.tareas.desc });
+      try { nuevo.setColor(CalendarApp.EventColor.GREEN); } catch(e) {}
+      Logger.log("[CAL] Creado: " + resultado.tareas.titulo);
+    }
+    hechos++;
+  }
+
+  var titulos = existentes.map(function(e) { return e.getTitle(); });
+  resultado.urgentes.forEach(function(ev) {
+    if (titulos.indexOf(ev.titulo) >= 0) { Logger.log("[SKIP] Ya existe: " + ev.titulo); return; }
+    // Evento con hora (no de día completo): sólo así se puede fijar cuándo suena el aviso.
+    var desde = new Date(dia); desde.setHours(EVENTO_UNICO.horaUrgente, 0, 0, 0);
+    var hasta = new Date(desde.getTime() + EVENTO_UNICO.duracionMin * 60000);
+    var evento = cal.createEvent(ev.titulo, desde, hasta, { description: ev.desc });
+    try { evento.setColor(CalendarApp.EventColor.RED); } catch(e) {}
+    try { evento.removeAllReminders(); evento.addPopupReminder(0); } catch(e) {}
+    Logger.log("[CAL] Urgente creado: " + ev.titulo);
+    hechos++;
+  });
+
+  return hechos;
+}
+
+// Prueba SIN tocar el calendario: ejecutar sola y mirar el registro.
+function testEventoUnico() {
+  var muestra = [
+    { titulo: "🔄 COMPOST: Revolver 2 sistema(s) hoy", desc: "• Sistema 1 — 12 días\n• Sistema 2 — 11 días\n\nAcción: revolver hoy.", area: "compost" },
+    { titulo: "💧 RIEGO: 3 planta(s) necesitan agua", desc: "• Monstera\n• Helecho\n• Pilea", area: "plantas" },
+    { titulo: "🐛 REVISIÓN PLAGAS: 1 planta(s)", desc: "• Mandarina\nRevisar envés.", area: "plantas" },
+    { titulo: "🐠 PECERA: cambio de agua", desc: "Van 8 días sin cambio.", area: "pecera" },
+    { titulo: "❄️ HELADA: proteger plantas de exterior hoy (2)", desc: "Mínima: -1°C", area: "plantas", urgente: true }
+  ];
+  var r = armarEventoUnico_(muestra);
+  Logger.log("Tareas: " + r.cantidadTareas + " | Urgentes: " + r.urgentes.length);
+  Logger.log("TÍTULO: " + (r.tareas ? r.tareas.titulo : "(ninguno)"));
+  Logger.log("DESCRIPCIÓN:\n" + (r.tareas ? r.tareas.desc : ""));
+  Logger.log("URGENTES: " + JSON.stringify(r.urgentes.map(function(e) { return e.titulo; })));
+  var vacio = armarEventoUnico_([]);
+  Logger.log("Sin eventos → tareas=" + vacio.tareas + ", urgentes=" + vacio.urgentes.length);
 }
 
 // ====================================================================
@@ -2008,7 +2132,8 @@ function verificarEventosPlantas(cal, manana) {
           return '• ' + x.nombre + ' (tolera hasta ~' + x.tempTolerado + '°C)';
         }).join('\n') +
         '\n\nAcción: alejarlas de ventanas/corrientes de aire esta noche.',
-      color: CalendarApp.EventColor.CYAN
+      color: CalendarApp.EventColor.CYAN,
+      urgente: true
     });
   }
 
@@ -2022,7 +2147,8 @@ function verificarEventosPlantas(cal, manana) {
         (severa
           ? 'RIESGO ALTO de daño en hojas y brotes.\nAcción: cubrir con tela antihelada, regar el suelo esta tarde (retiene calor).'
           : 'Riesgo moderado para cítrico joven.\nAcción: cubrir con tela antihelada esta noche.'),
-      color: severa ? CalendarApp.EventColor.RED : CalendarApp.EventColor.CYAN
+      color: severa ? CalendarApp.EventColor.RED : CalendarApp.EventColor.CYAN,
+      urgente: true
     });
   }
 
