@@ -1364,6 +1364,7 @@ function doPost(e) {
     if      (tipo === 'revolcada')     guardarRevolcadaSheet(data);
     else if (tipo === 'sistema')       guardarSistemaSheet(data);
     else if (tipo === 'planta')        guardarPlantaSheet(data);
+    else if (tipo === 'plantaEliminar') eliminarPlantaSheet(data);
     else if (tipo === 'plantaEvento')  guardarEventoPlantaSheet(data);
     else if (tipo === 'pecera')        guardarPeceraSheet(data);
     else if (tipo === 'peceraEvento')  guardarEventoPeceraSheet(data);
@@ -1421,6 +1422,18 @@ function guardarSistemaSheet(d) {
 }
 
 // ── Planta: actualiza la ficha si el ID ya existe, si no la agrega ──
+// Borra la fila de la planta (y sus eventos) para que el sync Sheet -> Firestore no la resucite.
+function eliminarPlantaSheet(d) {
+  if (!d || !d.id) return;
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(CFG_PLANTAS.sheetPlantas);
+  if (!sh) return;
+  var datos = sh.getDataRange().getValues();
+  for (var i = datos.length - 1; i >= 1; i--) {
+    if (String(datos[i][0]).trim() === String(d.id).trim()) { sh.deleteRow(i + 1); break; }
+  }
+}
+
 function guardarPlantaSheet(d) {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG_PLANTAS.sheetPlantas);
   if (!sh || !d.id) return;
