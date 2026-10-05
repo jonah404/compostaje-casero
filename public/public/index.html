@@ -1014,8 +1014,10 @@ const est = s => {
   }
   return {label:'En carga',cls:'bc',fase:'c'};
 };
+// Igual que verificarYCrearEventos() del calendario: se revuelve cada 7 días también
+// con el sistema ya en estanque (no se corta al cargar inicioE).
 const proxRev = s => {
-  if (!s.inicioC || s.inicioE) return null;
+  if (!s.inicioC) return null;
   const r = S.revolcadas.filter(x=>x.sistema===s.id).sort((a,b)=>a.fecha>b.fecha?-1:1);
   const base = r.length ? pISO(r[0].fecha) : pISO(s.inicioC);
   const p = new Date(base); p.setDate(p.getDate()+7); return p;
