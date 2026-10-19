@@ -1,15 +1,12 @@
-// Los módulos JS same-origin (p. ej. huerta-catalogo.js) van network-first: la caché
-// es solo respaldo sin conexión, así que un deploy no deja a index.html con un módulo viejo.
+// Los módulos JS same-origin van network-first: la caché es solo respaldo sin conexión.
 // El resto de los archivos del shell (manifest, íconos, etc.) siguen cache-first:
 // si cambian, hay que subir esta versión.
 // Hosting sirve html/js con "Cache-Control: no-cache" (firebase.json) y acá se piden con
-// cache:'no-cache'/'reload' para que la caché HTTP del navegador no deje a index.html con
-// un huerta-catalogo.js de otra versión (la app queda en blanco si faltan exports).
-const CACHE = 'compost-tracker-v4';
+// cache:'no-cache'/'reload' para que la caché HTTP del navegador no deje versiones mezcladas.
+const CACHE = 'compost-tracker-v5';
 const APP_SHELL = [
   '/',
   '/index.html',
-  '/huerta-catalogo.js',
   '/manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',

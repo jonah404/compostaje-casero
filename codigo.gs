@@ -1075,13 +1075,6 @@ function verificarYCrearEventos() {
     eventos = eventos.concat(eventosPlantas);
   }
 
-  // ── ALERTAS DE LA HUERTA ─────────────────────────────────────────
-  var eventosHuerta = verificarEventosHuerta();
-  if (eventosHuerta) {
-    eventosHuerta.forEach(function(ev) { ev.area = "huerta"; });
-    eventos = eventos.concat(eventosHuerta);
-  }
-
   // ── ALERTAS DE PECERA ────────────────────────────────────────────
   var eventosPecera = verificarEventosPecera();
   if (eventosPecera) {
@@ -1116,7 +1109,6 @@ var EVENTO_UNICO = {
   areas: [
     { id: "compost", encabezado: "🌱 COMPOST" },
     { id: "plantas", encabezado: "🪴 PLANTAS" },
-    { id: "huerta",  encabezado: "🥬 HUERTA"  },
     { id: "pecera",  encabezado: "🐠 PECERA"  }
   ]
 };
@@ -1352,8 +1344,7 @@ function diagnosticar() {
 }
 
 function doPost(e) {
-  // Serializa las escrituras: el riego agrupado manda varios POST a la vez y
-  // sin lock dos ejecuciones calculan la misma "última fila + 1".
+  // Serializa las escrituras: varios POST a la vez calculan la misma "última fila + 1".
   var lock = LockService.getScriptLock();
   var conLock = false;
   try {
@@ -1452,22 +1443,6 @@ function guardarPlantaSheet(d) {
   sh.getRange(fila, 7).setValue(d.exposicion || '');        // G: Exposición solar
   sh.getRange(fila, 8).setValue(d.suelo || '');             // H: Tipo suelo
   sh.getRange(fila, 20).setValue(d.notas || '');            // T: Notas
-  if (d.categoria === 'huerta') {
-    sh.getRange(fila, 21).setValue('huerta');                                // U: categoría
-    sh.getRange(fila, 22).setValue(d.cultivo || '');                         // V: cultivo
-    sh.getRange(fila, 23).setValue(d.ciclo || '');                           // W: ciclo
-    if (d.fechaTrasplante) sh.getRange(fila, 24).setValue(new Date(d.fechaTrasplante + 'T12:00:00')).setNumberFormat('DD/MM/YYYY');
-    else sh.getRange(fila, 24).clearContent();                               // X: fecha trasplante
-    sh.getRange(fila, 25).setValue(numOVacio_(d.riegoVerano));               // Y
-    sh.getRange(fila, 26).setValue(numOVacio_(d.riegoInvierno));             // Z
-    sh.getRange(fila, 27).setValue(numOVacio_(d.diasFert));                  // AA
-    sh.getRange(fila, 28).setValue(numOVacio_(d.diasPlagas));                // AB
-    sh.getRange(fila, 29).setValue(numOVacio_(d.diasATrasplante));           // AC
-    sh.getRange(fila, 30).setValue(numOVacio_(d.diasACosecha));              // AD
-    sh.getRange(fila, 31).setValue(d.estadoCultivo || 'activo');             // AE
-    if (d.fechaCierre) sh.getRange(fila, 32).setValue(new Date(d.fechaCierre + 'T12:00:00')).setNumberFormat('DD/MM/YYYY');
-    else sh.getRange(fila, 32).clearContent();                               // AF: fecha cierre
-  }
   // Columnas I-S (fertilización, poda, plagas, riego, días) no se tocan:
   // las mantiene actualizarFichaPlantas() con el trigger diario de las 07:00.
 }
@@ -1571,22 +1546,6 @@ function sincronizarPlantasAFirestore() {
       estado:        { stringValue: String(row[18] || '') },
       notas:         { stringValue: String(row[19] || '') },
     };
-    // Campos de la huerta: solo en filas de cultivos (si no, se pisarían con vacíos los
-    // valores que la app ya guardó en Firestore cuando la hoja aún no tiene estas columnas).
-    if (String(row[20] || '') === 'huerta') {
-      campos.categoria       = { stringValue: 'huerta' };
-      campos.cultivo         = { stringValue: String(row[21] || '') };
-      campos.ciclo           = { stringValue: String(row[22] || '') };
-      campos.fechaTrasplante = { stringValue: fechaISO_(row[23]) };
-      campos.riegoVerano     = numVal_(row[24]);
-      campos.riegoInvierno   = numVal_(row[25]);
-      campos.diasFert        = numVal_(row[26]);
-      campos.diasPlagas      = numVal_(row[27]);
-      campos.diasATrasplante = numVal_(row[28]);
-      campos.diasACosecha    = numVal_(row[29]);
-      campos.estadoCultivo   = { stringValue: String(row[30] || 'activo') };
-      campos.fechaCierre     = { stringValue: fechaISO_(row[31]) };
-    }
 
     var mask = Object.keys(campos).map(function(k){ return 'updateMask.fieldPaths=' + k; }).join('&');
     var url = 'https://firestore.googleapis.com/v1/projects/' + FIRESTORE_PROJECT_ID +
@@ -1730,16 +1689,65 @@ function agregarEspeciesFaltantes() {
       'Muy tolerante a la sequía — el tronco almacena agua. Mejor pecar de poco riego que de mucho, raíz sensible al encharque.',
       'Fertilizante para cactus/suculentas o balanceado muy diluido',
       '1/4 de dosis, cada 60 días — bajo requerimiento', 450],
+    ['Helecho de cinta', 'Interior', 3, 6, 30, 9, 4, 10, 'Indirecta media, sin sol directo',
+      'Le gusta el sustrato siempre apenas húmedo y humedad ambiente alta. Puntas marrones = aire seco o riego irregular.',
+      'Fertilizante líquido balanceado para plantas de hoja',
+      'A 1/4–1/2 de la dosis, cada 30 días en temporada (sensible a las sales)', 240],
+    ['Helecho Hawaii', 'Interior', 4, 7, 30, 9, 4, 10, 'Indirecta media, sin sol directo',
+      'Mantener el sustrato levemente húmedo sin encharcar; agradece humedad ambiente.',
+      'Fertilizante líquido balanceado para plantas de hoja',
+      'A 1/4–1/2 de la dosis, cada 30 días en temporada', 240],
+    ['Helecho Davana', 'Interior', 5, 9, 30, 9, 4, 10, 'Indirecta brillante, sin sol directo',
+      'De rizoma (patas peludas): dejar los rizomas a la vista y regar cuando la superficie empieza a secarse. Tolera algo más de sequedad que otros helechos.',
+      'Fertilizante líquido balanceado para plantas de hoja',
+      'A 1/4–1/2 de la dosis, cada 30 días en temporada', 300],
+    ['Helecho estrella azul', 'Interior', 6, 10, 45, 9, 4, 10, 'Indirecta brillante',
+      'El más tolerante a la sequía de los helechos: dejar secar apenas la superficie entre riegos. Hojas azuladas; rizomas superficiales.',
+      'Fertilizante líquido balanceado para plantas de hoja',
+      'A 1/2 de la dosis, cada 45 días en temporada', 300],
+    ['Helecho espárrago', 'Interior', 5, 9, 45, 9, 4, 5, 'Luz brillante o media sombra, sin sol fuerte de tarde',
+      'Está en la galería exterior pero se trata como de interior: no se cuenta la lluvia ni se avisa helada de exterior. Las raíces tuberosas guardan agua: regar cuando la superficie seca, evitar encharque. Protegerla si baja de ~5°C.',
+      'Fertilizante líquido balanceado',
+      'A 1/2 de la dosis, cada 45 días en temporada', 365],
+    ['Dracena marginata', 'Interior', 10, 16, 45, 9, 4, 10, 'Indirecta brillante, tolera algo de sol suave',
+      'Regar cuando los 3-5 cm superiores estén secos; el exceso de agua pudre la raíz. Sensible al flúor/cloro (puntas marrones): usar agua reposada.',
+      'Fertilizante líquido balanceado para plantas de hoja',
+      'A 1/2 de la dosis, cada 45 días en temporada', 365],
+    ['Philodendron imperial red', 'Interior', 7, 11, 30, 9, 4, 15, 'Indirecta brillante, sin sol directo',
+      'Sustrato aireado, regar cuando la superficie seca. Sensible al frío (hojas oscuras/negras por debajo de ~15°C).',
+      'Fertilizante líquido para plantas de hoja',
+      'A 1/2 de la dosis, cada 30 días en temporada', 240],
+    ['Falsa aralia', 'Interior', 6, 10, 30, 9, 4, 15, 'Indirecta brillante',
+      'No tolera que se seque del todo ni el encharque: sustrato apenas húmedo. Pierde hojas con cambios bruscos de lugar, frío o corrientes.',
+      'Fertilizante líquido balanceado para plantas de hoja',
+      'A 1/2 de la dosis, cada 30 días en temporada', 240],
   ];
 
   var agregadas = 0;
   nuevas.forEach(function (fila) {
-    if (perfilEspecie(fila[0])) {
-      Logger.log('[SKIP] "' + fila[0] + '" ya matchea con una fila existente en Especies');
+    // Exacto por nombre (no perfilEspecie): "Helecho Hawaii" matchea con el "Helecho" genérico,
+    // pero es una especie distinta y necesita su propia fila.
+    var existentes = sh.getRange(1, 1, sh.getLastRow(), 1).getValues();
+    var yaEsta = false, filaGenerico = -1;
+    for (var k = 1; k < existentes.length; k++) {
+      var nombreFila = String(existentes[k][0] || '').toLowerCase().trim();
+      if (nombreFila === String(fila[0]).toLowerCase()) yaEsta = true;
+      if (nombreFila === 'helecho' && filaGenerico < 0) filaGenerico = k + 1;
+    }
+    if (yaEsta) {
+      Logger.log('[SKIP] "' + fila[0] + '" ya existe en Especies');
       return;
     }
-    sh.appendRow(fila);
-    var filaNum = sh.getLastRow();
+    // perfilEspecie devuelve la PRIMERA fila que matchea: los helechos específicos van
+    // antes del "Helecho" genérico para que no los tape.
+    var antesDelGenerico = filaGenerico > 0 && String(fila[0]).toLowerCase().indexOf('helecho') === 0;
+    if (antesDelGenerico) {
+      sh.insertRowBefore(filaGenerico);
+      sh.getRange(filaGenerico, 1, 1, fila.length).setValues([fila]);
+    } else {
+      sh.appendRow(fila);
+    }
+    var filaNum = antesDelGenerico ? filaGenerico : sh.getLastRow();
     sh.getRange(filaNum, 1, 1, fila.length).setFontFamily('Arial').setFontSize(9)
       .setVerticalAlignment('middle').setHorizontalAlignment('center');
     sh.getRange(filaNum, 1).setFontWeight('bold').setHorizontalAlignment('left');
@@ -2014,10 +2022,7 @@ function actualizarFichaPlantas() {
     if (!datos[i][0]) continue;
     var idPlanta = datos[i][0];
     var especie = datos[i][3] || datos[i][1] || '';
-    var esHuerta = esHuertaFila_(datos[i]);
-    if (esHuerta && huertaCerradaFila_(datos[i])) continue;   // cultivo cerrado: sin avisos
-    var perfil = esHuerta ? perfilHuertaFila_(datos[i]) : perfilEspecie(especie);
-    if (esHuerta) { inicializarProximosHuerta_(shP, fila, datos[i], perfil); especie = ''; }   // '' → sin perfil de interior
+    var perfil = perfilEspecie(especie);
 
     var ultimoRiego = datos[i][16] ? new Date(datos[i][16]) : null;
     var riegoEvento = obtenerUltimoEventoPlanta_(idPlanta, 'Riego');
@@ -2045,10 +2050,9 @@ function actualizarFichaPlantas() {
     }
 
     actualizarProximoEvento_(shP, fila, idPlanta, 'Fertiliz', 11, 12, perfil ? perfil.diasFert : CFG_PLANTAS.diasFertilizante);
-    if (esHuerta) actualizarProximoFertHuerta_(shP, fila, datos[i], perfil);   // cultivos: desde el trasplante, no en el almácigo
-    if (!esHuerta) actualizarProximoEvento_(shP, fila, idPlanta, 'Poda', 13, 14, perfil && perfil.podaDias ? perfil.podaDias : CFG_PLANTAS.diasPoda);
-    var fichaFitoP = esHuerta ? null : fichaFito(datos[i][1]);
-    var intervaloPlagas = esHuerta ? perfil.diasPlagas : (fichaFitoP ? diasVigilancia(fichaFitoP, mes) : CFG_PLANTAS.diasRevisionPlagas);
+    actualizarProximoEvento_(shP, fila, idPlanta, 'Poda', 13, 14, perfil && perfil.podaDias ? perfil.podaDias : CFG_PLANTAS.diasPoda);
+    var fichaFitoP = fichaFito(datos[i][1]);
+    var intervaloPlagas = fichaFitoP ? diasVigilancia(fichaFitoP, mes) : CFG_PLANTAS.diasRevisionPlagas;
     actualizarProximoEvento_(shP, fila, idPlanta, 'plagas', 15, 16, intervaloPlagas);
   }
 
@@ -2104,9 +2108,7 @@ function verificarEventosPlantas(cal, manana) {
     if (!p[0] || !p[1]) return;
     var nombre = p[1];
     var especie = p[3] || nombre;
-    var esHuerta = esHuertaFila_(p);
-    if (esHuerta && huertaCerradaFila_(p)) return;             // cultivo cerrado: ni helada
-    var perfil = esHuerta ? null : perfilEspecie(especie);
+    var perfil = perfilEspecie(especie);
     var esInterior = perfil && perfil.tipo === 'Interior';
 
     // ── HELADA / FRÍO ──────────────────────────────────────────────
@@ -2120,9 +2122,6 @@ function verificarEventosPlantas(cal, manana) {
         grupos.heladaExterior.plantas.push(nombre);
       }
     }
-
-    // Riego, fertilización y plagas de los cultivos: verificarEventosHuerta().
-    if (esHuerta) return;
 
     // ── RIEGO ──────────────────────────────────────────────────────
     var ultimoRiego = p[16] ? new Date(p[16]) : null;
@@ -2481,6 +2480,144 @@ function altaPotusId12() {
     Logger.log('[WARN] No se encontró el perfil "Potus" en la hoja Especies — va a usar los ' +
       'valores genéricos de cítricos, que no son los correctos para esta planta. Revisá la hoja Especies.');
   }
+}
+
+// ====================================================================
+//  ALTA DE 8 PLANTAS NUEVAS (7 de interior + helecho espárrago de la
+//  galería, que se trata como de interior).
+//  Ejecutar UNA vez desde el editor. Es segura de repetir: si ya existe
+//  una planta con el mismo nombre en la hoja Plantas, la saltea.
+//
+//  Qué hace: agrega sus perfiles a la hoja Especies (agregarEspeciesFaltantes),
+//  crea las fichas con ID nuevo, deja cargado un riego "hoy" (tanto en la
+//  ficha como en Registro Plantas — es un SUPUESTO: si las regaste otro
+//  día, corregilo desde la app), recalcula la ficha y sincroniza a Firestore.
+// ====================================================================
+function altaPlantasInterior2() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var shP = ss.getSheetByName(CFG_PLANTAS.sheetPlantas);
+  var shR = ss.getSheetByName(CFG_PLANTAS.sheetRegistro);
+  if (!shP || !shR) { Logger.log('[ERROR] Faltan hojas Plantas/Registro Plantas'); return; }
+
+  // Primero los perfiles: así perfilEspecie() ya encuentra cada planta con sus valores.
+  agregarEspeciesFaltantes();
+
+  var plantas = [
+    { nombre: 'Helecho de cinta',            ubic: 'Interior' },
+    { nombre: 'Helecho Hawaii',              ubic: 'Interior' },
+    { nombre: 'Helecho Davana',              ubic: 'Interior' },
+    { nombre: 'Helecho estrella azul',       ubic: 'Interior' },
+    { nombre: 'Dracena marginata tricolor',  ubic: 'Interior' },
+    { nombre: 'Philodendron imperial red',   ubic: 'Interior' },
+    { nombre: 'Falsa aralia',                ubic: 'Interior' },
+    { nombre: 'Helecho espárrago',           ubic: 'Galería (exterior)' }
+  ];
+
+  var datos = shP.getDataRange().getValues();
+  var maxId = 19;                       // piso: los IDs 13-19 estuvieron en uso (no se reutilizan)
+  var nombresExistentes = {};
+  for (var i = 1; i < datos.length; i++) {
+    var n = Number(datos[i][0]);
+    if (!isNaN(n) && n > maxId) maxId = n;
+    nombresExistentes[String(datos[i][1] || '').toLowerCase().trim()] = true;
+  }
+
+  var hoy = new Date();
+  var altas = 0;
+  plantas.forEach(function (pl) {
+    if (nombresExistentes[pl.nombre.toLowerCase()]) {
+      Logger.log('[SKIP] "' + pl.nombre + '" ya existe en Plantas');
+      return;
+    }
+    var id = ++maxId;
+    var perfil = perfilEspecie(pl.nombre);
+    // Próximas fechas como en el alta automática de actualizarFichaPlantas(): sin esto,
+    // la ficha no tendría "Próxima X" hasta el primer registro y el calendario no avisaría.
+    var enDias = function (n) { var d = new Date(hoy); d.setDate(d.getDate() + n); return d; };
+    var proxFert = enDias(perfil ? perfil.diasFert : CFG_PLANTAS.diasFertilizante);
+    var proxPoda = enDias(perfil && perfil.podaDias ? perfil.podaDias : CFG_PLANTAS.diasPoda);
+    var proxPlagas = enDias(CFG_PLANTAS.diasRevisionPlagas);
+    var fila = [
+      id, pl.nombre, '', pl.nombre, hoy,
+      pl.ubic, perfil ? perfil.luz : '', 'Maceta',
+      '', '', '', proxFert, '', proxPoda, hoy, proxPlagas,
+      hoy, '', 'Recién agregada 🌱',
+      'Cargada el ' + Utilities.formatDate(hoy, CFG.tz, 'dd/MM/yyyy') +
+        '. Último riego = el día de la carga (supuesto): corregí fechas desde la app.'
+    ];
+    shP.appendRow(fila);
+    var filaNum = shP.getLastRow();
+    [5, 12, 14, 15, 16, 17].forEach(function (col) { shP.getRange(filaNum, col).setNumberFormat('DD/MM/YYYY'); });
+    shP.getRange(filaNum, 1, 1, 20)
+      .setFontFamily('Arial').setFontSize(9)
+      .setVerticalAlignment('middle').setHorizontalAlignment('center');
+    shP.getRange(filaNum, 2).setFontWeight('bold');
+    shP.getRange(filaNum, 20).setHorizontalAlignment('left');
+    shP.setRowHeight(filaNum, 22);
+    colorearEstadoPlanta(shP, filaNum, 'Recién agregada');
+
+    shR.appendRow([id, pl.nombre, hoy, '💧 Riego', 'Riego al agregar la planta', '', '', '', '', '']);
+    var filaR = shR.getLastRow();
+    shR.getRange(filaR, 3).setNumberFormat('DD/MM/YYYY');
+    shR.getRange(filaR, 1, 1, 10)
+      .setFontFamily('Arial').setFontSize(9)
+      .setVerticalAlignment('middle').setHorizontalAlignment('center');
+    shR.getRange(filaR, 5).setHorizontalAlignment('left');
+    shR.getRange(filaR, 10).setHorizontalAlignment('left');
+    shR.setRowHeight(filaR, 20);
+
+    Logger.log('[OK] ' + pl.nombre + ' (ID ' + id + ') — ' +
+      (perfil ? 'riego cada ' + perfil.riegoVerano + 'd verano / ' + perfil.riegoInvierno + 'd invierno, fertilizar cada ' + perfil.diasFert + 'd'
+              : '[WARN] sin perfil en Especies'));
+    altas++;
+  });
+
+  actualizarFichaPlantas();
+  sincronizarPlantasAFirestore();
+  Logger.log('[OK] ' + altas + ' planta(s) nueva(s). Ya figuran en la app y en el calendario.');
+}
+
+// ====================================================================
+//  QUITAR LA HUERTA de la hoja. Ejecutar UNA vez, ANTES de borrar los
+//  cultivos de Firestore (si no, el sync diario Sheet → Firestore los
+//  resucitaría): borra de "Plantas" las filas con categoría "huerta"
+//  (col. U), de "Registro Plantas" todos sus eventos, y vacía las
+//  columnas U:AF que usaba la huerta. Deja en el registro de ejecución
+//  lo que borró, por si hay que recuperarlo.
+// ====================================================================
+function quitarHuertaSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var shP = ss.getSheetByName(CFG_PLANTAS.sheetPlantas);
+  var shR = ss.getSheetByName(CFG_PLANTAS.sheetRegistro);
+  if (!shP) { Logger.log('[ERROR] No existe la hoja Plantas'); return; }
+
+  var ids = {};
+  var datos = shP.getDataRange().getValues();
+  for (var i = datos.length - 1; i >= 1; i--) {
+    if (String(datos[i][20] || '').toLowerCase().trim() !== 'huerta') continue;
+    ids[String(datos[i][0]).trim()] = true;
+    Logger.log('[BORRADA planta] fila ' + (i + 1) + ': ' + JSON.stringify(datos[i].slice(0, 20)));
+    shP.deleteRow(i + 1);
+  }
+
+  var eventos = 0;
+  if (shR && shR.getLastRow() > 1) {
+    var reg = shR.getDataRange().getValues();
+    for (var j = reg.length - 1; j >= 1; j--) {
+      if (!ids[String(reg[j][0]).trim()]) continue;
+      Logger.log('[BORRADO evento] fila ' + (j + 1) + ': ' + JSON.stringify(reg[j].slice(0, 6)));
+      shR.deleteRow(j + 1);
+      eventos++;
+    }
+  }
+
+  if (shP.getMaxColumns() >= 21) {
+    var cols = Math.min(12, shP.getMaxColumns() - 20);
+    shP.getRange(1, 21, shP.getMaxRows(), cols).clearContent();
+  }
+
+  Logger.log('[OK] Huerta quitada: ' + Object.keys(ids).length + ' cultivo(s) y ' + eventos +
+    ' evento(s) borrados (IDs: ' + Object.keys(ids).join(', ') + ').');
 }
 
 // ====================================================================
@@ -2878,237 +3015,4 @@ function diagnosticarPecera() {
     var existentes = cal.getEvents(hoy, fin).map(function (e) { return e.getTitle(); });
     Logger.log('10) Eventos que YA existen hoy en el calendario: ' + JSON.stringify(existentes));
   }
-}
-
-
-// ====================================================================
-//  HUERTA — cultivos en la hoja "Plantas" (columnas U–AF, 21–32)
-//  Cada cultivo lleva una "foto" del perfil (riego, fertilización,
-//  plagas, días a trasplante/cosecha) copiada por la app al agregarlo:
-//  acá no hace falta conocer el catálogo. Índices de fila (base 0):
-//  20 categoría, 21 cultivo, 22 ciclo, 23 fecha trasplante, 24 riego
-//  verano, 25 riego invierno, 26 fertilizar cada, 27 plagas cada,
-//  28 días a trasplante, 29 días a cosecha, 30 estado, 31 fecha cierre.
-//  Correr agregarColumnasHuerta() UNA vez antes de usar la huerta.
-// ====================================================================
-
-var COL_HUERTA_INICIO = 21;   // U
-var COLS_HUERTA = ['Categoría', 'Cultivo', 'Ciclo', 'Fecha trasplante', 'Riego verano (d)', 'Riego invierno (d)',
-  'Fertilizar cada (d)', 'Revisar plagas cada (d)', 'Días a trasplante', 'Días a cosecha', 'Estado cultivo', 'Fecha cierre'];
-
-function agregarColumnasHuerta() {
-  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG_PLANTAS.sheetPlantas);
-  if (!sh) { Logger.log('[ERROR] No existe la hoja Plantas'); return; }
-  var rango = sh.getRange(1, COL_HUERTA_INICIO, 1, COLS_HUERTA.length);
-  rango.setValues([COLS_HUERTA]);
-  rango.setBackground('#1B5E20').setFontColor('#fff').setFontWeight('bold')
-    .setFontSize(9).setFontFamily('Arial').setHorizontalAlignment('center')
-    .setVerticalAlignment('middle').setWrap(true);
-  for (var c = 0; c < COLS_HUERTA.length; c++) sh.setColumnWidth(COL_HUERTA_INICIO + c, 95);
-  Logger.log('[OK] Columnas de huerta (U-AF) listas en la hoja Plantas');
-}
-
-function numOVacio_(v) {
-  return (v === '' || v === null || v === undefined || isNaN(Number(v))) ? '' : Number(v);
-}
-function esHuertaFila_(row) { return String(row[20] || '') === 'huerta'; }
-function huertaCerradaFila_(row) {
-  var e = String(row[30] || '');
-  return e === 'cosechado' || e === 'terminado';
-}
-// Mismos valores de respaldo que PERFIL_POR_DEFECTO en huerta-catalogo.js (3/5/30/7).
-function perfilHuertaFila_(row) {
-  function n(v, def) { var x = numOVacio_(v); return x === '' ? def : x; }
-  return {
-    especie: String(row[1] || ''), tipo: 'Exterior',
-    riegoVerano: n(row[24], 3), riegoInvierno: n(row[25], 5),
-    diasFert: n(row[26], 30), diasPlagas: n(row[27], 7),
-    fertMesIni: null, fertMesFin: null, tempMin: null, podaDias: null,
-    productoFert: '', dosisFert: ''
-  };
-}
-
-// Cultivo con trasplante pendiente (semillero o "por trasplantar"): mismas condiciones
-// que faseCultivo (huerta-catalogo.js). Anual con días a cosecha y a trasplante > 0 y
-// sin fecha de trasplante. Una celda de trasplante con solo espacios cuenta como vacía.
-function esViveroHuertaFila_(row) {
-  var siembra = row[4] ? new Date(row[4]) : null;
-  if (!siembra || isNaN(siembra.getTime())) return false;
-  var dt = numOVacio_(row[28]), dc = numOVacio_(row[29]);
-  var esPerenne = String(row[22]).toLowerCase().trim() === 'perenne';
-  return !esPerenne && dc !== '' && dc > 0 && dt !== '' && dt > 0 && String(row[23]).trim() === '';
-}
-
-// Desde cuándo se cuenta la próxima fertilización de un cultivo (Date | null): espejo de
-// baseFertilizacion() en huerta-catalogo.js. En el almácigo no se fertiliza; después del
-// trasplante cuenta el trasplante o la última fertilización (la más reciente); en siembra
-// directa y perennes, la siembra o la última fertilización.
-function baseFertHuertaFila_(row, ultimaFert) {
-  if (esViveroHuertaFila_(row)) return null;
-  function fecha(v) {
-    var x = v ? new Date(v) : null;
-    if (x && isNaN(x.getTime())) x = null;
-    if (x) x.setHours(0, 0, 0, 0);
-    return x;
-  }
-  var ancla = fecha(row[23]) || fecha(row[4]);
-  var ult = fecha(ultimaFert);
-  if (!ancla) return ult;
-  return (ult && ult.getTime() > ancla.getTime()) ? ult : ancla;
-}
-
-// Recalcula "Próxima fertilización" (col. L) de un cultivo con la regla de arriba; vacía la
-// celda si no corresponde (almácigo). Corre después de actualizarProximoEvento_, que ya dejó
-// "Última fertilización" (col. K) al día con los eventos.
-function actualizarProximoFertHuerta_(sh, fila, row, perfil) {
-  var base = baseFertHuertaFila_(row, sh.getRange(fila, 11).getValue());
-  var celda = sh.getRange(fila, 12);
-  if (!base) { celda.clearContent(); row[11] = ''; return; }
-  var prox = new Date(base); prox.setDate(prox.getDate() + perfil.diasFert);
-  celda.setValue(prox).setNumberFormat('DD/MM/YYYY');
-  row[11] = prox;
-}
-
-// guardarPlantaSheet no toca las columnas I–S: un cultivo nuevo arranca con las fechas de
-// "último riego / próxima revisión de plagas" contadas desde la siembra (col. E). La
-// fertilización NO se inicializa acá: la calcula actualizarProximoFertHuerta_ (no hay en
-// el almácigo y después se cuenta desde el trasplante).
-function inicializarProximosHuerta_(sh, fila, row, perfil) {
-  var base = row[4] ? new Date(row[4]) : null;
-  if (!base || isNaN(base.getTime())) return;
-  if (!row[16]) { sh.getRange(fila, 17).setValue(base).setNumberFormat('DD/MM/YYYY'); row[16] = base; }
-  if (!row[15]) {
-    var pp = new Date(base); pp.setDate(pp.getDate() + perfil.diasPlagas);
-    sh.getRange(fila, 16).setValue(pp).setNumberFormat('DD/MM/YYYY'); row[15] = pp;
-  }
-}
-
-function listaCultivos_(items, formato) { return items.map(formato).join('\n'); }
-
-// Eventos de la huerta para el evento único diario (área "huerta").
-function verificarEventosHuerta() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var shP = ss.getSheetByName(CFG_PLANTAS.sheetPlantas);
-  if (!shP || shP.getLastRow() < 2) return [];
-
-  var hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-  var mes = hoy.getMonth() + 1;
-  var esVerano = CFG_PLANTAS.mesesVerano.indexOf(mes) >= 0;
-  var datos = shP.getDataRange().getValues().slice(1);
-  var g = { riego: [], trasplante: [], cosecha: [], fertilizar: [], plagas: [] };
-
-  datos.forEach(function (p) {
-    if (!p[0] || !p[1] || !esHuertaFila_(p) || huertaCerradaFila_(p)) return;
-    var nombre = p[1];
-    var perfil = perfilHuertaFila_(p);
-    var siembra = p[4] ? new Date(p[4]) : null;
-    if (siembra && !isNaN(siembra.getTime())) siembra.setHours(0, 0, 0, 0); else siembra = null;
-    var diasDesdeSiembra = siembra ? Math.floor((hoy - siembra) / 86400000) : null;
-
-    // Riego: la lluvia >= UMBRAL_LLUVIA_MM cuenta como riego.
-    var ultimoRiego = p[16] ? new Date(p[16]) : siembra;
-    if (ultimoRiego && !isNaN(ultimoRiego.getTime())) {
-      var agua = calcularUltimaAguaEfectiva(ultimoRiego, '');
-      if (agua && agua.fecha) {
-        var fechaAgua = new Date(agua.fecha); fechaAgua.setHours(0, 0, 0, 0);
-        var diasSinAgua = Math.floor((hoy - fechaAgua) / 86400000);
-        var limite = esVerano ? perfil.riegoVerano : perfil.riegoInvierno;
-        if (diasSinAgua >= limite) g.riego.push({ nombre: nombre, diasSinAgua: diasSinAgua, limite: limite });
-      }
-    }
-
-    // Fase del cultivo: mismas compuertas que faseCultivo (huerta-catalogo.js).
-    // Perenne o sin diasACosecha: siempre "crecimiento" (ni trasplante ni cosecha).
-    // Con diasATrasplante > 0 y sin trasplante registrado: antes del trasplante
-    // no hay tarea; desde ahí solo "Trasplantar" (la cosecha espera al trasplante).
-    var diasATrasplante = numOVacio_(p[28]);
-    var diasACosecha = numOVacio_(p[29]);
-    var esPerenne = String(p[22]).toLowerCase().trim() === 'perenne';
-    var sinTrasplante = String(p[23]).trim() === '';
-    var conFase = !esPerenne && diasACosecha !== '' && diasDesdeSiembra !== null;
-    var pideTrasplante = conFase && diasATrasplante !== '' && diasATrasplante > 0 && sinTrasplante;
-
-    if (pideTrasplante && diasDesdeSiembra >= diasATrasplante) {
-      g.trasplante.push({ nombre: nombre, dias: diasDesdeSiembra });
-    }
-
-    // Cosecha (solo anuales ya trasplantadas o sin trasplante); se silencia 3 días tras un evento de cosecha.
-    if (conFase && !pideTrasplante && diasDesdeSiembra >= diasACosecha) {
-      var ultCosecha = obtenerUltimoEventoPlanta_(p[0], 'Cosecha');
-      var silenciada = false;
-      if (ultCosecha) {
-        var uc = new Date(ultCosecha); uc.setHours(0, 0, 0, 0);
-        silenciada = Math.floor((hoy - uc) / 86400000) < 3;
-      }
-      if (!silenciada) g.cosecha.push({ nombre: nombre, dias: diasDesdeSiembra, total: diasACosecha });
-    }
-
-    // Fertilización y plagas: fechas "Próxima ..." que mantiene actualizarFichaPlantas.
-    // En el almácigo no se fertiliza (aunque la celda traiga una fecha vieja calculada desde la siembra).
-    var proxFert = (p[11] && !esViveroHuertaFila_(p)) ? new Date(p[11]) : null;
-    if (proxFert && !isNaN(proxFert.getTime())) {
-      proxFert.setHours(0, 0, 0, 0);
-      if (Math.floor((proxFert - hoy) / 86400000) <= 0) g.fertilizar.push({ nombre: nombre });
-    }
-    var proxPlagas = p[15] ? new Date(p[15]) : null;
-    if (proxPlagas && !isNaN(proxPlagas.getTime())) {
-      proxPlagas.setHours(0, 0, 0, 0);
-      if (Math.floor((proxPlagas - hoy) / 86400000) <= 0) g.plagas.push({ nombre: nombre });
-    }
-  });
-
-  var eventos = [];
-  if (g.riego.length) {
-    eventos.push({
-      titulo: '💧 Regar la huerta · ' + g.riego.length + ' cultivo(s)',
-      desc: listaCultivos_(g.riego, function (x) {
-        return '• ' + x.nombre + ' — ' + x.diasSinAgua + ' días sin agua efectiva (límite ' + x.limite + 'd)';
-      }) + '\n\nAcción: regar hoy temprano a la mañana o al atardecer y registrar el riego (Hoy → ✓).',
-      color: CalendarApp.EventColor.BLUE
-    });
-  }
-  if (g.trasplante.length) {
-    eventos.push({
-      titulo: '🪴 Trasplantar · ' + g.trasplante.length + ' cultivo(s)',
-      desc: listaCultivos_(g.trasplante, function (x) { return '• ' + x.nombre + ' — día ' + x.dias + ' desde la siembra'; }) +
-        '\n\nAcción: pasar al lugar definitivo y registrar el trasplante en la app (Hoy → ✓).',
-      color: CalendarApp.EventColor.ORANGE
-    });
-  }
-  if (g.cosecha.length) {
-    eventos.push({
-      titulo: '🧺 Cosechar · ' + g.cosecha.length + ' cultivo(s)',
-      desc: listaCultivos_(g.cosecha, function (x) { return '• ' + x.nombre + ' — día ' + x.dias + ' de ' + x.total; }) +
-        '\n\nAcción: cosechar y marcar "Cosechado" en la app (o registrar una cosecha parcial).',
-      color: CalendarApp.EventColor.GREEN
-    });
-  }
-  if (g.fertilizar.length) {
-    eventos.push({
-      titulo: '🌿 Fertilizar · ' + g.fertilizar.length + ' cultivo(s)',
-      desc: listaCultivos_(g.fertilizar, function (x) { return '• ' + x.nombre; }) +
-        '\n\nAcción: fertilizar y registrar en la app.',
-      color: CalendarApp.EventColor.GREEN
-    });
-  }
-  if (g.plagas.length) {
-    eventos.push({
-      titulo: '🐛 Revisar plagas · ' + g.plagas.length + ' cultivo(s)',
-      desc: listaCultivos_(g.plagas, function (x) { return '• ' + x.nombre; }) +
-        '\n\nQué revisar: envés de las hojas, brotes tiernos y base de las plantas (pulgones, caracoles, hongos). ' +
-        'La guía de cada cultivo está en la app. Aplicar siempre a la tardecita y confirmar contra la etiqueta del producto.',
-      color: CalendarApp.EventColor.YELLOW
-    });
-  }
-  return eventos;
-}
-
-// Diagnóstico: muestra en el registro lo que se crearía hoy para la huerta, SIN
-// tocar el calendario. Ejecutar desde el editor y mirar Ver → Registros de ejecución.
-function testHuerta() {
-  var eventos = verificarEventosHuerta();
-  Logger.log('Eventos de huerta que se crearían hoy: ' + eventos.length);
-  eventos.forEach(function (ev) { Logger.log('— ' + ev.titulo + '\n' + ev.desc); });
-  var r = armarEventoUnico_(eventos.map(function (ev) { ev.area = 'huerta'; return ev; }));
-  Logger.log('Evento único (solo huerta): ' + (r.tareas ? r.tareas.titulo + '\n' + r.tareas.desc : '(ninguno)'));
 }
