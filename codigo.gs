@@ -1689,16 +1689,65 @@ function agregarEspeciesFaltantes() {
       'Muy tolerante a la sequía — el tronco almacena agua. Mejor pecar de poco riego que de mucho, raíz sensible al encharque.',
       'Fertilizante para cactus/suculentas o balanceado muy diluido',
       '1/4 de dosis, cada 60 días — bajo requerimiento', 450],
+    ['Helecho de cinta', 'Interior', 3, 6, 30, 9, 4, 10, 'Indirecta media, sin sol directo',
+      'Le gusta el sustrato siempre apenas húmedo y humedad ambiente alta. Puntas marrones = aire seco o riego irregular.',
+      'Fertilizante líquido balanceado para plantas de hoja',
+      'A 1/4–1/2 de la dosis, cada 30 días en temporada (sensible a las sales)', 240],
+    ['Helecho Hawaii', 'Interior', 4, 7, 30, 9, 4, 10, 'Indirecta media, sin sol directo',
+      'Mantener el sustrato levemente húmedo sin encharcar; agradece humedad ambiente.',
+      'Fertilizante líquido balanceado para plantas de hoja',
+      'A 1/4–1/2 de la dosis, cada 30 días en temporada', 240],
+    ['Helecho Davana', 'Interior', 5, 9, 30, 9, 4, 10, 'Indirecta brillante, sin sol directo',
+      'De rizoma (patas peludas): dejar los rizomas a la vista y regar cuando la superficie empieza a secarse. Tolera algo más de sequedad que otros helechos.',
+      'Fertilizante líquido balanceado para plantas de hoja',
+      'A 1/4–1/2 de la dosis, cada 30 días en temporada', 300],
+    ['Helecho estrella azul', 'Interior', 6, 10, 45, 9, 4, 10, 'Indirecta brillante',
+      'El más tolerante a la sequía de los helechos: dejar secar apenas la superficie entre riegos. Hojas azuladas; rizomas superficiales.',
+      'Fertilizante líquido balanceado para plantas de hoja',
+      'A 1/2 de la dosis, cada 45 días en temporada', 300],
+    ['Helecho espárrago', 'Interior', 5, 9, 45, 9, 4, 5, 'Luz brillante o media sombra, sin sol fuerte de tarde',
+      'Está en la galería exterior pero se trata como de interior: no se cuenta la lluvia ni se avisa helada de exterior. Las raíces tuberosas guardan agua: regar cuando la superficie seca, evitar encharque. Protegerla si baja de ~5°C.',
+      'Fertilizante líquido balanceado',
+      'A 1/2 de la dosis, cada 45 días en temporada', 365],
+    ['Dracena marginata', 'Interior', 10, 16, 45, 9, 4, 10, 'Indirecta brillante, tolera algo de sol suave',
+      'Regar cuando los 3-5 cm superiores estén secos; el exceso de agua pudre la raíz. Sensible al flúor/cloro (puntas marrones): usar agua reposada.',
+      'Fertilizante líquido balanceado para plantas de hoja',
+      'A 1/2 de la dosis, cada 45 días en temporada', 365],
+    ['Philodendron imperial red', 'Interior', 7, 11, 30, 9, 4, 15, 'Indirecta brillante, sin sol directo',
+      'Sustrato aireado, regar cuando la superficie seca. Sensible al frío (hojas oscuras/negras por debajo de ~15°C).',
+      'Fertilizante líquido para plantas de hoja',
+      'A 1/2 de la dosis, cada 30 días en temporada', 240],
+    ['Falsa aralia', 'Interior', 6, 10, 30, 9, 4, 15, 'Indirecta brillante',
+      'No tolera que se seque del todo ni el encharque: sustrato apenas húmedo. Pierde hojas con cambios bruscos de lugar, frío o corrientes.',
+      'Fertilizante líquido balanceado para plantas de hoja',
+      'A 1/2 de la dosis, cada 30 días en temporada', 240],
   ];
 
   var agregadas = 0;
   nuevas.forEach(function (fila) {
-    if (perfilEspecie(fila[0])) {
-      Logger.log('[SKIP] "' + fila[0] + '" ya matchea con una fila existente en Especies');
+    // Exacto por nombre (no perfilEspecie): "Helecho Hawaii" matchea con el "Helecho" genérico,
+    // pero es una especie distinta y necesita su propia fila.
+    var existentes = sh.getRange(1, 1, sh.getLastRow(), 1).getValues();
+    var yaEsta = false, filaGenerico = -1;
+    for (var k = 1; k < existentes.length; k++) {
+      var nombreFila = String(existentes[k][0] || '').toLowerCase().trim();
+      if (nombreFila === String(fila[0]).toLowerCase()) yaEsta = true;
+      if (nombreFila === 'helecho' && filaGenerico < 0) filaGenerico = k + 1;
+    }
+    if (yaEsta) {
+      Logger.log('[SKIP] "' + fila[0] + '" ya existe en Especies');
       return;
     }
-    sh.appendRow(fila);
-    var filaNum = sh.getLastRow();
+    // perfilEspecie devuelve la PRIMERA fila que matchea: los helechos específicos van
+    // antes del "Helecho" genérico para que no los tape.
+    var antesDelGenerico = filaGenerico > 0 && String(fila[0]).toLowerCase().indexOf('helecho') === 0;
+    if (antesDelGenerico) {
+      sh.insertRowBefore(filaGenerico);
+      sh.getRange(filaGenerico, 1, 1, fila.length).setValues([fila]);
+    } else {
+      sh.appendRow(fila);
+    }
+    var filaNum = antesDelGenerico ? filaGenerico : sh.getLastRow();
     sh.getRange(filaNum, 1, 1, fila.length).setFontFamily('Arial').setFontSize(9)
       .setVerticalAlignment('middle').setHorizontalAlignment('center');
     sh.getRange(filaNum, 1).setFontWeight('bold').setHorizontalAlignment('left');
@@ -2431,6 +2480,144 @@ function altaPotusId12() {
     Logger.log('[WARN] No se encontró el perfil "Potus" en la hoja Especies — va a usar los ' +
       'valores genéricos de cítricos, que no son los correctos para esta planta. Revisá la hoja Especies.');
   }
+}
+
+// ====================================================================
+//  ALTA DE 8 PLANTAS NUEVAS (7 de interior + helecho espárrago de la
+//  galería, que se trata como de interior).
+//  Ejecutar UNA vez desde el editor. Es segura de repetir: si ya existe
+//  una planta con el mismo nombre en la hoja Plantas, la saltea.
+//
+//  Qué hace: agrega sus perfiles a la hoja Especies (agregarEspeciesFaltantes),
+//  crea las fichas con ID nuevo, deja cargado un riego "hoy" (tanto en la
+//  ficha como en Registro Plantas — es un SUPUESTO: si las regaste otro
+//  día, corregilo desde la app), recalcula la ficha y sincroniza a Firestore.
+// ====================================================================
+function altaPlantasInterior2() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var shP = ss.getSheetByName(CFG_PLANTAS.sheetPlantas);
+  var shR = ss.getSheetByName(CFG_PLANTAS.sheetRegistro);
+  if (!shP || !shR) { Logger.log('[ERROR] Faltan hojas Plantas/Registro Plantas'); return; }
+
+  // Primero los perfiles: así perfilEspecie() ya encuentra cada planta con sus valores.
+  agregarEspeciesFaltantes();
+
+  var plantas = [
+    { nombre: 'Helecho de cinta',            ubic: 'Interior' },
+    { nombre: 'Helecho Hawaii',              ubic: 'Interior' },
+    { nombre: 'Helecho Davana',              ubic: 'Interior' },
+    { nombre: 'Helecho estrella azul',       ubic: 'Interior' },
+    { nombre: 'Dracena marginata tricolor',  ubic: 'Interior' },
+    { nombre: 'Philodendron imperial red',   ubic: 'Interior' },
+    { nombre: 'Falsa aralia',                ubic: 'Interior' },
+    { nombre: 'Helecho espárrago',           ubic: 'Galería (exterior)' }
+  ];
+
+  var datos = shP.getDataRange().getValues();
+  var maxId = 19;                       // piso: los IDs 13-19 estuvieron en uso (no se reutilizan)
+  var nombresExistentes = {};
+  for (var i = 1; i < datos.length; i++) {
+    var n = Number(datos[i][0]);
+    if (!isNaN(n) && n > maxId) maxId = n;
+    nombresExistentes[String(datos[i][1] || '').toLowerCase().trim()] = true;
+  }
+
+  var hoy = new Date();
+  var altas = 0;
+  plantas.forEach(function (pl) {
+    if (nombresExistentes[pl.nombre.toLowerCase()]) {
+      Logger.log('[SKIP] "' + pl.nombre + '" ya existe en Plantas');
+      return;
+    }
+    var id = ++maxId;
+    var perfil = perfilEspecie(pl.nombre);
+    // Próximas fechas como en el alta automática de actualizarFichaPlantas(): sin esto,
+    // la ficha no tendría "Próxima X" hasta el primer registro y el calendario no avisaría.
+    var enDias = function (n) { var d = new Date(hoy); d.setDate(d.getDate() + n); return d; };
+    var proxFert = enDias(perfil ? perfil.diasFert : CFG_PLANTAS.diasFertilizante);
+    var proxPoda = enDias(perfil && perfil.podaDias ? perfil.podaDias : CFG_PLANTAS.diasPoda);
+    var proxPlagas = enDias(CFG_PLANTAS.diasRevisionPlagas);
+    var fila = [
+      id, pl.nombre, '', pl.nombre, hoy,
+      pl.ubic, perfil ? perfil.luz : '', 'Maceta',
+      '', '', '', proxFert, '', proxPoda, hoy, proxPlagas,
+      hoy, '', 'Recién agregada 🌱',
+      'Cargada el ' + Utilities.formatDate(hoy, CFG.tz, 'dd/MM/yyyy') +
+        '. Último riego = el día de la carga (supuesto): corregí fechas desde la app.'
+    ];
+    shP.appendRow(fila);
+    var filaNum = shP.getLastRow();
+    [5, 12, 14, 15, 16, 17].forEach(function (col) { shP.getRange(filaNum, col).setNumberFormat('DD/MM/YYYY'); });
+    shP.getRange(filaNum, 1, 1, 20)
+      .setFontFamily('Arial').setFontSize(9)
+      .setVerticalAlignment('middle').setHorizontalAlignment('center');
+    shP.getRange(filaNum, 2).setFontWeight('bold');
+    shP.getRange(filaNum, 20).setHorizontalAlignment('left');
+    shP.setRowHeight(filaNum, 22);
+    colorearEstadoPlanta(shP, filaNum, 'Recién agregada');
+
+    shR.appendRow([id, pl.nombre, hoy, '💧 Riego', 'Riego al agregar la planta', '', '', '', '', '']);
+    var filaR = shR.getLastRow();
+    shR.getRange(filaR, 3).setNumberFormat('DD/MM/YYYY');
+    shR.getRange(filaR, 1, 1, 10)
+      .setFontFamily('Arial').setFontSize(9)
+      .setVerticalAlignment('middle').setHorizontalAlignment('center');
+    shR.getRange(filaR, 5).setHorizontalAlignment('left');
+    shR.getRange(filaR, 10).setHorizontalAlignment('left');
+    shR.setRowHeight(filaR, 20);
+
+    Logger.log('[OK] ' + pl.nombre + ' (ID ' + id + ') — ' +
+      (perfil ? 'riego cada ' + perfil.riegoVerano + 'd verano / ' + perfil.riegoInvierno + 'd invierno, fertilizar cada ' + perfil.diasFert + 'd'
+              : '[WARN] sin perfil en Especies'));
+    altas++;
+  });
+
+  actualizarFichaPlantas();
+  sincronizarPlantasAFirestore();
+  Logger.log('[OK] ' + altas + ' planta(s) nueva(s). Ya figuran en la app y en el calendario.');
+}
+
+// ====================================================================
+//  QUITAR LA HUERTA de la hoja. Ejecutar UNA vez, ANTES de borrar los
+//  cultivos de Firestore (si no, el sync diario Sheet → Firestore los
+//  resucitaría): borra de "Plantas" las filas con categoría "huerta"
+//  (col. U), de "Registro Plantas" todos sus eventos, y vacía las
+//  columnas U:AF que usaba la huerta. Deja en el registro de ejecución
+//  lo que borró, por si hay que recuperarlo.
+// ====================================================================
+function quitarHuertaSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var shP = ss.getSheetByName(CFG_PLANTAS.sheetPlantas);
+  var shR = ss.getSheetByName(CFG_PLANTAS.sheetRegistro);
+  if (!shP) { Logger.log('[ERROR] No existe la hoja Plantas'); return; }
+
+  var ids = {};
+  var datos = shP.getDataRange().getValues();
+  for (var i = datos.length - 1; i >= 1; i--) {
+    if (String(datos[i][20] || '').toLowerCase().trim() !== 'huerta') continue;
+    ids[String(datos[i][0]).trim()] = true;
+    Logger.log('[BORRADA planta] fila ' + (i + 1) + ': ' + JSON.stringify(datos[i].slice(0, 20)));
+    shP.deleteRow(i + 1);
+  }
+
+  var eventos = 0;
+  if (shR && shR.getLastRow() > 1) {
+    var reg = shR.getDataRange().getValues();
+    for (var j = reg.length - 1; j >= 1; j--) {
+      if (!ids[String(reg[j][0]).trim()]) continue;
+      Logger.log('[BORRADO evento] fila ' + (j + 1) + ': ' + JSON.stringify(reg[j].slice(0, 6)));
+      shR.deleteRow(j + 1);
+      eventos++;
+    }
+  }
+
+  if (shP.getMaxColumns() >= 21) {
+    var cols = Math.min(12, shP.getMaxColumns() - 20);
+    shP.getRange(1, 21, shP.getMaxRows(), cols).clearContent();
+  }
+
+  Logger.log('[OK] Huerta quitada: ' + Object.keys(ids).length + ' cultivo(s) y ' + eventos +
+    ' evento(s) borrados (IDs: ' + Object.keys(ids).join(', ') + ').');
 }
 
 // ====================================================================

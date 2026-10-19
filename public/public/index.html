@@ -992,11 +992,21 @@ const CFG_PLA = { diasSinRiegoVerano:7, diasSinRiegoInvierno:14, diasFert:60, di
 const ESPECIES = [
   { especie:'Monstera',          tipo:'Interior', riegoVerano:8,  riegoInvierno:12, diasFert:30, fertMesIni:9, fertMesFin:4, tempMin:12, podaDias:150 },
   { especie:'Palo de agua',      tipo:'Interior', riegoVerano:10, riegoInvierno:14, diasFert:60, fertMesIni:9, fertMesFin:4, tempMin:15, podaDias:240 },
+  // Específicos antes del genérico 'Helecho': perfilEspecie devuelve el primero que matchea.
+  { especie:'Helecho de cinta',      tipo:'Interior', riegoVerano:3,  riegoInvierno:6,  diasFert:30, fertMesIni:9, fertMesFin:4, tempMin:10, podaDias:240 },
+  { especie:'Helecho Hawaii',        tipo:'Interior', riegoVerano:4,  riegoInvierno:7,  diasFert:30, fertMesIni:9, fertMesFin:4, tempMin:10, podaDias:240 },
+  { especie:'Helecho Davana',        tipo:'Interior', riegoVerano:5,  riegoInvierno:9,  diasFert:30, fertMesIni:9, fertMesFin:4, tempMin:10, podaDias:300 },
+  { especie:'Helecho estrella azul', tipo:'Interior', riegoVerano:6,  riegoInvierno:10, diasFert:45, fertMesIni:9, fertMesFin:4, tempMin:10, podaDias:300 },
+  // Galería exterior, pero se trata como de interior: no cuenta lluvia ni helada de exterior.
+  { especie:'Helecho espárrago',     tipo:'Interior', riegoVerano:5,  riegoInvierno:9,  diasFert:45, fertMesIni:9, fertMesFin:4, tempMin:5,  podaDias:365 },
   { especie:'Helecho',           tipo:'Interior', riegoVerano:3,  riegoInvierno:5,  diasFert:30, fertMesIni:9, fertMesFin:4, tempMin:15, podaDias:240 },
   { especie:'Pilea',             tipo:'Interior', riegoVerano:7,  riegoInvierno:10, diasFert:30, fertMesIni:9, fertMesFin:4, tempMin:10, podaDias:200 },
   { especie:'Potus',             tipo:'Interior', riegoVerano:8,  riegoInvierno:12, diasFert:45, fertMesIni:9, fertMesFin:4, tempMin:10, podaDias:null },
   { especie:'Planta cebra',      tipo:'Interior', riegoVerano:5,  riegoInvierno:8,  diasFert:30, fertMesIni:9, fertMesFin:4, tempMin:15, podaDias:200 },
   { especie:'Pata de elefante',  tipo:'Interior', riegoVerano:20, riegoInvierno:35, diasFert:60, fertMesIni:9, fertMesFin:4, tempMin:7,  podaDias:450 },
+  { especie:'Dracena marginata',  tipo:'Interior', riegoVerano:10, riegoInvierno:16, diasFert:45, fertMesIni:9, fertMesFin:4, tempMin:10, podaDias:365 },
+  { especie:'Philodendron imperial red', tipo:'Interior', riegoVerano:7, riegoInvierno:11, diasFert:30, fertMesIni:9, fertMesFin:4, tempMin:15, podaDias:240 },
+  { especie:'Falsa aralia',      tipo:'Interior', riegoVerano:6,  riegoInvierno:10, diasFert:30, fertMesIni:9, fertMesFin:4, tempMin:15, podaDias:240 },
 ];
 const perfilEspecie = especie => {
   const buscado = String(especie||'').toLowerCase().trim();
