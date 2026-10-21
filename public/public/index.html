@@ -481,6 +481,13 @@ body.sin-sesion > *:not(#acceso):not(script):not(.toast) { display: none !import
 .acc-ico { font-size: 44px; margin-bottom: 8px; }
 .acc-card h1 { font-family: var(--serif); font-size: 28px; color: var(--ink); margin: 0 0 8px; }
 .acc-card p { color: var(--ink3); font-size: 14px; margin: 0 0 20px; line-height: 1.5; }
+.his-filtros { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.his-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--rule); }
+.his-txt { font-size: 14px; color: var(--ink); line-height: 1.4; min-width: 0; }
+.his-mas, .his-fecha { font-size: 12px; color: var(--ink3); }
+.his-rest { padding: 8px 14px; min-height: 40px; border-radius: var(--r); border: 1px solid var(--sage-mid); background: transparent; color: var(--sage); font-weight: 600; font-size: 13px; cursor: pointer; font-family: var(--sans); flex-shrink: 0; }
+.his-rest:hover { background: var(--sage-bg); }
+.his-vacio { color: var(--ink3); font-size: 14px; padding: 24px 0; text-align: center; }
 .sb-user { padding: 8px 12px; font-size: 12px; color: var(--ink3); }
 .sb-user b { display: block; color: var(--ink); font-weight: 600; }
 </style>
@@ -584,6 +591,19 @@ body.sin-sesion > *:not(#acceso):not(script):not(.toast) { display: none !import
     <div class="pg" id="pg-cli">
       <div class="fetch-bar hide" id="fetch-bar"><i class="ti ti-cloud-download"></i> Actualizando clima desde Open-Meteo...</div>
       <div id="cli-c"></div>
+    </div>
+
+    <!-- HISTORIAL -->
+    <div class="pg" id="pg-his">
+      <div class="his-filtros">
+        <div class="f"><label>Persona</label><select id="his-p" onchange="renderHistorial()"><option value="">Todas</option></select></div>
+        <div class="f"><label>Acción</label><select id="his-a" onchange="renderHistorial()">
+          <option value="">Todas</option><option value="alta">Altas</option><option value="edicion">Ediciones</option>
+          <option value="baja">Borrados</option><option value="restauracion">Restauraciones</option></select></div>
+        <div class="f"><label>Planta o sistema</label><select id="his-r" onchange="renderHistorial()"><option value="">Todos</option></select></div>
+      </div>
+      <div id="his-c" onclick="clickHistorial(event)"></div>
+      <button class="btn-o" id="his-mas" style="display:none;margin-top:10px" onclick="cargarMasHistorial()">Ver más</button>
     </div>
 
     <!-- REGISTRAR -->
@@ -753,7 +773,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/fireba
 import {
   getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, onAuthStateChanged, signOut
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import { esAutorizado, nombreCorto } from './historial.js';
+import { esAutorizado, nombreCorto, agruparEntradas, filtrarEntradas, htmlGrupo, claveGrupo } from './historial.js';
 import { crearEscritor } from './escritor.js';
 import {
   getFirestore, collection, doc,
@@ -2168,7 +2188,7 @@ window.delRev = async (id, e) => {
 // ════ NAVEGACIÓN ════
 let cur = 'hoy';
 const TABS   = ['hoy','comp','pla','cli'];
-const TITLES = {hoy:'Hoy',comp:'Compost',pla:'Plantas',cli:'Clima'};
+const TITLES = {hoy:'Hoy',comp:'Compost',pla:'Plantas',cli:'Clima',his:'Historial'};
 // ids viejos → nueva ubicación (openSis/openPla/etc. todavía los usan)
 const LEGACY = { dash:{tab:'hoy'}, sist:{tab:'comp',seg:'sist'}, rev:{tab:'comp',seg:'rev'}, pec:{tab:'pla',seg:'pec'}, fito:{tab:'pla',seg:'pla'} };
 const renderTab = t => {
@@ -2176,6 +2196,7 @@ const renderTab = t => {
   if (t==='comp') { renderCompostResumen(); renderSist(); renderRev(); }
   if (t==='pla')  { renderPlaResumen(); renderPla(); renderPec(); }
   if (t==='cli')  renderCli();
+  if (t==='his')  renderHistorial();
 };
 window.refresh = () => renderTab(cur);
 window.setSeg = (tab, s) => {
@@ -2194,6 +2215,62 @@ window.go = t => {
   const ttEl = document.getElementById('tb-title'); if (ttEl) ttEl.textContent = TITLES[t] || '';
   if (TABS.includes(t)) { try { localStorage.setItem('compost_tab', t); } catch(e) {} }
   if (seg) setSeg(t, seg); else refresh();
+};
+
+// ════ HISTORIAL ════
+const HIS_PAGINA = 50;
+let hisEntradas = [], hisCursor = null, hisFin = true;
+const hisRefLbl = r => r.tipo === 'planta' ? (S.plantas.find(p => p.id == r.id) ? pLbl(S.plantas.find(p => p.id == r.id)) : 'Planta ' + r.id)
+  : r.tipo === 'sistema' ? (S.sistemas.find(x => x.id == r.id) ? sLbl(S.sistemas.find(x => x.id == r.id)) : 'Sistema ' + r.id) : 'Pecera';
+const llenarSel = (id, primera, opciones) => {
+  const el = document.getElementById(id), previo = el.value;
+  el.innerHTML = `<option value="">${primera}</option>` + opciones.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+  if ([...el.options].some(o => o.value === previo)) el.value = previo;
+};
+window.renderHistorial = () => {
+  const esc = x => String(x).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const personas = new Map(), refs = new Map();
+  hisEntradas.forEach(e => { if (e.by) personas.set(e.by.email, nombreCorto(e.by)); if (e.ref) refs.set(e.ref.tipo + ':' + e.ref.id, hisRefLbl(e.ref)); });
+  llenarSel('his-p', 'Todas', [...personas].map(([v, l]) => [esc(v), esc(l)]));
+  llenarSel('his-r', 'Todos', [...refs].map(([v, l]) => [esc(v), esc(l)]));
+  const rv = document.getElementById('his-r').value;
+  const f = { persona: document.getElementById('his-p').value, accion: document.getElementById('his-a').value };
+  if (rv) { const [tipo, ...id] = rv.split(':'); f.ref = { tipo, id: id.join(':') }; }
+  const grupos = agruparEntradas(filtrarEntradas(hisEntradas, f));
+  document.getElementById('his-c').innerHTML = grupos.length
+    ? grupos.map(g => htmlGrupo(g, { puedeRestaurar: true })).join('')
+    : '<div class="his-vacio">Todavía no hay cambios registrados</div>';
+  document.getElementById('his-mas').style.display = hisFin ? 'none' : '';
+};
+const cargarHistorial = async (mas = false) => {
+  // En ?dry=1 no se lee Firestore; window.__hisDemo permite probar la lista en el navegador.
+  if (!useFirebase || DRY) { hisEntradas = window.__hisDemo || []; renderHistorial(); return; }
+  try {
+    const base = [collection(db, 'historial'), orderBy('_ts', 'desc')];
+    const q = mas && hisCursor ? query(...base, startAfter(hisCursor), limit(HIS_PAGINA)) : query(...base, limit(HIS_PAGINA));
+    const sn = await getDocs(q);
+    const nuevas = sn.docs.map(d => ({ ...d.data(), _id: d.id }));
+    hisEntradas = mas ? hisEntradas.concat(nuevas) : nuevas;
+    if (sn.docs.length) hisCursor = sn.docs[sn.docs.length - 1];
+    hisFin = sn.docs.length < HIS_PAGINA;
+    renderHistorial();
+  } catch (e) { toast('No se pudo cargar el historial'); }
+};
+window.abrirHistorial = () => { go('his'); cargarHistorial(false); };
+window.cargarMasHistorial = () => cargarHistorial(true);
+window.clickHistorial = async ev => {
+  const b = ev.target.closest('[data-restaurar]'); if (!b) return;
+  const clave = b.dataset.restaurar;
+  const g = agruparEntradas(hisEntradas).find(x => claveGrupo(x) === clave); if (!g) return;
+  // Una sola pregunta aunque el grupo tenga varios documentos que pisar.
+  let respuesta = null;
+  const confirmarPisar = async () => respuesta ??= await appConfirm('Hoy ese dato existe con otro valor. ¿Reemplazarlo por la versión anterior?', { title:'Restaurar', okText:'Restaurar', danger:true });
+  let hechas = 0;
+  for (const e of [...g].reverse()) { if ((e.accion === 'baja' || e.accion === 'edicion') && await fbRestaurar(e, { confirmarPisar })) hechas++; }
+  if (!hechas) { toast('No se restauró nada'); return; }
+  await fbLoad(); poblarSels(); refresh();
+  await cargarHistorial(false);
+  toast(hechas > 1 ? `✅ Se restauraron ${hechas} registros` : '✅ Restaurado');
 };
 
 // ════ HOJA DE REGISTRO ════
