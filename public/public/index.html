@@ -754,9 +754,10 @@ import {
   getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, onAuthStateChanged, signOut
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { esAutorizado, nombreCorto } from './historial.js';
+import { crearEscritor } from './escritor.js';
 import {
   getFirestore, collection, doc,
-  setDoc, getDocs, addDoc, deleteDoc,
+  getDoc, getDocs, writeBatch,
   query, orderBy, limit, startAfter, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
@@ -910,14 +911,22 @@ async function autoFetch(force = false) {
   const datos = await fetchClima(subDays(hoy, 35), subDays(hoy, 1));
   if (!datos.length) return false;
   upsertCli(datos); S.climaLastFetch = hoy; sv();
-  if (useFirebase) datos.forEach(c => fbSave('clima', c.id, c).catch(()=>{}));
+  if (useFirebase) datos.forEach(c => fbSave('clima', c.id, c, { sinHistorial:true }).catch(()=>{}));
   return true;
 }
 
 // ════ FIREBASE OPS ════
-const fbSave = async (col, id, data) => { if (DRY) { console.info('[dry] fbSave', col, id); return; } if (!useFirebase) return; try { await setDoc(doc(db,col,String(id)),{...data,_ts:serverTimestamp()}); } catch(e){} };
-const fbAdd  = async (col, data) => { if (DRY) { console.info('[dry] fbAdd', col, data); return null; } if (!useFirebase) return null; try { const r=await addDoc(collection(db,col),{...data,_ts:serverTimestamp()}); return r.id; } catch(e){ return null; } };
-const fbDel  = async (col, id)   => { if (DRY) { console.info('[dry] fbDel', col, id); return; } if (!useFirebase) return; try { await deleteDoc(doc(db,col,String(id))); } catch(e){} };
+// Cada escritura lleva autor (_by) y deja una entrada en la colección `historial`
+// (ver escritor.js). opts: { grupo, sinHistorial }.
+const { fbSave, fbAdd, fbDel, restaurar: fbRestaurar } = crearEscritor({
+  db,
+  sdk: { doc, collection, getDoc, writeBatch, serverTimestamp },
+  getUsuario: () => window.usuarioActual(),
+  ctx: { plantaNombre: id => { const p = S.plantas.find(x => x.id == id); return p ? pLbl(p) : 'planta ' + id; }, sistemaLabel: id => { const x = S.sistemas.find(y => y.id == id); return x ? sLbl(x) : 'Sistema ' + id; } },
+  dry: DRY,
+  habilitado: () => useFirebase,
+  alFallarHistorial: () => toast('Guardado, pero no se pudo registrar en el historial')
+});
 // Al reemplazar una colección con lo que trae Firestore, conserva los registros
 // locales pendientes (_pend + id generado en el dispositivo) que todavía no tienen
 // su par allá: los guardados mientras la consulta estaba en curso o que nunca
@@ -968,7 +977,7 @@ const sheetSync = (tipo, data) => {
   fetch(SHEET_SYNC_URL, {
     method: 'POST', mode: 'no-cors', keepalive: true,
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ tipo, data })
+    body: JSON.stringify({ tipo, data, usuario: (window.usuarioActual() || {}).email || '' })
   }).catch(()=>{});
 };
 
@@ -2058,7 +2067,8 @@ window.delPlanta = async id => {
   const regs = S.registroPlantas.filter(r=>r.planta===id);
   const extra = regs.length ? `\nTambién se borran sus ${regs.length} registro(s) de historial.` : '';
   if(!await appConfirm(`¿Eliminar "${pLbl(p)}"?${extra}\nEsta acción no se puede deshacer.`, {title:'Eliminar planta', okText:'Eliminar', danger:true})) return;
-  await Promise.all([fbDel('plantas', id), ...regs.filter(r=>!ID_LOCAL_PLA(String(r.id))).map(r=>fbDel('registroPlantas', r.id))]);
+  const grupo = 'del-planta-' + id + '-' + Date.now();
+  await Promise.all([fbDel('plantas', id, { grupo }), ...regs.filter(r=>!ID_LOCAL_PLA(String(r.id))).map(r=>fbDel('registroPlantas', r.id, { grupo }))]);
   S.plantas = S.plantas.filter(x=>x.id!==id);
   S.registroPlantas = S.registroPlantas.filter(r=>r.planta!==id);
   sv(); sheetSync('plantaEliminar', {id});

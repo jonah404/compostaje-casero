@@ -63,9 +63,12 @@ export const resumir = ({ accion, col, datos, previo, usuario }, ctx) => {
   return `${n} editó ${obj}` + (campos.length ? ` (${campos.join(', ')})` : '');
 };
 
+// Firestore rechaza `undefined`: si no se sabe a qué planta/sistema pertenece, sin ref.
+const refSegura = r => (r && r.id !== undefined ? r : null);
+
 export const armarEntrada = ({ accion, col, docId, datos, previo, usuario, grupo = null, ahora }, ctx) => ({
   accion, col, docId: String(docId),
-  ref: refDe(col, datos || previo || {}),
+  ref: refSegura(refDe(col, datos || previo || {})),
   resumen: resumir({ accion, col, datos, previo, usuario }, ctx),
   previo: limpiar(previo),
   campos: accion === 'edicion' ? camposCambiados(previo, datos) : [],
