@@ -17,7 +17,7 @@ Abrir la app y probar:
 3. Borrar algo de prueba y tocar **Restaurar**: debe volver, y quedar una entrada "restauró…".
 4. Repetir el ingreso con `mavidiaz092@gmail.com` (en su celular).
 5. Entrar con una tercera cuenta cualquiera: debe mostrar "Sin acceso" y no ver ningún dato.
-6. **Probar el ingreso desde la app instalada (PWA) en cada celular**, no solo desde el navegador: es el caso más delicado en iOS. Después, con sesión iniciada, poner el celular en modo avión y abrir la app: debe abrir igual.
+6. **Probar el ingreso desde la app instalada (PWA) en cada celular**, no solo desde el navegador: es el caso más delicado en iOS. Nota: `authDomain` queda en `compostaje-casero.firebaseapp.com`; ponerlo en `.web.app` da `redirect_uri_mismatch` salvo que se agregue `https://compostaje-casero.web.app/__/auth/handler` a las URIs de redireccionamiento autorizadas del cliente web en Google Cloud → Credenciales. Después, con sesión iniciada, poner el celular en modo avión y abrir la app: debe abrir igual.
 
 Las copias viejas instaladas como app se reemplazan solas: el service worker pasó a `compost-tracker-v6`.
 
