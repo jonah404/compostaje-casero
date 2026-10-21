@@ -94,8 +94,9 @@ export const filtrarEntradas = (entradas, f = {}) => entradas.filter(e =>
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-// Clave con la que la vista pide restaurar un grupo (o una entrada suelta).
-export const claveGrupo = g => g[0].grupo || `${g[0].col}/${g[0].docId}`;
+// Clave con la que la vista pide restaurar un grupo (o una entrada suelta): el id de la entrada
+// de historial, porque varias ediciones del mismo documento comparten col/docId.
+export const claveGrupo = g => g[0].grupo || g[0]._id || `${g[0].col}/${g[0].docId}`;
 
 export const htmlGrupo = (grupo, { puedeRestaurar }) => {
   const e = grupo[0];

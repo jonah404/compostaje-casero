@@ -17,6 +17,7 @@ Abrir la app y probar:
 3. Borrar algo de prueba y tocar **Restaurar**: debe volver, y quedar una entrada "restauró…".
 4. Repetir el ingreso con `mavidiaz092@gmail.com` (en su celular).
 5. Entrar con una tercera cuenta cualquiera: debe mostrar "Sin acceso" y no ver ningún dato.
+6. **Probar el ingreso desde la app instalada (PWA) en cada celular**, no solo desde el navegador: es el caso más delicado en iOS. Después, con sesión iniciada, poner el celular en modo avión y abrir la app: debe abrir igual.
 
 Las copias viejas instaladas como app se reemplazan solas: el service worker pasó a `compost-tracker-v6`.
 
@@ -30,12 +31,13 @@ Cuando las reglas se cierren, los scripts que escriben en Firestore (`sincroniza
    ]
    ```
    Importante: si el manifiesto no tenía `oauthScopes`, agregar también los scopes que el script ya usa (hojas, calendario, conexión externa, etc.) o se perderán. Apps Script los detecta solos cuando el campo no existe.
-3. La cuenta dueña del script necesita un rol de Firestore en el proyecto de Firebase (Consola de Google Cloud → IAM → "Cloud Datastore User" o "Editor" para esa cuenta). Si es `jonahlalvarez@gmail.com` y es propietaria del proyecto, ya lo tiene.
-4. Ejecutar una función cualquiera desde el editor para aceptar los permisos nuevos.
-5. **Columnas nuevas en la Sheet:** el script ahora escribe el correo de quien cargó en estas columnas. Antes de publicar, confirmar que estén libres (hoy no deberían tener nada):
+3. **Proyecto de Google Cloud del script:** Configuración del proyecto → "Proyecto de Google Cloud Platform (GCP)" → Cambiar proyecto → poner el número del proyecto `compostaje-casero` (Consola de Google Cloud → Información del proyecto). Hace falta tener configurada la pantalla de consentimiento OAuth en ese proyecto. Sin este paso, Google rechaza las llamadas con "Cloud Firestore API has not been used in project…". Si no querés cambiar el proyecto del script, la alternativa es una cuenta de servicio (avisame y lo armamos).
+4. La cuenta dueña del script necesita un rol de Firestore en el proyecto de Firebase (Consola de Google Cloud → IAM → "Cloud Datastore User" o "Editor" para esa cuenta). Si es `jonahlalvarez@gmail.com` y es propietaria del proyecto, ya lo tiene.
+5. Ejecutar una función cualquiera desde el editor para aceptar los permisos nuevos.
+6. **Columnas nuevas en la Sheet:** el script ahora escribe el correo de quien cargó en estas columnas. Antes de publicar, confirmar que estén libres (hoy no deberían tener nada):
    - Registro Revolcadas: **F** · Sistemas: **K** (encabezado en la fila 2) · Registro Plantas: **K** · Plantas: **U** ("Editado por") · Pecera: **D** (fila 2) · Registro Pecera: **E**.
-6. Implementar → Administrar implementaciones → editar la implementación existente → nueva versión (la URL de `SHEET_SYNC_URL` no cambia).
-7. Todavía con las reglas abiertas, ejecutar `sincronizarPlantasAFirestore()` y verificar en la consola de Firestore que sigue escribiendo.
+7. Implementar → Administrar implementaciones → editar la implementación existente → nueva versión (la URL de `SHEET_SYNC_URL` no cambia).
+8. Todavía con las reglas abiertas, ejecutar `sincronizarPlantasAFirestore()` y verificar en la consola de Firestore que sigue escribiendo.
 
 ## 4. Verificar el historial
 En Firestore debe existir la colección `historial` con las entradas de las pruebas del paso 2.

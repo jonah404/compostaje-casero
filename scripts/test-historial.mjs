@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {
   CORREOS_AUTORIZADOS, esAutorizado, nombreCorto, refDe, camposCambiados,
-  resumir, armarEntrada, agruparEntradas, filtrarEntradas, htmlGrupo
+  resumir, armarEntrada, agruparEntradas, filtrarEntradas, htmlGrupo, claveGrupo
 } from '../public/public/historial.js';
 
 let ok = 0;
@@ -76,5 +76,11 @@ t('htmlGrupo escapa y controla Restaurar', () => {
   assert.ok(htmlGrupo([base], { puedeRestaurar: true }).includes('data-restaurar'));
   assert.ok(!htmlGrupo([{ ...base, previo: null }], { puedeRestaurar: true }).includes('data-restaurar'));
   assert.ok(!htmlGrupo([{ ...base, accion: 'alta' }], { puedeRestaurar: true }).includes('data-restaurar'));
+});
+t('Restaurar de ediciones sucesivas del mismo documento apunta a cada entrada (por _id)', () => {
+  const mk = (_id, notas) => ({ accion: 'edicion', col: 'sistemas', docId: '2', previo: { id: 2, notas }, _id, resumen: 'x', fechaLocal: '2026-10-21T10:00:00Z', by: maria, grupo: null });
+  const [g1, g2] = agruparEntradas([mk('h2', 'b'), mk('h1', 'a')]);
+  assert.notEqual(claveGrupo(g1), claveGrupo(g2));
+  assert.notEqual(htmlGrupo(g1, { puedeRestaurar: true }), htmlGrupo(g2, { puedeRestaurar: true }));
 });
 console.log(`${ok} ok`);
