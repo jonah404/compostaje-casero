@@ -1351,14 +1351,14 @@ function doPost(e) {
     lock.waitLock(30000);
     conLock = true;
     var body = JSON.parse(e.postData.contents);
-    var tipo = body.tipo, data = body.data;
-    if      (tipo === 'revolcada')     guardarRevolcadaSheet(data);
-    else if (tipo === 'sistema')       guardarSistemaSheet(data);
-    else if (tipo === 'planta')        guardarPlantaSheet(data);
+    var tipo = body.tipo, data = body.data, usuario = body.usuario || '';   // correo de quien cargó (login de la app)
+    if      (tipo === 'revolcada')     guardarRevolcadaSheet(data, usuario);
+    else if (tipo === 'sistema')       guardarSistemaSheet(data, usuario);
+    else if (tipo === 'planta')        guardarPlantaSheet(data, usuario);
     else if (tipo === 'plantaEliminar') eliminarPlantaSheet(data);
-    else if (tipo === 'plantaEvento')  guardarEventoPlantaSheet(data);
-    else if (tipo === 'pecera')        guardarPeceraSheet(data);
-    else if (tipo === 'peceraEvento')  guardarEventoPeceraSheet(data);
+    else if (tipo === 'plantaEvento')  guardarEventoPlantaSheet(data, usuario);
+    else if (tipo === 'pecera')        guardarPeceraSheet(data, usuario);
+    else if (tipo === 'peceraEvento')  guardarEventoPeceraSheet(data, usuario);
     return ContentService.createTextOutput(JSON.stringify({ok:true}))
       .setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
@@ -1383,8 +1383,17 @@ function ultimaFilaConDatos_(sh, col) {
   return 0;
 }
 
+// Escribe el correo de quien hizo el cambio en la columna "Cargado por" de la fila, y deja el
+// encabezado si esa celda estaba vacía. Sin usuario no toca nada.
+function escribirUsuario_(sh, fila, col, usuario, filaEnc) {
+  if (!usuario) return;
+  sh.getRange(fila, col).setValue(usuario);
+  var enc = sh.getRange(filaEnc || 1, col);
+  if (!enc.getValue()) enc.setValue(col === 21 ? 'Editado por' : 'Cargado por');
+}
+
 // ── Revolcada: se agrega siempre como fila nueva al final ──────────
-function guardarRevolcadaSheet(d) {
+function guardarRevolcadaSheet(d, usuario) {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.sheetRevolc);
   if (!sh || !d.sistema || !d.fecha) return;
   var fila = ultimaFilaConDatos_(sh, 1) + 1;                        // ancla en col. A (Sistema #), no en getLastRow()
@@ -1392,12 +1401,13 @@ function guardarRevolcadaSheet(d) {
   var fc = sh.getRange(fila, 2);
   fc.setValue(new Date(d.fecha + 'T12:00:00')).setNumberFormat('DD/MM/YYYY'); // B: Fecha
   if (d.obs) sh.getRange(fila, 5).setValue(d.obs);                  // E: Observaciones
+  escribirUsuario_(sh, fila, 6, usuario);                           // F: Cargado por
   // C (días desde última) y D (¿en tiempo?) se dejan intactas: si son
   // fórmulas que se auto-extienden, se completan solas.
 }
 
 // ── Sistema: actualiza la fila existente del Sistema # (no crea filas) ──
-function guardarSistemaSheet(d) {
+function guardarSistemaSheet(d, usuario) {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.sheetSistemas);
   if (!sh || !d.id) return;
   var datos = sh.getDataRange().getValues();
@@ -1408,6 +1418,7 @@ function guardarSistemaSheet(d) {
     if (d.finC)    sh.getRange(fila,3).setValue(new Date(d.finC+'T12:00:00')).setNumberFormat('DD/MM/YYYY');    // C
     if (d.inicioE) sh.getRange(fila,6).setValue(new Date(d.inicioE+'T12:00:00')).setNumberFormat('DD/MM/YYYY'); // F
     if (d.notas)   sh.getRange(fila,10).setValue(d.notas);          // J
+    escribirUsuario_(sh, fila, 11, usuario, 2);                      // K: Cargado por (encabezado en fila 2)
     return;
   }
 }
@@ -1425,7 +1436,7 @@ function eliminarPlantaSheet(d) {
   }
 }
 
-function guardarPlantaSheet(d) {
+function guardarPlantaSheet(d, usuario) {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG_PLANTAS.sheetPlantas);
   if (!sh || !d.id) return;
   var datos = sh.getDataRange().getValues();
@@ -1443,12 +1454,13 @@ function guardarPlantaSheet(d) {
   sh.getRange(fila, 7).setValue(d.exposicion || '');        // G: Exposición solar
   sh.getRange(fila, 8).setValue(d.suelo || '');             // H: Tipo suelo
   sh.getRange(fila, 20).setValue(d.notas || '');            // T: Notas
+  escribirUsuario_(sh, fila, 21, usuario);                  // U: Editado por
   // Columnas I-S (fertilización, poda, plagas, riego, días) no se tocan:
   // las mantiene actualizarFichaPlantas() con el trigger diario de las 07:00.
 }
 
 // ── Evento de planta: se agrega siempre como fila nueva al final ───
-function guardarEventoPlantaSheet(d) {
+function guardarEventoPlantaSheet(d, usuario) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(CFG_PLANTAS.sheetRegistro);
   if (!sh || !d.planta || !d.fecha) return;
@@ -1470,22 +1482,24 @@ function guardarEventoPlantaSheet(d) {
   sh.getRange(fila, 5).setValue(d.detalle || '');            // E: Detalle
   sh.getRange(fila, 6).setValue(d.producto || '');           // F: Producto / Dosis
   sh.getRange(fila, 10).setValue(d.resultado || '');         // J: Resultado / Observación
+  escribirUsuario_(sh, fila, 11, usuario);                  // K: Cargado por
   // G-I (T° día, lluvia, humedad) se dejan vacías — no son críticas y
   // actualizarFichaPlantas() no las requiere para funcionar.
 }
 
 // ── Pecera: actualiza la fila única de datos (fila 2 de la hoja "Pecera") ──
-function guardarPeceraSheet(d) {
+function guardarPeceraSheet(d, usuario) {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG_PECERA.sheetPecera);
   if (!sh) return;
   if (sh.getLastRow() < 2) sh.appendRow(['', '', '']);
   if (d.litros)         sh.getRange(2, 1).setValue(Number(d.litros));            // A: Litros
   if (d.fechaArmado)    sh.getRange(2, 2).setValue(new Date(d.fechaArmado + 'T12:00:00')).setNumberFormat('DD/MM/YYYY'); // B: Fecha armado
   if (d.notas != null)  sh.getRange(2, 3).setValue(d.notas);                     // C: Notas
+  escribirUsuario_(sh, 2, 4, usuario);                                           // D: Cargado por
 }
 
 // ── Evento de pecera: se agrega siempre como fila nueva al final ───
-function guardarEventoPeceraSheet(d) {
+function guardarEventoPeceraSheet(d, usuario) {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG_PECERA.sheetRegistro);
   if (!sh || !d.fecha || !d.tipo) return;
   var fila = ultimaFilaConDatos_(sh, 1) + 1;                 // ancla en col. A (Fecha), no en getLastRow()
@@ -1493,6 +1507,7 @@ function guardarEventoPeceraSheet(d) {
   sh.getRange(fila, 2).setValue(d.tipo || '');                // B: Tipo evento
   sh.getRange(fila, 3).setValue(d.detalle || '');             // C: Detalle
   sh.getRange(fila, 4).setValue(d.resultado || '');           // D: Resultado / Observación
+  escribirUsuario_(sh, fila, 5, usuario);                     // E: Cargado por
 }
 
 // ====================================================================
@@ -1513,6 +1528,15 @@ function guardarEventoPeceraSheet(d) {
 // ====================================================================
 
 var FIRESTORE_PROJECT_ID = 'compostaje-casero';
+
+// Las reglas de Firestore exigen sesión de una cuenta autorizada: el script llama como la
+// cuenta que lo ejecuta (token OAuth con el scope datastore, ver docs/login-historial-despliegue.md).
+function fsFetch_(url, opciones) {
+  var o = opciones || {};
+  o.headers = o.headers || {};
+  o.headers['Authorization'] = 'Bearer ' + ScriptApp.getOAuthToken();
+  return UrlFetchApp.fetch(url, o);
+}
 
 function sincronizarPlantasAFirestore() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1551,7 +1575,7 @@ function sincronizarPlantasAFirestore() {
     var url = 'https://firestore.googleapis.com/v1/projects/' + FIRESTORE_PROJECT_ID +
       '/databases/(default)/documents/plantas/' + id + '?' + mask;
 
-    var resp = UrlFetchApp.fetch(url, {
+    var resp = fsFetch_(url, {
       method: 'patch',
       contentType: 'application/json',
       payload: JSON.stringify({ fields: campos }),
@@ -2666,7 +2690,7 @@ function sincronizarSistemasAFirestore() {
     var mask = Object.keys(campos).map(function (k) { return 'updateMask.fieldPaths=' + k; }).join('&');
     var url = 'https://firestore.googleapis.com/v1/projects/' + FIRESTORE_PROJECT_ID +
       '/databases/(default)/documents/sistemas/' + id + '?' + mask;
-    var resp = UrlFetchApp.fetch(url, {
+    var resp = fsFetch_(url, {
       method: 'patch', contentType: 'application/json',
       payload: JSON.stringify({ fields: campos }), muteHttpExceptions: true
     });
@@ -2688,7 +2712,7 @@ function sincronizarRevolcadasAFirestore() {
   do {
     var listUrl = 'https://firestore.googleapis.com/v1/projects/' + FIRESTORE_PROJECT_ID +
       '/databases/(default)/documents/revolcadas?pageSize=300' + (pageToken ? '&pageToken=' + pageToken : '');
-    var listResp = UrlFetchApp.fetch(listUrl, { muteHttpExceptions: true });
+    var listResp = fsFetch_(listUrl, { muteHttpExceptions: true });
     var listJson = JSON.parse(listResp.getContentText());
     (listJson.documents || []).forEach(function (doc) {
       var f = doc.fields || {};
@@ -2719,7 +2743,7 @@ function sincronizarRevolcadasAFirestore() {
     var id = 'sh-' + sistema + '-' + fecha;
     var url = 'https://firestore.googleapis.com/v1/projects/' + FIRESTORE_PROJECT_ID +
       '/databases/(default)/documents/revolcadas/' + id;
-    var resp = UrlFetchApp.fetch(url, {
+    var resp = fsFetch_(url, {
       method: 'patch', contentType: 'application/json',
       payload: JSON.stringify({ fields: campos }), muteHttpExceptions: true
     });
@@ -2774,7 +2798,7 @@ function sincronizarClimaAFirestore() {
     var id = 'c-' + fecha;
     var url = 'https://firestore.googleapis.com/v1/projects/' + FIRESTORE_PROJECT_ID +
       '/databases/(default)/documents/clima/' + id + '?' + mask;
-    var resp = UrlFetchApp.fetch(url, {
+    var resp = fsFetch_(url, {
       method: 'patch', contentType: 'application/json',
       payload: JSON.stringify({ fields: campos }), muteHttpExceptions: true
     });

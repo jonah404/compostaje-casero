@@ -472,9 +472,35 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
 @keyframes shim { to { background-position: -200% 0; } }
 .fold { margin-top: 12px; }
 .fold summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-size: 13px; font-weight: 700; color: var(--ink2); }
+
+/* Acceso (login) */
+body.sin-sesion > *:not(#acceso):not(script):not(.toast) { display: none !important; }
+#acceso { position: fixed; inset: 0; z-index: 9999; background: var(--cream); display: flex; align-items: center; justify-content: center; padding: 24px; }
+#acceso.hide { display: none; }
+.acc-card { max-width: 360px; width: 100%; text-align: center; }
+.acc-ico { font-size: 44px; margin-bottom: 8px; }
+.acc-card h1 { font-family: var(--serif); font-size: 28px; color: var(--ink); margin: 0 0 8px; }
+.acc-card p { color: var(--ink3); font-size: 14px; margin: 0 0 20px; line-height: 1.5; }
+.his-filtros { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.his-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--rule); }
+.his-txt { font-size: 14px; color: var(--ink); line-height: 1.4; min-width: 0; }
+.his-mas, .his-fecha { font-size: 12px; color: var(--ink3); }
+.his-rest { padding: 8px 14px; min-height: 40px; border-radius: var(--r); border: 1px solid var(--sage-mid); background: transparent; color: var(--sage); font-weight: 600; font-size: 13px; cursor: pointer; font-family: var(--sans); flex-shrink: 0; }
+.his-rest:hover { background: var(--sage-bg); }
+.his-vacio { color: var(--ink3); font-size: 14px; padding: 24px 0; text-align: center; }
+.sb-user { padding: 8px 12px; font-size: 12px; color: var(--ink3); }
+.sb-user b { display: block; color: var(--ink); font-weight: 600; }
 </style>
 </head>
-<body>
+<body class="sin-sesion">
+<div id="acceso">
+  <div class="acc-card">
+    <div class="acc-ico">🌿</div>
+    <h1 id="acc-t">Compost</h1>
+    <p id="acc-p">Entrá con tu cuenta de Google para ver y registrar los cambios.</p>
+    <button class="btn-g" id="acc-btn" onclick="entrarConGoogle()">Entrar con Google</button>
+  </div>
+</div>
 <div class="layout">
 
 <!-- ═══ SIDEBAR ═══ -->
@@ -496,6 +522,9 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
     <button class="sn"    data-tab="cli"  onclick="go('cli')"><i class="ti ti-cloud"></i>Clima</button>
   </nav>
   <div class="sb-foot">
+    <div class="sb-user"><b id="sb-user-n"></b><span id="sb-user-e"></span></div>
+    <button class="sync-side" onclick="abrirHistorial()"><i class="ti ti-history"></i> Historial</button>
+    <button class="sync-side" onclick="salir()"><i class="ti ti-logout"></i> Salir</button>
     <button class="sync-side" onclick="doSync()">
       <i class="ti ti-refresh" id="sync-i-side"></i> Sincronizar
     </button>
@@ -513,6 +542,8 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
       <div class="mob-icon">🌿</div>
       <div class="mob-title">Compost</div>
     </div>
+    <button class="mob-sync" onclick="abrirHistorial()" aria-label="Historial"><i class="ti ti-history"></i></button>
+    <button class="mob-sync" onclick="salir()" aria-label="Salir"><i class="ti ti-logout"></i></button>
     <button class="mob-sync" onclick="doSync()"><i class="ti ti-refresh" id="sync-i-mob"></i></button>
   </div>
 
@@ -560,6 +591,19 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
     <div class="pg" id="pg-cli">
       <div class="fetch-bar hide" id="fetch-bar"><i class="ti ti-cloud-download"></i> Actualizando clima desde Open-Meteo...</div>
       <div id="cli-c"></div>
+    </div>
+
+    <!-- HISTORIAL -->
+    <div class="pg" id="pg-his">
+      <div class="his-filtros">
+        <div class="f"><label>Persona</label><select id="his-p" onchange="renderHistorial()"><option value="">Todas</option></select></div>
+        <div class="f"><label>Acción</label><select id="his-a" onchange="renderHistorial()">
+          <option value="">Todas</option><option value="alta">Altas</option><option value="edicion">Ediciones</option>
+          <option value="baja">Borrados</option><option value="restauracion">Restauraciones</option></select></div>
+        <div class="f"><label>Planta o sistema</label><select id="his-r" onchange="renderHistorial()"><option value="">Todos</option></select></div>
+      </div>
+      <div id="his-c" onclick="clickHistorial(event)"></div>
+      <button class="btn-o" id="his-mas" style="display:none;margin-top:10px" onclick="cargarMasHistorial()">Ver más</button>
     </div>
 
     <!-- REGISTRAR -->
@@ -727,15 +771,21 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import {
+  getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, onAuthStateChanged, signOut
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { esAutorizado, nombreCorto, agruparEntradas, filtrarEntradas, htmlGrupo, claveGrupo } from './historial.js';
+import { crearEscritor } from './escritor.js';
+import {
   getFirestore, collection, doc,
-  setDoc, getDocs, addDoc, deleteDoc,
+  getDoc, getDocs, writeBatch,
   query, orderBy, limit, startAfter, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // ════ FIREBASE CONFIG ════
 const firebaseConfig = {
   apiKey: "AIzaSyCjlf3MS68H4lCSZbeWpdvCvv8tZjnm2cE",
-  authDomain: "compostaje-casero.firebaseapp.com",
+  // En *.web.app el login por redirección solo anda si authDomain es el mismo host (Safari/iOS).
+  authDomain: location.hostname.endsWith('.web.app') ? location.hostname : "compostaje-casero.firebaseapp.com",
   projectId: "compostaje-casero",
   storageBucket: "compostaje-casero.firebasestorage.app",
   messagingSenderId: "570860670823",
@@ -748,10 +798,11 @@ const CLIMA_DIAS_INICIAL = 14;    // filas que muestra el historial hasta tocar 
 // ?dry=1 → las funciones de escritura (Firestore/Sheet) solo loguean; sirve para
 // probar la UI en el navegador sin tocar datos reales.
 const DRY = new URLSearchParams(location.search).has('dry');
-let db, useFirebase = false;
+let db, auth, useFirebase = false;
 try {
   const a = initializeApp(firebaseConfig);
   db = getFirestore(a);
+  auth = getAuth(a);
   if (!firebaseConfig.apiKey.includes('TU_')) useFirebase = true;
 } catch(e) {}
 
@@ -881,14 +932,22 @@ async function autoFetch(force = false) {
   const datos = await fetchClima(subDays(hoy, 35), subDays(hoy, 1));
   if (!datos.length) return false;
   upsertCli(datos); S.climaLastFetch = hoy; sv();
-  if (useFirebase) datos.forEach(c => fbSave('clima', c.id, c).catch(()=>{}));
+  if (useFirebase) datos.forEach(c => fbSave('clima', c.id, c, { sinHistorial:true }).catch(()=>{}));
   return true;
 }
 
 // ════ FIREBASE OPS ════
-const fbSave = async (col, id, data) => { if (DRY) { console.info('[dry] fbSave', col, id); return; } if (!useFirebase) return; try { await setDoc(doc(db,col,String(id)),{...data,_ts:serverTimestamp()}); } catch(e){} };
-const fbAdd  = async (col, data) => { if (DRY) { console.info('[dry] fbAdd', col, data); return null; } if (!useFirebase) return null; try { const r=await addDoc(collection(db,col),{...data,_ts:serverTimestamp()}); return r.id; } catch(e){ return null; } };
-const fbDel  = async (col, id)   => { if (DRY) { console.info('[dry] fbDel', col, id); return; } if (!useFirebase) return; try { await deleteDoc(doc(db,col,String(id))); } catch(e){} };
+// Cada escritura lleva autor (_by) y deja una entrada en la colección `historial`
+// (ver escritor.js). opts: { grupo, sinHistorial }.
+const { fbSave, fbAdd, fbDel, restaurar: fbRestaurar } = crearEscritor({
+  db,
+  sdk: { doc, collection, getDoc, writeBatch, serverTimestamp },
+  getUsuario: () => window.usuarioActual(),
+  ctx: { plantaNombre: id => { const p = S.plantas.find(x => x.id == id); return p ? pLbl(p) : 'planta ' + id; }, sistemaLabel: id => { const x = S.sistemas.find(y => y.id == id); return x ? sLbl(x) : 'Sistema ' + id; } },
+  dry: DRY,
+  habilitado: () => useFirebase,
+  alFallarHistorial: () => toast('Guardado, pero no se pudo registrar en el historial')
+});
 // Al reemplazar una colección con lo que trae Firestore, conserva los registros
 // locales pendientes (_pend + id generado en el dispositivo) que todavía no tienen
 // su par allá: los guardados mientras la consulta estaba en curso o que nunca
@@ -939,7 +998,7 @@ const sheetSync = (tipo, data) => {
   fetch(SHEET_SYNC_URL, {
     method: 'POST', mode: 'no-cors', keepalive: true,
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ tipo, data })
+    body: JSON.stringify({ tipo, data, usuario: (window.usuarioActual() || {}).email || '' })
   }).catch(()=>{});
 };
 
@@ -2029,7 +2088,8 @@ window.delPlanta = async id => {
   const regs = S.registroPlantas.filter(r=>r.planta===id);
   const extra = regs.length ? `\nTambién se borran sus ${regs.length} registro(s) de historial.` : '';
   if(!await appConfirm(`¿Eliminar "${pLbl(p)}"?${extra}\nEsta acción no se puede deshacer.`, {title:'Eliminar planta', okText:'Eliminar', danger:true})) return;
-  await Promise.all([fbDel('plantas', id), ...regs.filter(r=>!ID_LOCAL_PLA(String(r.id))).map(r=>fbDel('registroPlantas', r.id))]);
+  const grupo = 'del-planta-' + id + '-' + Date.now();
+  await Promise.all([fbDel('plantas', id, { grupo }), ...regs.filter(r=>!ID_LOCAL_PLA(String(r.id))).map(r=>fbDel('registroPlantas', r.id, { grupo }))]);
   S.plantas = S.plantas.filter(x=>x.id!==id);
   S.registroPlantas = S.registroPlantas.filter(r=>r.planta!==id);
   sv(); sheetSync('plantaEliminar', {id});
@@ -2129,7 +2189,7 @@ window.delRev = async (id, e) => {
 // ════ NAVEGACIÓN ════
 let cur = 'hoy';
 const TABS   = ['hoy','comp','pla','cli'];
-const TITLES = {hoy:'Hoy',comp:'Compost',pla:'Plantas',cli:'Clima'};
+const TITLES = {hoy:'Hoy',comp:'Compost',pla:'Plantas',cli:'Clima',his:'Historial'};
 // ids viejos → nueva ubicación (openSis/openPla/etc. todavía los usan)
 const LEGACY = { dash:{tab:'hoy'}, sist:{tab:'comp',seg:'sist'}, rev:{tab:'comp',seg:'rev'}, pec:{tab:'pla',seg:'pec'}, fito:{tab:'pla',seg:'pla'} };
 const renderTab = t => {
@@ -2137,6 +2197,7 @@ const renderTab = t => {
   if (t==='comp') { renderCompostResumen(); renderSist(); renderRev(); }
   if (t==='pla')  { renderPlaResumen(); renderPla(); renderPec(); }
   if (t==='cli')  renderCli();
+  if (t==='his')  renderHistorial();
 };
 window.refresh = () => renderTab(cur);
 window.setSeg = (tab, s) => {
@@ -2155,6 +2216,62 @@ window.go = t => {
   const ttEl = document.getElementById('tb-title'); if (ttEl) ttEl.textContent = TITLES[t] || '';
   if (TABS.includes(t)) { try { localStorage.setItem('compost_tab', t); } catch(e) {} }
   if (seg) setSeg(t, seg); else refresh();
+};
+
+// ════ HISTORIAL ════
+const HIS_PAGINA = 50;
+let hisEntradas = [], hisCursor = null, hisFin = true;
+const hisRefLbl = r => r.tipo === 'planta' ? (S.plantas.find(p => p.id == r.id) ? pLbl(S.plantas.find(p => p.id == r.id)) : 'Planta ' + r.id)
+  : r.tipo === 'sistema' ? (S.sistemas.find(x => x.id == r.id) ? sLbl(S.sistemas.find(x => x.id == r.id)) : 'Sistema ' + r.id) : 'Pecera';
+const llenarSel = (id, primera, opciones) => {
+  const el = document.getElementById(id), previo = el.value;
+  el.innerHTML = `<option value="">${primera}</option>` + opciones.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+  if ([...el.options].some(o => o.value === previo)) el.value = previo;
+};
+window.renderHistorial = () => {
+  const esc = x => String(x).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const personas = new Map(), refs = new Map();
+  hisEntradas.forEach(e => { if (e.by) personas.set(e.by.email, nombreCorto(e.by)); if (e.ref) refs.set(e.ref.tipo + ':' + e.ref.id, hisRefLbl(e.ref)); });
+  llenarSel('his-p', 'Todas', [...personas].map(([v, l]) => [esc(v), esc(l)]));
+  llenarSel('his-r', 'Todos', [...refs].map(([v, l]) => [esc(v), esc(l)]));
+  const rv = document.getElementById('his-r').value;
+  const f = { persona: document.getElementById('his-p').value, accion: document.getElementById('his-a').value };
+  if (rv) { const [tipo, ...id] = rv.split(':'); f.ref = { tipo, id: id.join(':') }; }
+  const grupos = agruparEntradas(filtrarEntradas(hisEntradas, f));
+  document.getElementById('his-c').innerHTML = grupos.length
+    ? grupos.map(g => htmlGrupo(g, { puedeRestaurar: true })).join('')
+    : '<div class="his-vacio">Todavía no hay cambios registrados</div>';
+  document.getElementById('his-mas').style.display = hisFin ? 'none' : '';
+};
+const cargarHistorial = async (mas = false) => {
+  // En ?dry=1 no se lee Firestore; window.__hisDemo permite probar la lista en el navegador.
+  if (!useFirebase || DRY) { hisEntradas = window.__hisDemo || []; renderHistorial(); return; }
+  try {
+    const base = [collection(db, 'historial'), orderBy('_ts', 'desc')];
+    const q = mas && hisCursor ? query(...base, startAfter(hisCursor), limit(HIS_PAGINA)) : query(...base, limit(HIS_PAGINA));
+    const sn = await getDocs(q);
+    const nuevas = sn.docs.map(d => ({ ...d.data(), _id: d.id }));
+    hisEntradas = mas ? hisEntradas.concat(nuevas) : nuevas;
+    if (sn.docs.length) hisCursor = sn.docs[sn.docs.length - 1];
+    hisFin = sn.docs.length < HIS_PAGINA;
+    renderHistorial();
+  } catch (e) { toast('No se pudo cargar el historial'); }
+};
+window.abrirHistorial = () => { go('his'); cargarHistorial(false); };
+window.cargarMasHistorial = () => cargarHistorial(true);
+window.clickHistorial = async ev => {
+  const b = ev.target.closest('[data-restaurar]'); if (!b) return;
+  const clave = b.dataset.restaurar;
+  const g = agruparEntradas(hisEntradas).find(x => claveGrupo(x) === clave); if (!g) return;
+  // Una sola pregunta aunque el grupo tenga varios documentos que pisar.
+  let respuesta = null;
+  const confirmarPisar = async () => respuesta ??= await appConfirm('Hoy ese dato existe con otro valor. ¿Reemplazarlo por la versión anterior?', { title:'Restaurar', okText:'Restaurar', danger:true });
+  let hechas = 0;
+  for (const e of [...g].reverse()) { if ((e.accion === 'baja' || e.accion === 'edicion') && await fbRestaurar(e, { confirmarPisar })) hechas++; }
+  if (!hechas) { toast('No se restauró nada'); return; }
+  await fbLoad(); poblarSels(); refresh();
+  await cargarHistorial(false);
+  toast(hechas > 1 ? `✅ Se restauraron ${hechas} registros` : '✅ Restaurado');
 };
 
 // ════ HOJA DE REGISTRO ════
@@ -2329,7 +2446,63 @@ const init = async () => {
   fbLoad().then(()=>{ poblarSels(); refresh(); });
 };
 
-init();
+// ════ ACCESO (login con Google) ════
+// La app solo arranca con una cuenta autorizada; las reglas de Firestore son el control real,
+// esto evita mostrar datos (ni la copia local) a quien no corresponde.
+window.usuarioActual = () => {
+  if (DRY) return { uid:'dry', email:'dry@local', nombre:'Dry' };
+  const u = auth && auth.currentUser;
+  return u ? { uid:u.uid, email:u.email, nombre:u.displayName || '' } : null;
+};
+let appIniciada = false, rechazado = null;
+const mostrarAcceso = (modo, email) => {
+  document.body.classList.add('sin-sesion');
+  document.getElementById('acceso').classList.remove('hide');
+  const sin = modo === 'sinacceso';
+  document.getElementById('acc-t').textContent = sin ? 'Sin acceso' : 'Compost';
+  document.getElementById('acc-p').textContent = sin
+    ? `La cuenta ${email} no tiene permiso para usar esta app.`
+    : 'Entrá con tu cuenta de Google para ver y registrar los cambios.';
+  document.getElementById('acc-btn').textContent = sin ? 'Probar con otra cuenta' : 'Entrar con Google';
+};
+const arrancar = () => {
+  if (appIniciada) return;
+  appIniciada = true;
+  document.getElementById('acceso').classList.add('hide');
+  document.body.classList.remove('sin-sesion');
+  const u = window.usuarioActual();
+  if (u) { document.getElementById('sb-user-n').textContent = nombreCorto(u); document.getElementById('sb-user-e').textContent = u.email; }
+  init();
+};
+window.entrarConGoogle = async () => {
+  rechazado = null;
+  const prov = new GoogleAuthProvider();
+  prov.setCustomParameters({ prompt:'select_account' });
+  try { await signInWithPopup(auth, prov); }
+  catch (e) {
+    if (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment') {
+      try { await signInWithRedirect(auth, prov); } catch (e2) { toast('No se pudo iniciar sesión'); }
+    } else if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') {
+      toast('No se pudo iniciar sesión: revisá la conexión');
+    }
+  }
+};
+window.salir = async () => {
+  if (!auth) return;
+  try { await signOut(auth); } catch (e) {}
+  location.reload();
+};
+if (DRY || !auth) arrancar();
+else onAuthStateChanged(auth, async user => {
+  if (!user) { mostrarAcceso(rechazado ? 'sinacceso' : 'login', rechazado); return; }
+  if (!esAutorizado(user.email)) {
+    rechazado = user.email;
+    await signOut(auth).catch(()=>{});
+    mostrarAcceso('sinacceso', rechazado);
+    return;
+  }
+  arrancar();
+});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
