@@ -1,0 +1,12 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "Solo pruebas de las reglas de Firestore (la app no tiene build)",
+  "scripts": {
+    "test:reglas": "firebase emulators:exec --config public/firebase.json --only firestore --project compostaje-casero \"node scripts/test-reglas.mjs\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "firebase": "^13.0.0"
+  }
+}
