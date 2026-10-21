@@ -472,9 +472,28 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
 @keyframes shim { to { background-position: -200% 0; } }
 .fold { margin-top: 12px; }
 .fold summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-size: 13px; font-weight: 700; color: var(--ink2); }
+
+/* Acceso (login) */
+body.sin-sesion > *:not(#acceso):not(script):not(.toast) { display: none !important; }
+#acceso { position: fixed; inset: 0; z-index: 9999; background: var(--cream); display: flex; align-items: center; justify-content: center; padding: 24px; }
+#acceso.hide { display: none; }
+.acc-card { max-width: 360px; width: 100%; text-align: center; }
+.acc-ico { font-size: 44px; margin-bottom: 8px; }
+.acc-card h1 { font-family: var(--serif); font-size: 28px; color: var(--ink); margin: 0 0 8px; }
+.acc-card p { color: var(--ink3); font-size: 14px; margin: 0 0 20px; line-height: 1.5; }
+.sb-user { padding: 8px 12px; font-size: 12px; color: var(--ink3); }
+.sb-user b { display: block; color: var(--ink); font-weight: 600; }
 </style>
 </head>
-<body>
+<body class="sin-sesion">
+<div id="acceso">
+  <div class="acc-card">
+    <div class="acc-ico">🌿</div>
+    <h1 id="acc-t">Compost</h1>
+    <p id="acc-p">Entrá con tu cuenta de Google para ver y registrar los cambios.</p>
+    <button class="btn-g" id="acc-btn" onclick="entrarConGoogle()">Entrar con Google</button>
+  </div>
+</div>
 <div class="layout">
 
 <!-- ═══ SIDEBAR ═══ -->
@@ -496,6 +515,9 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
     <button class="sn"    data-tab="cli"  onclick="go('cli')"><i class="ti ti-cloud"></i>Clima</button>
   </nav>
   <div class="sb-foot">
+    <div class="sb-user"><b id="sb-user-n"></b><span id="sb-user-e"></span></div>
+    <button class="sync-side" onclick="abrirHistorial()"><i class="ti ti-history"></i> Historial</button>
+    <button class="sync-side" onclick="salir()"><i class="ti ti-logout"></i> Salir</button>
     <button class="sync-side" onclick="doSync()">
       <i class="ti ti-refresh" id="sync-i-side"></i> Sincronizar
     </button>
@@ -513,6 +535,8 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
       <div class="mob-icon">🌿</div>
       <div class="mob-title">Compost</div>
     </div>
+    <button class="mob-sync" onclick="abrirHistorial()" aria-label="Historial"><i class="ti ti-history"></i></button>
+    <button class="mob-sync" onclick="salir()" aria-label="Salir"><i class="ti ti-logout"></i></button>
     <button class="mob-sync" onclick="doSync()"><i class="ti ti-refresh" id="sync-i-mob"></i></button>
   </div>
 
@@ -727,6 +751,10 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import {
+  getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, onAuthStateChanged, signOut
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { esAutorizado, nombreCorto } from './historial.js';
+import {
   getFirestore, collection, doc,
   setDoc, getDocs, addDoc, deleteDoc,
   query, orderBy, limit, startAfter, serverTimestamp
@@ -748,10 +776,11 @@ const CLIMA_DIAS_INICIAL = 14;    // filas que muestra el historial hasta tocar 
 // ?dry=1 → las funciones de escritura (Firestore/Sheet) solo loguean; sirve para
 // probar la UI en el navegador sin tocar datos reales.
 const DRY = new URLSearchParams(location.search).has('dry');
-let db, useFirebase = false;
+let db, auth, useFirebase = false;
 try {
   const a = initializeApp(firebaseConfig);
   db = getFirestore(a);
+  auth = getAuth(a);
   if (!firebaseConfig.apiKey.includes('TU_')) useFirebase = true;
 } catch(e) {}
 
@@ -2329,7 +2358,63 @@ const init = async () => {
   fbLoad().then(()=>{ poblarSels(); refresh(); });
 };
 
-init();
+// ════ ACCESO (login con Google) ════
+// La app solo arranca con una cuenta autorizada; las reglas de Firestore son el control real,
+// esto evita mostrar datos (ni la copia local) a quien no corresponde.
+window.usuarioActual = () => {
+  if (DRY) return { uid:'dry', email:'dry@local', nombre:'Dry' };
+  const u = auth && auth.currentUser;
+  return u ? { uid:u.uid, email:u.email, nombre:u.displayName || '' } : null;
+};
+let appIniciada = false, rechazado = null;
+const mostrarAcceso = (modo, email) => {
+  document.body.classList.add('sin-sesion');
+  document.getElementById('acceso').classList.remove('hide');
+  const sin = modo === 'sinacceso';
+  document.getElementById('acc-t').textContent = sin ? 'Sin acceso' : 'Compost';
+  document.getElementById('acc-p').textContent = sin
+    ? `La cuenta ${email} no tiene permiso para usar esta app.`
+    : 'Entrá con tu cuenta de Google para ver y registrar los cambios.';
+  document.getElementById('acc-btn').textContent = sin ? 'Probar con otra cuenta' : 'Entrar con Google';
+};
+const arrancar = () => {
+  if (appIniciada) return;
+  appIniciada = true;
+  document.getElementById('acceso').classList.add('hide');
+  document.body.classList.remove('sin-sesion');
+  const u = window.usuarioActual();
+  if (u) { document.getElementById('sb-user-n').textContent = nombreCorto(u); document.getElementById('sb-user-e').textContent = u.email; }
+  init();
+};
+window.entrarConGoogle = async () => {
+  rechazado = null;
+  const prov = new GoogleAuthProvider();
+  prov.setCustomParameters({ prompt:'select_account' });
+  try { await signInWithPopup(auth, prov); }
+  catch (e) {
+    if (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment') {
+      try { await signInWithRedirect(auth, prov); } catch (e2) { toast('No se pudo iniciar sesión'); }
+    } else if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') {
+      toast('No se pudo iniciar sesión: revisá la conexión');
+    }
+  }
+};
+window.salir = async () => {
+  if (!auth) return;
+  try { await signOut(auth); } catch (e) {}
+  location.reload();
+};
+if (DRY || !auth) arrancar();
+else onAuthStateChanged(auth, async user => {
+  if (!user) { mostrarAcceso(rechazado ? 'sinacceso' : 'login', rechazado); return; }
+  if (!esAutorizado(user.email)) {
+    rechazado = user.email;
+    await signOut(auth).catch(()=>{});
+    mostrarAcceso('sinacceso', rechazado);
+    return;
+  }
+  arrancar();
+});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
