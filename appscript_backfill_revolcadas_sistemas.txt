@@ -1,0 +1,134 @@
+// ====================================================================
+//  BACKFILL: trae a Firestore lo que está en la Sheet pero nunca se
+//  sincronizó — específicamente las revolcadas viejas (desde el
+//  05/05/2026) que cargaste directo en "Registro Revolcadas" antes
+//  de que existiera la app, y por las dudas también "Sistemas".
+//
+//  POR QUÉ PASÓ: hasta ahora solo existía sincronizarPlantasAFirestore()
+//  (Sheet → Firestore para Plantas). Para Sistemas y Revolcadas nunca
+//  hubo un sync en esa dirección — la app solo veía lo que vos mismo
+//  cargabas DESDE la app. Todo lo que ya estaba en la Sheet de antes
+//  (o lo que cargues ahí directo en el futuro) se quedaba afuera.
+//
+//  CÓMO INSTALARLO:
+//  1. Pegar todo este bloque al final del script.
+//  2. Ejecutar sincronizarSistemasAFirestore() una vez.
+//  3. Ejecutar sincronizarRevolcadasAFirestore() una vez — esta es la
+//     que trae las revolcadas viejas. Es segura para correr más de
+//     una vez: antes de crear algo, revisa qué ya existe en Firestore
+//     (por sistema+fecha) y no duplica nada.
+//  4. Si querés que esto se mantenga sincronizado solo de acá en
+//     adelante (por si seguís cargando cosas directo en la Sheet),
+//     ejecutar agregarTriggersSincroTodo() una vez — agrega los
+//     triggers diarios que falten, sin duplicar los que ya tenías.
+// ====================================================================
+
+function sincronizarSistemasAFirestore() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(CFG.sheetSistemas);
+  if (!sh || sh.getLastRow() < 3) { Logger.log('[WARN] Sin datos en Sistemas'); return; }
+
+  var datos = sh.getDataRange().getValues().slice(2);
+  var enviados = 0;
+  datos.forEach(function (row) {
+    var id = row[0];
+    if (!id || isNaN(Number(id))) return;
+
+    var campos = {
+      id: { integerValue: Number(id) },
+      inicioC: { stringValue: fechaISO_(row[1]) },
+      finC: { stringValue: fechaISO_(row[2]) },
+      inicioE: { stringValue: fechaISO_(row[5]) },
+      notas: { stringValue: String(row[9] || '') },
+    };
+    var mask = Object.keys(campos).map(function (k) { return 'updateMask.fieldPaths=' + k; }).join('&');
+    var url = 'https://firestore.googleapis.com/v1/projects/' + FIRESTORE_PROJECT_ID +
+      '/databases/(default)/documents/sistemas/' + id + '?' + mask;
+    var resp = fsFetch_(url, {
+      method: 'patch', contentType: 'application/json',
+      payload: JSON.stringify({ fields: campos }), muteHttpExceptions: true
+    });
+    if (resp.getResponseCode() >= 300) Logger.log('[ERROR] Sistema ' + id + ': ' + resp.getResponseCode() + ' ' + resp.getContentText());
+    else enviados++;
+  });
+  Logger.log('[OK] Sincronizados ' + enviados + ' sistemas a Firestore');
+}
+
+function sincronizarRevolcadasAFirestore() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(CFG.sheetRevolc);
+  if (!sh || sh.getLastRow() < 3) { Logger.log('[WARN] Sin datos en Registro Revolcadas'); return; }
+
+  // 1) Traer qué revolcadas (sistema+fecha) ya existen en Firestore,
+  //    para no duplicar las que la app ya sincronizó por su cuenta.
+  var existentes = {};
+  var pageToken = null;
+  do {
+    var listUrl = 'https://firestore.googleapis.com/v1/projects/' + FIRESTORE_PROJECT_ID +
+      '/databases/(default)/documents/revolcadas?pageSize=300' + (pageToken ? '&pageToken=' + pageToken : '');
+    var listResp = fsFetch_(listUrl, { muteHttpExceptions: true });
+    var listJson = JSON.parse(listResp.getContentText());
+    (listJson.documents || []).forEach(function (doc) {
+      var f = doc.fields || {};
+      var sis = f.sistema && (f.sistema.integerValue != null ? f.sistema.integerValue : f.sistema.doubleValue);
+      var fec = f.fecha && f.fecha.stringValue;
+      if (sis != null && fec) existentes[Number(sis) + '|' + fec] = true;
+    });
+    pageToken = listJson.nextPageToken || null;
+  } while (pageToken);
+
+  // 2) Recorrer la Sheet y crear en Firestore solo lo que falta.
+  var datos = sh.getDataRange().getValues().slice(2);
+  var creados = 0, saltados = 0;
+  datos.forEach(function (row) {
+    var sistema = row[0];
+    if (!sistema || isNaN(Number(sistema))) return;
+    var fechaRaw = row[1];
+    if (!fechaRaw) return;
+    var fecha = fechaRaw instanceof Date ? Utilities.formatDate(fechaRaw, CFG.tz, 'yyyy-MM-dd') : String(fechaRaw).substring(0, 10);
+    var key = Number(sistema) + '|' + fecha;
+    if (existentes[key]) { saltados++; return; }
+
+    var campos = {
+      sistema: { integerValue: Number(sistema) },
+      fecha: { stringValue: fecha },
+      obs: { stringValue: String(row[4] || '') },
+    };
+    var id = 'sh-' + sistema + '-' + fecha;
+    var url = 'https://firestore.googleapis.com/v1/projects/' + FIRESTORE_PROJECT_ID +
+      '/databases/(default)/documents/revolcadas/' + id;
+    var resp = fsFetch_(url, {
+      method: 'patch', contentType: 'application/json',
+      payload: JSON.stringify({ fields: campos }), muteHttpExceptions: true
+    });
+    if (resp.getResponseCode() >= 300) Logger.log('[ERROR] Revolcada ' + key + ': ' + resp.getResponseCode() + ' ' + resp.getContentText());
+    else { creados++; existentes[key] = true; }
+  });
+  Logger.log('[OK] Revolcadas nuevas cargadas a Firestore: ' + creados + ' (ya existían: ' + saltados + ')');
+}
+
+// Agrega los triggers diarios que falten para mantener todo sincronizado
+// de acá en adelante. No duplica triggers que ya tenías.
+function agregarTriggersSincroTodo() {
+  var yaExisten = {};
+  ScriptApp.getProjectTriggers().forEach(function (t) { yaExisten[t.getHandlerFunction()] = true; });
+
+  [
+    { fn: 'sincronizarPlantasAFirestore', min: 30 },
+    { fn: 'sincronizarSistemasAFirestore', min: 35 },
+    { fn: 'sincronizarRevolcadasAFirestore', min: 40 },
+  ].forEach(function (t) {
+    if (yaExisten[t.fn]) { Logger.log('[SKIP] Ya existía trigger para ' + t.fn); return; }
+    ScriptApp.newTrigger(t.fn).timeBased().atHour(7).nearMinute(t.min).everyDays(1).inTimezone(CFG.tz).create();
+    Logger.log('[OK] Trigger creado para ' + t.fn + ' (~07:' + t.min + ')');
+  });
+}
+
+
+// Las reglas de Firestore exigen sesión de una cuenta autorizada: se llama con el token OAuth del script.
+function fsFetch_(url, opciones) {
+  var o = opciones || {};
+  o.headers = o.headers || {};
+  o.headers['Authorization'] = 'Bearer ' + ScriptApp.getOAuthToken();
+  return UrlFetchApp.fetch(url, o);
+}

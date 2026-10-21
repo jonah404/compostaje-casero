@@ -1,0 +1,110 @@
+// ====================================================================
+//  BACKFILL: trae a Firestore el clima completo desde la Sheet
+//  (llena el agujero de junio/julio y cualquier otro hueco futuro)
+//
+//  POR QUÉ PASÓ: la app solo carga clima con su propio fetch automático,
+//  una ventana móvil de 35 días hacia atrás desde "hoy". Si pasás más
+//  de 35 días sin abrir la app, ese tramo queda afuera para siempre en
+//  Firestore, aunque tu Sheet sí lo tenga completo (el trigger diario
+//  de tu Apps Script corre solo, la abras o no).
+//
+//  OJO — un efecto secundario esperable: la app y tu Sheet usan
+//  coordenadas ligeramente distintas para pedirle el clima a
+//  Open-Meteo (app: -33.4939,-60.0628 — Sheet: -33.5050,-60.0719,
+//  a pocos km de diferencia). Después de este backfill, la Sheet pasa
+//  a ser la fuente autoritativa: para los días donde ya había un dato
+//  cargado por la app, el valor puede cambiar levemente (temperatura,
+//  mm de lluvia, etc.) al tomar ahora el de la Sheet. Es la manera de
+//  que deje de verse "mezclado" — un solo origen de verdad en vez de
+//  dos fetches distintos pisándose.
+//
+//  CÓMO INSTALARLO:
+//  1. Pegar este bloque al final del script.
+//  2. Ejecutar sincronizarClimaAFirestore() una vez.
+//  3. (Opcional, para que seguir corriendo esto sea automático) volver
+//     a pegar y correr agregarTriggersSincroTodo() del archivo
+//     anterior — esta versión de acá abajo ya incluye clima, así que
+//     si la pegás encima de la que ya tenías no hace falta re-ejecutar
+//     los sync de sistemas/revolcadas/plantas, solo se agrega el
+//     trigger nuevo que falta.
+// ====================================================================
+
+function sincronizarClimaAFirestore() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(CFG.sheetClima);
+  if (!sh || sh.getLastRow() < 3) { Logger.log('[WARN] Sin datos en Clima'); return; }
+
+  var datos = sh.getDataRange().getValues().slice(2);
+  var enviados = 0;
+  datos.forEach(function (row) {
+    if (!row[0]) return;
+    var fecha = row[0] instanceof Date ? Utilities.formatDate(row[0], CFG.tz, 'yyyy-MM-dd') : String(row[0]).substring(0, 10);
+    if (!fecha) return;
+
+    var humMax = row[4], humMin = row[5];
+    var humProm = row[6] !== '' && row[6] != null ? row[6]
+      : (humMax !== '' && humMin !== '' ? Math.round((Number(humMax) + Number(humMin)) / 2) : '');
+
+    var campos = {
+      fecha: { stringValue: fecha },
+      temp: numVal_(row[1]),
+      tmax: numVal_(row[2]),
+      tmin: numVal_(row[3]),
+      humMax: numVal_(humMax),
+      humMin: numVal_(humMin),
+      hum: numVal_(humProm),
+      lluvia: { stringValue: row[7] === '✅ Sí' ? 'si' : 'no' },
+      mm: numVal_(row[8]),
+      hsLluvia: numVal_(row[9]),
+      viento: numVal_(row[10]),
+      rafaga: numVal_(row[11]),
+      dir: { stringValue: String(row[12] || '') },
+      evapo: numVal_(row[13]),
+      sol: numVal_(row[15]),
+      notas: { stringValue: String(row[16] || '') },
+    };
+    var mask = Object.keys(campos).map(function (k) { return 'updateMask.fieldPaths=' + k; }).join('&');
+    var id = 'c-' + fecha;
+    var url = 'https://firestore.googleapis.com/v1/projects/' + FIRESTORE_PROJECT_ID +
+      '/databases/(default)/documents/clima/' + id + '?' + mask;
+    var resp = fsFetch_(url, {
+      method: 'patch', contentType: 'application/json',
+      payload: JSON.stringify({ fields: campos }), muteHttpExceptions: true
+    });
+    if (resp.getResponseCode() >= 300) Logger.log('[ERROR] Clima ' + fecha + ': ' + resp.getResponseCode() + ' ' + resp.getContentText());
+    else enviados++;
+  });
+  Logger.log('[OK] Sincronizados ' + enviados + ' días de clima a Firestore');
+}
+
+function numVal_(v) {
+  if (v === '' || v === null || v === undefined || isNaN(Number(v))) return { nullValue: null };
+  return { doubleValue: Number(v) };
+}
+
+// ── REEMPLAZA a agregarTriggersSincroTodo() del archivo anterior ──────
+// (agrega el trigger de clima; no toca ni duplica los que ya existían)
+function agregarTriggersSincroTodo() {
+  var yaExisten = {};
+  ScriptApp.getProjectTriggers().forEach(function (t) { yaExisten[t.getHandlerFunction()] = true; });
+
+  [
+    { fn: 'sincronizarPlantasAFirestore', min: 30 },
+    { fn: 'sincronizarSistemasAFirestore', min: 35 },
+    { fn: 'sincronizarRevolcadasAFirestore', min: 40 },
+    { fn: 'sincronizarClimaAFirestore', min: 45 },
+  ].forEach(function (t) {
+    if (yaExisten[t.fn]) { Logger.log('[SKIP] Ya existía trigger para ' + t.fn); return; }
+    ScriptApp.newTrigger(t.fn).timeBased().atHour(7).nearMinute(t.min).everyDays(1).inTimezone(CFG.tz).create();
+    Logger.log('[OK] Trigger creado para ' + t.fn + ' (~07:' + t.min + ')');
+  });
+}
+
+
+// Las reglas de Firestore exigen sesión de una cuenta autorizada: se llama con el token OAuth del script.
+function fsFetch_(url, opciones) {
+  var o = opciones || {};
+  o.headers = o.headers || {};
+  o.headers['Authorization'] = 'Bearer ' + ScriptApp.getOAuthToken();
+  return UrlFetchApp.fetch(url, o);
+}

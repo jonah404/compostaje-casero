@@ -47,6 +47,9 @@ const cargar = (hojas, llamadas = []) => {
     Utilities: { formatDate: d => new Date(d).toISOString().slice(0, 10) },
     CalendarApp: { EventColor: new Proxy({}, { get: (_, k) => String(k) }) },
     SpreadsheetApp: { getActiveSpreadsheet: () => ({ getSheetByName: n => hojas[n] || null }) },
+    ScriptApp: { getOAuthToken: () => 'TOKEN-STUB' },
+    LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
+    ContentService: { MimeType: { JSON: 'json' }, createTextOutput: txt => ({ txt, setMimeType() { return this; } }) },
     UrlFetchApp: { fetch: (url, o) => { llamadas.push({ url, o }); return { getResponseCode: () => 200, getContentText: () => '' }; } },
   };
   vm.createContext(ctx);
@@ -151,6 +154,62 @@ console.log('quitarHuertaSheet');
     pla.rows.forEach(r => { for (let c = 20; c < 32; c++) assert.ok(r[c] === '' || r[c] === undefined, 'col ' + (c + 1)); });
   });
   t('repetirla no rompe nada', () => { g.quitarHuertaSheet(); assert.equal(pla.rows.length, 3); });
+}
+
+console.log('autenticación de Firestore');
+{
+  const llamadas = [];
+  const g = cargar({ Especies: hoja(espBase(), 13), Plantas: hoja(plaBase()), 'Registro Plantas': hoja(regBase()) }, llamadas);
+  g.altaPlantasInterior2();
+  t('las llamadas a Firestore llevan el token OAuth del script', () => {
+    const fs_ = llamadas.filter(l => l.url.includes('firestore.googleapis.com'));
+    assert.ok(fs_.length > 0);
+    fs_.forEach(l => assert.equal(l.o.headers.Authorization, 'Bearer TOKEN-STUB'));
+  });
+  const sinAuth = (nombre, texto) => t(nombre + ': ningún fetch a Firestore sin fsFetch_', () => {
+    const ls = texto.split(/\r?\n/);
+    ls.forEach((l, i) => {
+      if (!l.includes('UrlFetchApp.fetch(')) return;
+      const ventana = ls.slice(Math.max(0, i - 6), i + 1).join(' ');
+      assert.ok(!ventana.includes('firestore.googleapis.com') || l.includes('function fsFetch_') || ventana.includes('return UrlFetchApp'), 'línea ' + (i + 1));
+    });
+  });
+  sinAuth('codigo.gs', src);
+  for (const n of ['appscript_backfill_clima.txt', 'appscript_backfill_revolcadas_sistemas.txt'])
+    sinAuth(n, fs.readFileSync(fileURLToPath(new URL('../' + n, import.meta.url)), 'utf8'));
+}
+
+console.log('doPost: "Cargado por"');
+{
+  const post = (g, tipo, data, usuario) => g.doPost({ postData: { contents: JSON.stringify({ tipo, data, usuario }) } });
+  const g0 = (hojas) => cargar(hojas);
+  t('revolcada: el correo queda en la col. 6 y el encabezado se escribe', () => {
+    const rev = hoja([['Sistema', 'Fecha', 'Días', 'En tiempo', 'Obs']]);
+    post(g0({ 'Registro Revolcadas': rev }), 'revolcada', { sistema: 1, fecha: '2026-10-21', obs: '' }, 'a@b.c');
+    assert.equal(rev.rows[1][5], 'a@b.c');
+    assert.equal(rev.rows[0][5], 'Cargado por');
+  });
+  t('revolcada sin usuario no rompe y deja la celda vacía', () => {
+    const rev = hoja([['Sistema', 'Fecha']]);
+    post(g0({ 'Registro Revolcadas': rev }), 'revolcada', { sistema: 1, fecha: '2026-10-21' });
+    assert.equal(rev.rows[1][0], 1);
+    assert.ok(!rev.rows[1][5]);
+  });
+  t('evento de planta: col. 11', () => {
+    const pla = hoja(plaBase()), reg = hoja([['ID', 'Planta']]);
+    post(g0({ Plantas: pla, 'Registro Plantas': reg }), 'plantaEvento', { planta: 7, fecha: '2026-10-21', tipo: 'Riego' }, 'a@b.c');
+    assert.equal(reg.rows[1][10], 'a@b.c');
+  });
+  t('ficha de planta: col. 21 ("Editado por")', () => {
+    const pla = hoja(plaBase());
+    post(g0({ Plantas: pla }), 'planta', { id: 7, nombre: 'Helecho' }, 'a@b.c');
+    assert.equal(pla.rows[1][20], 'a@b.c');
+  });
+  t('evento de pecera: col. 5', () => {
+    const pe = hoja([['Fecha', 'Tipo']]);
+    post(g0({ 'Registro Pecera': pe }), 'peceraEvento', { fecha: '2026-10-21', tipo: 'Cambio' }, 'a@b.c');
+    assert.equal(pe.rows[1][4], 'a@b.c');
+  });
 }
 
 console.log(ok + ' pruebas ok' + (process.exitCode ? ' (hay fallas)' : ''));
