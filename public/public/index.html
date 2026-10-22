@@ -775,6 +775,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { esAutorizado, nombreCorto, agruparEntradas, filtrarEntradas, htmlGrupo, claveGrupo } from './historial.js';
 import { crearEscritor } from './escritor.js';
+import { duenoDelDia } from './turnos.js';
 import {
   getFirestore, collection, doc,
   getDoc, getDocs, writeBatch,
@@ -1566,7 +1567,7 @@ const renderHoy = () => {
       <button class="chip" onclick="go('pla')">🪴 Plantas · ${nP}</button>
     </div>
     ${urg.map(a => `<div class="al ${a.c}"><div class="al-t">${a.t}</div>${a.b ? `<div class="al-b">${a.b}</div>` : ''}</div>`).join('')}
-    <div class="sh">Tareas de hoy <span class="sh-sub">${pend.length}</span></div>
+    <div class="sh">Tareas de hoy para ${duenoDelDia(TODAY)} <span class="sh-sub">${pend.length}</span></div>
     ${hoy.length
       ? AREAS_HOY.map(seccion).join('')
       : `<div class="card tk-empty">Todo al día 🌿${prox[0] ? `<div class="tk-d">Próximo: ${prox[0].titulo} — ${prox[0].detalle}</div>` : ''}</div>`}
