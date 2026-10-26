@@ -1,7 +1,7 @@
 {
-  "name": "Compost Tracker",
-  "short_name": "Compost",
-  "description": "Seguimiento de compostaje, plantas y clima del jardín",
+  "name": "Brote",
+  "short_name": "Brote",
+  "description": "Tu huerta, tus plantas y tu compost: riego, fumigación, clima y tareas del día",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

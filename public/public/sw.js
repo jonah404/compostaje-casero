@@ -3,7 +3,7 @@
 // si cambian, hay que subir esta versión.
 // Hosting sirve html/js con "Cache-Control: no-cache" (firebase.json) y acá se piden con
 // cache:'no-cache'/'reload' para que la caché HTTP del navegador no deje versiones mezcladas.
-const CACHE = 'compost-tracker-v8';
+const CACHE = 'brote-v9';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -11,6 +11,7 @@ const APP_SHELL = [
   '/escritor.js',
   '/turnos.js',
   '/preventivo.js',
+  '/icons/logo.svg',
   '/manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',

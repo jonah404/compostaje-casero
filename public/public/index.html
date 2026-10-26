@@ -7,9 +7,9 @@
 <meta name="theme-color" content="#3c3325" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Compost">
+<meta name="apple-mobile-web-app-title" content="Brote">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Compost Tracker</title>
+<title>Brote</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -495,8 +495,8 @@ body.sin-sesion > *:not(#acceso):not(script):not(.toast) { display: none !import
 <body class="sin-sesion">
 <div id="acceso">
   <div class="acc-card">
-    <div class="acc-ico">🌿</div>
-    <h1 id="acc-t">Compost</h1>
+    <img class="acc-ico" src="icons/logo.svg" alt="" width="72" height="72">
+    <h1 id="acc-t">Brote</h1>
     <p id="acc-p">Entrá con tu cuenta de Google para ver y registrar los cambios.</p>
     <button class="btn-g" id="acc-btn" onclick="entrarConGoogle()">Entrar con Google</button>
   </div>
@@ -507,10 +507,10 @@ body.sin-sesion > *:not(#acceso):not(script):not(.toast) { display: none !import
 <aside class="sidebar">
   <div class="sb-brand">
     <div class="sb-logo">
-      <div class="sb-icon">🌿</div>
+      <img class="sb-icon" src="icons/logo.svg" alt="">
       <div>
-        <div class="sb-wordmark">Compost</div>
-        <div class="sb-sub">Tracker</div>
+        <div class="sb-wordmark">Brote</div>
+        <div class="sb-sub">Huerta al día</div>
       </div>
     </div>
     <div class="sb-date" id="sb-date"></div>
@@ -539,8 +539,8 @@ body.sin-sesion > *:not(#acceso):not(script):not(.toast) { display: none !import
   </div>
   <div class="mob-hdr">
     <div class="mob-brand">
-      <div class="mob-icon">🌿</div>
-      <div class="mob-title">Compost</div>
+      <img class="mob-icon" src="icons/logo.svg" alt="">
+      <div class="mob-title">Brote</div>
     </div>
     <button class="mob-sync" onclick="abrirHistorial()" aria-label="Historial"><i class="ti ti-history"></i></button>
     <button class="mob-sync" onclick="salir()" aria-label="Salir"><i class="ti ti-logout"></i></button>
@@ -2549,7 +2549,7 @@ const mostrarAcceso = (modo, email) => {
   document.body.classList.add('sin-sesion');
   document.getElementById('acceso').classList.remove('hide');
   const sin = modo === 'sinacceso';
-  document.getElementById('acc-t').textContent = sin ? 'Sin acceso' : 'Compost';
+  document.getElementById('acc-t').textContent = sin ? 'Sin acceso' : 'Brote';
   document.getElementById('acc-p').textContent = sin
     ? `La cuenta ${email} no tiene permiso para usar esta app.`
     : 'Entrá con tu cuenta de Google para ver y registrar los cambios.';
