@@ -675,6 +675,7 @@ body.sin-sesion > *:not(#acceso):not(script):not(.toast) { display: none !import
                 <option value="🌿 Fertilización">🌿 Fertilización</option>
                 <option value="✂️ Poda">✂️ Poda</option>
                 <option value="🐛 Revisión plagas">🐛 Revisión plagas</option>
+                <option value="🛡️ Preventivo">🛡️ Aplicación preventiva</option>
                 <option value="🍂 Cosecha">🍂 Cosecha</option>
                 <option value="📝 Observación">📝 Observación</option>
               </select>
@@ -776,6 +777,7 @@ import {
 import { esAutorizado, nombreCorto, agruparEntradas, filtrarEntradas, htmlGrupo, claveGrupo } from './historial.js';
 import { crearEscritor } from './escritor.js';
 import { duenoDelDia } from './turnos.js';
+import { PLANES, GRUPOS, grupoDePlanta, estadoTratamiento, calendarioAnual } from './preventivo.js';
 import {
   getFirestore, collection, doc,
   getDoc, getDocs, writeBatch,
@@ -1230,6 +1232,75 @@ const estPlanta = p => {
 };
 const pLbl = p => p.nombre || `Planta ${p.id}`;
 
+// ════ PREVENTIVO (fumigación programada) ════
+// Calendario por grupo en preventivo.js. Acá se cruza con lo registrado (tipo
+// "🛡️ Preventivo", detalle = nombre del tratamiento) y con el clima ya cargado en
+// la app (lluvia que lava el fungicida, calor), sin depender de ninguna API externa.
+const esInteriorP = p => { const pf = perfilEspecie(p.especie || p.nombre); return !!(pf && pf.tipo === 'Interior'); };
+const grupoP = p => grupoDePlanta(p.nombre, p.especie, esInteriorP(p));
+const ultimaPrev = (p, tr) => { const r = regEventos(p.id, 'Preventivo').find(x => x.detalle === tr.nombre); return r ? pISO(r.fecha) : null; };
+const lluviaDesde = fecha => S.clima.reduce((a, c) => { const f = pISO(c.fecha); return f && f > fecha ? a + (+c.mm || 0) : a; }, 0);
+// Un tratamiento se agenda por grupo (no por planta): se toma la planta más atrasada
+// y al marcarlo se registra para todas las del grupo.
+const estadoPreventivos = () => {
+  const grupos = {};
+  S.plantas.forEach(p => { const g = grupoP(p); if (g) (grupos[g] = grupos[g] || []).push(p); });
+  const ult = [...S.clima].sort((a,b) => a.fecha > b.fecha ? -1 : 1)[0];
+  const tmax = ult && ult.tmax != null && ult.tmax !== '' ? +ult.tmax : null;
+  const out = [];
+  Object.keys(grupos).forEach(g => PLANES[g].forEach(tr => {
+    const ults = grupos[g].map(p => ultimaPrev(p, tr));
+    const ultima = ults.some(u => !u) ? null : new Date(Math.min(...ults));
+    const e = estadoTratamiento(tr, ultima, TODAY, { mmDesdeUltima: tr.lavable && ultima ? lluviaDesde(ultima) : 0, tmax });
+    out.push({ g, tr, plantas: grupos[g], ultima, ...e });
+  }));
+  return out;
+};
+// Aplicaciones que ya se hicieron antes de que existiera el calendario: se cargan una
+// sola vez (por dispositivo) y solo si esa planta no tiene ya el registro. [grupo, tratamiento]
+const PREV_PREVIAS = { fecha:'2026-10-25', clave:'prev_previas_20261025', items:[
+  ['citrico','cobre-brotes'], ['citrico','insecticida-brotes'],
+  ['carozo','fungicida-primavera'], ['carozo','insecticida-brotes'],
+  ['interior','fungicida-interior'], ['interior','jabon-neem-interior'] ] };
+const cargarPreviasPrev = async () => {
+  try { if (localStorage.getItem(PREV_PREVIAS.clave)) return; } catch(e) {}
+  const nuevas = [];
+  PREV_PREVIAS.items.forEach(([g, trId]) => {
+    const tr = PLANES[g].find(x => x.id === trId);
+    S.plantas.filter(p => grupoP(p) === g).forEach(p => {
+      if (S.registroPlantas.some(r => r.planta === p.id && r.detalle === tr.nombre && r.fecha === PREV_PREVIAS.fecha)) return;
+      nuevas.push(registrarEventoPlanta(p.id, PREV_PREVIAS.fecha, TIPO_EVT.prev, tr.nombre, `${tr.producto} — ${tr.dosis}`, 'Cargado a posteriori: aplicado el 25/10'));
+    });
+  });
+  try { localStorage.setItem(PREV_PREVIAS.clave, '1'); } catch(e) {}
+  if (nuevas.length) { await Promise.all(nuevas); toast('🛡️ Cargué las aplicaciones del 25/10'); refresh(); }
+};
+const MESES_ABR = ['E','F','M','A','M','J','J','A','S','O','N','D'];
+const prevHTML = () => {
+  const est = estadoPreventivos();
+  if (!est.length) return '';
+  const mesAct = TODAY.getMonth() + 1;
+  const chip = e => e.estado === 'hoy' ? `<span class="tk-late" style="padding:1px 7px;border-radius:9px;font-size:11px">${e.dias < 0 ? 'atrasado' : 'toca hoy'}</span>`
+    : e.estado === 'prox' ? `<span style="font-size:11px;color:var(--umber-mid)">en ${e.dias} d</span>`
+    : e.estado === 'ok' ? `<span style="font-size:11px;color:var(--ink3)">al día · en ${e.dias} d</span>`
+    : `<span style="font-size:11px;color:var(--ink3)">fuera de época</span>`;
+  const grupos = [...new Set(est.map(e => e.g))];
+  return `<details class="fold" open><summary>🛡️ Calendario preventivo · ${est.filter(e => e.estado === 'hoy').length} para hoy</summary>
+    ${grupos.map(g => `
+      <div style="font-weight:600;margin:12px 0 4px">${GRUPOS[g].icono} ${GRUPOS[g].nombre} <span style="font-weight:400;font-size:12px;color:var(--ink3)">· ${est.find(e => e.g === g).plantas.map(pLbl).join(', ')}</span></div>
+      ${calendarioAnual(g).map(fila => {
+        const e = est.find(x => x.g === g && x.tr.id === fila.trat.id);
+        return `<div style="padding:8px 0;border-top:1px solid var(--paper3)">
+          <div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b style="font-size:13px">${fila.trat.nombre}</b>${chip(e)}</div>
+          <div style="display:flex;gap:2px;margin:6px 0">${fila.meses.map((on, i) => `<span style="flex:1;text-align:center;font-size:9px;padding:2px 0;border-radius:3px;${on ? 'background:var(--chart-1);color:#fff;' : 'background:var(--paper3);color:var(--ink3);'}${i + 1 === mesAct ? 'outline:2px solid var(--ink);' : ''}">${MESES_ABR[i]}</span>`).join('')}</div>
+          <div style="font-size:12px;color:var(--ink3)"><b>${fila.trat.producto}</b> — ${fila.trat.dosis}${fila.trat.nota ? `<br><i>${fila.trat.nota}</i>` : ''}</div>
+          ${e.ultima ? `<div style="font-size:11px;color:var(--ink3);margin-top:3px">Última: ${fmt(fISO(e.ultima))}</div>` : ''}
+        </div>`;
+      }).join('')}`).join('')}
+    <div style="font-size:12px;color:var(--ink3);font-style:italic;margin-top:10px">Referencia general para huerta familiar — confirmá contra la etiqueta de tu producto. Aplicar a la tardecita, sin viento ni lluvia próxima. Primero se monitorea (ver Fitosanitario en cada planta); esto es solo lo preventivo.</div>
+  </details>`;
+};
+
 // ════ PECERA ════
 // Fase "ciclado" = primeros CFG_PEC.diasFinCiclado días desde el armado/limpieza
 // total: la bacteria nitrificante todavía no está establecida (se forma sola,
@@ -1465,7 +1536,7 @@ const ringSVG = (pct, color, size=76, thickness=8) => {
 // Une lo que ya calculan estPlanta/proxRev/estPecera en una lista de tareas.
 // Mismos criterios que el evento "Tareas de hoy" del calendario (codigo.gs).
 const ETQ      = { riego:'regar', fert:'fertilizar', plagas:'revisar plagas', poda:'poda', revolcada:'revolver' };
-const TIPO_EVT = { riego:'💧 Riego', fert:'🌿 Fertilización', plagas:'🐛 Revisión plagas', poda:'✂️ Poda' };
+const TIPO_EVT = { riego:'💧 Riego', fert:'🌿 Fertilización', plagas:'🐛 Revisión plagas', poda:'✂️ Poda', prev:'🛡️ Preventivo' };
 const AREAS_HOY = [ {id:'compost', t:'🌱 Compost'}, {id:'plantas', t:'🪴 Plantas'}, {id:'pecera', t:'🐠 Pecera'} ];
 const TEMP_CALOR = 38, TEMP_HELADA = 2, TEMP_HELADA_SEVERA = -2;
 const diferidos = new Map();   // id de tarea → { timer, commit } (ver "marcar hecho")
@@ -1495,6 +1566,13 @@ const armarTareasHoy = () => {
       prox.push({ ...base('poda','form'), detalle: e.diasParaPoda === 0 ? 'toca hoy' : `en ${e.diasParaPoda} d`, atraso: -e.diasParaPoda });
     }
   });
+  estadoPreventivos().forEach(e => {
+    if (e.estado !== 'hoy' && e.estado !== 'prox') return;
+    const t = { id:`prev-${e.g}-${e.tr.id}`, area:'plantas', tipo:'prev', ref:`${e.g}|${e.tr.id}`, modo:'uno',
+      titulo:`🛡️ ${e.tr.nombre} · ${GRUPOS[e.g].nombre.toLowerCase()}`,
+      detalle:`${e.detalle} — ${e.tr.producto}`, atraso: -e.dias };
+    (e.estado === 'hoy' ? hoy : prox).push(t);
+  });
   const ep = estPecera();
   const pec = (tipo, titulo, modo) => ({ id:`pec-${tipo}`, area:'pecera', tipo, ref:null, titulo, modo });
   if (ep.cambioUrg) hoy.push({ ...pec('cambio-agua','Cambio de agua','uno'), detalle:`${ep.diasSinCambio} días sin cambio (objetivo cada ${ep.limiteCambio} d)`, atraso: ep.diasSinCambio - ep.limiteCambio });
@@ -1511,7 +1589,12 @@ const hechasHoy = () => {
     const s = S.sistemas.find(x => x.id === r.sistema);
     out.push({ titulo:`${s ? sLbl(s) : 'Sistema '+r.sistema} · revolcada` });
   });
-  S.registroPlantas.filter(r => r.fecha === hoyISO && /Riego|Fertiliz|plagas|Poda/.test(r.tipo)).forEach(r => {
+  const prevVistos = new Set();   // un preventivo se registra para todo el grupo: se muestra una sola vez
+  S.registroPlantas.filter(r => r.fecha === hoyISO && /Riego|Fertiliz|plagas|Poda|Preventivo/.test(r.tipo)).forEach(r => {
+    if (/Preventivo/.test(r.tipo)) {
+      if (prevVistos.has(r.detalle)) return;
+      prevVistos.add(r.detalle); out.push({ titulo:`🛡️ ${r.detalle || 'Preventivo'}` }); return;
+    }
     const p = S.plantas.find(x => x.id === r.planta);
     out.push({ titulo:`${p ? pLbl(p) : 'Planta'} · ${r.tipo.replace(/^\S+\s/, '')}` });
   });
@@ -1586,6 +1669,12 @@ const ejecutarTarea = t => {
   if (t.tipo === 'revolcada')   return registrarRevolcada(t.ref, hoy);
   if (t.tipo === 'riego')       return registrarEventoPlanta(t.ref, hoy, TIPO_EVT.riego);
   if (t.tipo === 'cambio-agua') return registrarEventoPecera(hoy, '💧 Cambio de agua parcial');
+  if (t.tipo === 'prev') {
+    const [g, trId] = t.ref.split('|');
+    const tr = PLANES[g].find(x => x.id === trId);
+    return Promise.all(S.plantas.filter(p => grupoP(p) === g)
+      .map(p => registrarEventoPlanta(p.id, hoy, TIPO_EVT.prev, tr.nombre, `${tr.producto} — ${tr.dosis}`)));
+  }
 };
 const marcarHecha = t => {
   if (diferidos.has(t.id)) return;
@@ -1706,7 +1795,7 @@ const plantHTML = p => {
   </div>`;
 };
 const renderPla = () => {
-  document.getElementById('pla-c').innerHTML = S.plantas.map(p=>plantHTML(p)).join('') || '<div style="font-size:13px;color:var(--ink3)">Sin plantas registradas.</div>';
+  document.getElementById('pla-c').innerHTML = prevHTML() + S.plantas.map(p=>plantHTML(p)).join('') || '<div style="font-size:13px;color:var(--ink3)">Sin plantas registradas.</div>';
 };
 
 // ════ RESUMEN DE PLANTAS (antes en Inicio) ════
@@ -2035,8 +2124,9 @@ const registrarLocal = async (lista, col, tipoSheet, datos) => {
 };
 const registrarRevolcada = (sistema, fecha, obs = '') =>
   registrarLocal(S.revolcadas, 'revolcadas', 'revolcada', { id:Date.now().toString(), sistema, fecha, obs });
+let seqEv = 0;   // evita ids repetidos al registrar varias plantas en el mismo milisegundo
 const registrarEventoPlanta = (planta, fecha, tipo, detalle = '', producto = '', resultado = '') =>
-  registrarLocal(S.registroPlantas, 'registroPlantas', 'plantaEvento', { id:'ev'+Date.now(), planta, fecha, tipo, detalle, producto, resultado });
+  registrarLocal(S.registroPlantas, 'registroPlantas', 'plantaEvento', { id:'ev'+Date.now()+(++seqEv), planta, fecha, tipo, detalle, producto, resultado });
 const registrarEventoPecera = (fecha, tipo, detalle = '', resultado = '') =>
   registrarLocal(S.registroPecera, 'registroPecera', 'peceraEvento', { id:'kv'+Date.now(), fecha, tipo, detalle, resultado });
 window.saveRev = async () => {
@@ -2443,7 +2533,7 @@ const init = async () => {
       if(ok){ refresh(); }
     });
   }
-  fbLoad().then(()=>{ poblarSels(); refresh(); });
+  fbLoad().then(async ()=>{ poblarSels(); refresh(); await cargarPreviasPrev(); });
 };
 
 // ════ ACCESO (login con Google) ════
