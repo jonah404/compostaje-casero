@@ -994,14 +994,19 @@ const fbLoad = async () => {
 // ════ SYNC A GOOGLE SHEET (Apps Script Web App) ════
 // fetch en modo no-cors: no podemos leer la respuesta, pero evita el preflight CORS
 // que el Web App de Apps Script no maneja. Es "fire and forget".
-const sheetSync = (tipo, data) => {
+// Manda el ID token de Firebase: el Apps Script lo valida y solo acepta las cuentas
+// autorizadas (el correo que figura en la Sheet sale del token, no de lo que diga el cliente).
+const sheetSync = async (tipo, data) => {
   if (!SHEET_SYNC_URL) return;
   if (DRY) { console.info('[dry] sheetSync', tipo, data); return; }
-  fetch(SHEET_SYNC_URL, {
-    method: 'POST', mode: 'no-cors', keepalive: true,
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ tipo, data, usuario: (window.usuarioActual() || {}).email || '' })
-  }).catch(()=>{});
+  try {
+    const idToken = auth && auth.currentUser ? await auth.currentUser.getIdToken() : '';
+    await fetch(SHEET_SYNC_URL, {
+      method: 'POST', mode: 'no-cors', keepalive: true,
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ tipo, data, idToken })
+    });
+  } catch(e) {}
 };
 
 // ════ UTILS ════

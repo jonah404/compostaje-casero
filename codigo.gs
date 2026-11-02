@@ -1343,6 +1343,33 @@ function diagnosticar() {
   Logger.log("=== FIN DIAGNÓSTICO ===");
 }
 
+// Cuentas que pueden escribir en la Sheet. Mantener igual que las reglas de Firestore
+// (public/firestore.rules) y CORREOS_AUTORIZADOS en public/public/historial.js.
+var CORREOS_AUTORIZADOS_ = ['jonahlalvarez@gmail.com', 'mavidiaz092@gmail.com'];
+// Clave web de Firebase (la misma que va en index.html; es pública, no es un secreto).
+var FIREBASE_API_KEY_ = 'AIzaSyCjlf3MS68H4lCSZbeWpdvCvv8tZjnm2cE';
+
+// Valida el ID token de Firebase que manda la app y devuelve el correo verificado de una
+// cuenta autorizada, o '' si no hay token, es inválido/vencido o la cuenta no está en la lista.
+// accounts:lookup comprueba la firma y la vigencia del token del lado de Google.
+function correoVerificado_(idToken) {
+  if (!idToken) return '';
+  var cache = CacheService.getScriptCache();
+  var clave = 'tok_' + Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, idToken));
+  var enCache = cache.get(clave);
+  if (enCache) return enCache;
+  var resp = UrlFetchApp.fetch('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' + FIREBASE_API_KEY_, {
+    method: 'post', contentType: 'application/json',
+    payload: JSON.stringify({ idToken: idToken }), muteHttpExceptions: true
+  });
+  if (resp.getResponseCode() !== 200) return '';
+  var u = (JSON.parse(resp.getContentText()).users || [])[0];
+  var email = u && u.emailVerified && u.email ? String(u.email).trim().toLowerCase() : '';
+  if (!email || CORREOS_AUTORIZADOS_.indexOf(email) < 0) return '';
+  cache.put(clave, email, 600);   // 10 min: evita una consulta por cada escritura
+  return email;
+}
+
 function doPost(e) {
   // Serializa las escrituras: varios POST a la vez calculan la misma "última fila + 1".
   var lock = LockService.getScriptLock();
@@ -1351,7 +1378,12 @@ function doPost(e) {
     lock.waitLock(30000);
     conLock = true;
     var body = JSON.parse(e.postData.contents);
-    var tipo = body.tipo, data = body.data, usuario = body.usuario || '';   // correo de quien cargó (login de la app)
+    var usuario = correoVerificado_(body.idToken);   // correo de quien cargó, sale del token (no del cliente)
+    if (!usuario) {
+      return ContentService.createTextOutput(JSON.stringify({ok:false, error:'no autorizado'}))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    var tipo = body.tipo, data = body.data;
     if      (tipo === 'revolcada')     guardarRevolcadaSheet(data, usuario);
     else if (tipo === 'sistema')       guardarSistemaSheet(data, usuario);
     else if (tipo === 'planta')        guardarPlantaSheet(data, usuario);

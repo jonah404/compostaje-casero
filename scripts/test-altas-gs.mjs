@@ -41,16 +41,36 @@ const hoja = (rows, maxCols = 32) => {
   return h;
 };
 
+// Tokens de prueba → lo que devolvería accounts:lookup de Firebase.
+const OK = 'jonahlalvarez@gmail.com';
+const TOKENS = {
+  'tok-ok': { email: OK, emailVerified: true },
+  'tok-sin-verificar': { email: OK, emailVerified: false },
+  'tok-ajeno': { email: 'otro@x.com', emailVerified: true },
+};
 const cargar = (hojas, llamadas = []) => {
   const ctx = {
     Logger: { log() {} },
-    Utilities: { formatDate: d => new Date(d).toISOString().slice(0, 10) },
+    Utilities: {
+      formatDate: d => new Date(d).toISOString().slice(0, 10),
+      computeDigest: (_, s) => Array.from(Buffer.from(String(s))), DigestAlgorithm: { SHA_256: 'sha256' },
+      base64EncodeWebSafe: b => Buffer.from(b).toString('base64'),
+    },
     CalendarApp: { EventColor: new Proxy({}, { get: (_, k) => String(k) }) },
     SpreadsheetApp: { getActiveSpreadsheet: () => ({ getSheetByName: n => hojas[n] || null }) },
     ScriptApp: { getOAuthToken: () => 'TOKEN-STUB' },
+    CacheService: { getScriptCache: () => { const m = {}; return { get: k => m[k] || null, put: (k, v) => { m[k] = v; } }; } },
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
     ContentService: { MimeType: { JSON: 'json' }, createTextOutput: txt => ({ txt, setMimeType() { return this; } }) },
-    UrlFetchApp: { fetch: (url, o) => { llamadas.push({ url, o }); return { getResponseCode: () => 200, getContentText: () => '' }; } },
+    UrlFetchApp: { fetch: (url, o) => {
+      llamadas.push({ url, o });
+      if (url.includes('identitytoolkit')) {
+        const u = TOKENS[JSON.parse(o.payload).idToken];
+        return u ? { getResponseCode: () => 200, getContentText: () => JSON.stringify({ users: [u] }) }
+                 : { getResponseCode: () => 400, getContentText: () => '{}' };
+      }
+      return { getResponseCode: () => 200, getContentText: () => '' };
+    } },
   };
   vm.createContext(ctx);
   vm.runInContext(src, ctx);
@@ -181,34 +201,43 @@ console.log('autenticación de Firestore');
 
 console.log('doPost: "Cargado por"');
 {
-  const post = (g, tipo, data, usuario) => g.doPost({ postData: { contents: JSON.stringify({ tipo, data, usuario }) } });
+  const post = (g, tipo, data, idToken) => g.doPost({ postData: { contents: JSON.stringify({ tipo, data, idToken }) } });
   const g0 = (hojas) => cargar(hojas);
   t('revolcada: el correo queda en la col. 6 y el encabezado se escribe', () => {
     const rev = hoja([['Sistema', 'Fecha', 'Días', 'En tiempo', 'Obs']]);
-    post(g0({ 'Registro Revolcadas': rev }), 'revolcada', { sistema: 1, fecha: '2026-10-21', obs: '' }, 'a@b.c');
-    assert.equal(rev.rows[1][5], 'a@b.c');
+    post(g0({ 'Registro Revolcadas': rev }), 'revolcada', { sistema: 1, fecha: '2026-10-21', obs: '' }, 'tok-ok');
+    assert.equal(rev.rows[1][5], OK);
     assert.equal(rev.rows[0][5], 'Cargado por');
   });
-  t('revolcada sin usuario no rompe y deja la celda vacía', () => {
+  const rechaza = (nombre, idToken) => t('rechaza: ' + nombre, () => {
     const rev = hoja([['Sistema', 'Fecha']]);
-    post(g0({ 'Registro Revolcadas': rev }), 'revolcada', { sistema: 1, fecha: '2026-10-21' });
-    assert.equal(rev.rows[1][0], 1);
-    assert.ok(!rev.rows[1][5]);
+    const out = post(g0({ 'Registro Revolcadas': rev }), 'revolcada', { sistema: 1, fecha: '2026-10-21' }, idToken);
+    assert.equal(JSON.parse(out.txt).ok, false);
+    assert.equal(rev.rows.length, 1, 'no debe escribir nada');
+  });
+  rechaza('sin token', undefined);
+  rechaza('token inválido', 'tok-falso');
+  rechaza('cuenta no autorizada', 'tok-ajeno');
+  rechaza('correo sin verificar', 'tok-sin-verificar');
+  t('el correo de la Sheet sale del token, no de lo que diga el cliente', () => {
+    const rev = hoja([['Sistema', 'Fecha']]);
+    g0({ 'Registro Revolcadas': rev }).doPost({ postData: { contents: JSON.stringify({ tipo: 'revolcada', data: { sistema: 1, fecha: '2026-10-21' }, idToken: 'tok-ok', usuario: 'falso@x.com' }) } });
+    assert.equal(rev.rows[1][5], OK);
   });
   t('evento de planta: col. 11', () => {
     const pla = hoja(plaBase()), reg = hoja([['ID', 'Planta']]);
-    post(g0({ Plantas: pla, 'Registro Plantas': reg }), 'plantaEvento', { planta: 7, fecha: '2026-10-21', tipo: 'Riego' }, 'a@b.c');
-    assert.equal(reg.rows[1][10], 'a@b.c');
+    post(g0({ Plantas: pla, 'Registro Plantas': reg }), 'plantaEvento', { planta: 7, fecha: '2026-10-21', tipo: 'Riego' }, 'tok-ok');
+    assert.equal(reg.rows[1][10], OK);
   });
   t('ficha de planta: col. 21 ("Editado por")', () => {
     const pla = hoja(plaBase());
-    post(g0({ Plantas: pla }), 'planta', { id: 7, nombre: 'Helecho' }, 'a@b.c');
-    assert.equal(pla.rows[1][20], 'a@b.c');
+    post(g0({ Plantas: pla }), 'planta', { id: 7, nombre: 'Helecho' }, 'tok-ok');
+    assert.equal(pla.rows[1][20], OK);
   });
   t('evento de pecera: col. 5', () => {
     const pe = hoja([['Fecha', 'Tipo']]);
-    post(g0({ 'Registro Pecera': pe }), 'peceraEvento', { fecha: '2026-10-21', tipo: 'Cambio' }, 'a@b.c');
-    assert.equal(pe.rows[1][4], 'a@b.c');
+    post(g0({ 'Registro Pecera': pe }), 'peceraEvento', { fecha: '2026-10-21', tipo: 'Cambio' }, 'tok-ok');
+    assert.equal(pe.rows[1][4], OK);
   });
 }
 
