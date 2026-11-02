@@ -411,6 +411,10 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
 
 /* toast */
 .toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(0); background: var(--sage); color: #fff; padding: 10px 22px; border-radius: 30px; font-size: 13px; font-weight: 600; z-index: 200; white-space: nowrap; transition: opacity .25s, transform .25s; pointer-events: none; box-shadow: 0 4px 20px rgba(0,0,0,.25); }
+.estado-red { position: fixed; top: 0; left: 0; right: 0; z-index: 150; padding: calc(6px + env(safe-area-inset-top)) 14px 6px; background: var(--umber); color: #fff; font-size: 12.5px; font-weight: 600; text-align: center; }
+.estado-red.hide { display: none; }
+.sysc:focus-visible, .tk-btn:focus-visible, .del-btn:focus-visible, .fab:focus-visible, .mob-sync:focus-visible, .sync-side:focus-visible, .sn:focus-visible, .bt:focus-visible, .chip:focus-visible { outline: 2px solid var(--sage-mid); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
 .toast.h { opacity: 0; transform: translateX(-50%) translateY(8px); }
 /* desplegable propio (reemplaza al <select> nativo) */
 .cs { position: relative; }
@@ -560,7 +564,7 @@ body.sin-sesion > *:not(#acceso):not(script):not(.toast) { display: none !import
     </div>
     <button class="mob-sync" onclick="abrirHistorial()" aria-label="Historial"><i class="ti ti-history"></i></button>
     <button class="mob-sync" onclick="salir()" aria-label="Salir"><i class="ti ti-logout"></i></button>
-    <button class="mob-sync" onclick="doSync()"><i class="ti ti-refresh" id="sync-i-mob"></i></button>
+    <button class="mob-sync" onclick="doSync()" aria-label="Sincronizar"><i class="ti ti-refresh" id="sync-i-mob"></i></button>
   </div>
 
   <div class="pages" id="pages">
@@ -783,7 +787,8 @@ body.sin-sesion > *:not(#acceso):not(script):not(.toast) { display: none !import
   <button class="bt"    data-tab="pla"  onclick="go('pla')"><i class="ti ti-leaf"></i>Plantas</button>
   <button class="bt"    data-tab="cli"  onclick="go('cli')"><i class="ti ti-cloud"></i>Clima</button>
 </div></nav>
-<div class="toast h" id="toast"></div>
+<div class="estado-red hide" id="estado-red" role="status" aria-live="polite"></div>
+<div class="toast h" id="toast" role="status" aria-live="polite"></div>
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -1036,6 +1041,7 @@ const sheetSync = async (tipo, data) => {
   try { await enviarSheet(tipo, data); }
   catch(e) {
     guardarCola([...leerCola(), { tipo, data }]);
+    mostrarEstadoRed();
     toast('Sin conexión con la planilla: se reintenta solo al volver');
   }
 };
@@ -1049,9 +1055,25 @@ const vaciarColaSheet = async () => {
       try { await enviarSheet(cola[0].tipo, cola[0].data); } catch(e) { break; }
       cola = cola.slice(1); guardarCola(cola);   // se guarda de a uno: si se corta, no se reenvía lo ya enviado
     }
-  } finally { vaciandoCola = false; }
+  } finally { vaciandoCola = false; mostrarEstadoRed(); }
 };
-window.addEventListener('online', vaciarColaSheet);
+const mostrarEstadoRed = () => {
+  const el = document.getElementById('estado-red'); if (!el) return;
+  const sinRed = typeof navigator !== 'undefined' && navigator.onLine === false;
+  const pend = leerCola().length;
+  el.textContent = sinRed
+    ? 'Sin conexión: lo que cargues se guarda y se envía al volver' + (pend ? ' · ' + pend + ' pendiente' + (pend > 1 ? 's' : '') : '')
+    : pend ? pend + ' cambio' + (pend > 1 ? 's' : '') + ' pendiente' + (pend > 1 ? 's' : '') + ' de enviar a la planilla' : '';
+  el.classList.toggle('hide', !sinRed && !pend);
+};
+window.addEventListener('online', () => { mostrarEstadoRed(); vaciarColaSheet().then(mostrarEstadoRed); });
+window.addEventListener('offline', mostrarEstadoRed);
+mostrarEstadoRed();
+
+// Las tarjetas son <div role="button">: Enter o Espacio las abren como un clic.
+document.addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.sysc[role="button"]')) { e.preventDefault(); e.target.click(); }
+});
 
 // ════ UTILS ════
 // A medianoche local: si quedara con la hora real, los "días sin agua/cambio/
@@ -1337,12 +1359,12 @@ const sysHTML = s => {
   if(e.fase==='q'){pp=Math.min(100,Math.round(e.d/180*100));pc='pfa';}
   if(e.fase==='l'){pp=100;pc='pfg';}
   const mp = [s.inicioC?'Carga: '+fmt(s.inicioC):'', s.inicioE?'Estanque: '+fmt(s.inicioE):'', rc?rc+' revolcada(s)':''].filter(Boolean);
-  return `<div class="sysc" onclick="openSis(${s.id})">
+  return `<div class="sysc" role="button" tabindex="0" onclick="openSis(${s.id})">
     <div class="sysc-top">
       <span class="sysc-name">${esc(sLbl(s))}</span>
       <span style="display:flex;align-items:center;gap:6px">
         <span class="badge ${e.cls}">${e.label}${e.d?' · '+e.d+'d':''}</span>
-        <button class="del-btn" onclick="delSis(${s.id},event)" title="Eliminar sistema"><i class="ti ti-trash"></i></button>
+        <button class="del-btn" onclick="delSis(${s.id},event)" title="Eliminar sistema" aria-label="Eliminar sistema"><i class="ti ti-trash"></i></button>
       </span>
     </div>
     ${mp.length?`<div class="sysc-meta">${mp.join('&nbsp;&nbsp;·&nbsp;&nbsp;')}</div>`:''}
@@ -1646,7 +1668,7 @@ const plantHTML = p => {
   if (e.plagasUrg) badges.push(`<span class="badge" style="background:var(--sky-bg);color:var(--sky)">🐛 Revisar plagas</span>`);
   if (e.podaProx) badges.push(`<span class="badge bv">✂️ Poda cerca</span>`);
   const meta = [p.variedad||p.especie, p.ubicacion].filter(Boolean).join(' · ');
-  return `<div class="sysc" onclick="openPla(${p.id})">
+  return `<div class="sysc" role="button" tabindex="0" onclick="openPla(${p.id})">
     <div class="sysc-top">
       <span class="sysc-name">${esc(pLbl(p))}</span>
       ${p.estado?`<span class="badge bv">${p.estado}</span>`:''}
@@ -1712,7 +1734,7 @@ const renderRev = () => {
       <td>${ok}</td>
       <td style="font-size:12px;color:var(--ink3)">${c?`${n1(c.temp)}°C · ${n0(c.hum)}% · ${c.lluvia==='si'?'☔ '+n1(c.mm)+'mm':'sin lluvia'} · ${n0(c.viento)} km/h`:'Sin datos de clima'}</td>
       <td style="font-size:12px;color:var(--ink3);font-style:italic">${esc(r.obs)}</td>
-      <td><button class="del-btn" onclick="delRev('${r.id}',event)"><i class="ti ti-x"></i></button></td>
+      <td><button class="del-btn" aria-label="Eliminar revolcada" onclick="delRev('${r.id}',event)"><i class="ti ti-x"></i></button></td>
     </tr>`;
   }).join('');
   document.getElementById('rev-c').innerHTML=`
@@ -1757,7 +1779,7 @@ const renderPec = () => {
       <td>${esc(r.tipo)}</td>
       <td style="font-size:12px;color:var(--ink3)">${esc(r.detalle)}</td>
       <td style="font-size:12px;color:var(--ink3);font-style:italic">${esc(r.resultado)}</td>
-      <td><button class="del-btn" onclick="delEventoPecera('${r.id}',event)"><i class="ti ti-x"></i></button></td>
+      <td><button class="del-btn" aria-label="Eliminar evento" onclick="delEventoPecera('${r.id}',event)"><i class="ti ti-x"></i></button></td>
     </tr>`).join('');
   const tableHTML = regs.length
     ? `<div class="tbl-wrap"><div class="tbl-scroll"><table class="rtbl">
