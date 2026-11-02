@@ -48,25 +48,26 @@
   --paper2:    #e8d9b3;
   --paper3:    #dbc590;
   --ink:       #37301F;
-  --ink2:      #6c6250;
-  --ink3:      #8f8265;
+  --ink2:      #564d3c;
+  --ink3:      #5f5743;
   --rule:      #dbc998;
   --rule2:     #c6ae76;
   --sage:      #4d6538;
   --sage-bg:   #e8ecd9;
-  --sage-mid:  #66804c;
+  --sage-mid:  #586e42;
   --sage-lt:   #f1f4e7;
-  --umber:     #a8672e;
+  --umber:     #885325;
   --umber-bg:  #f5e8d3;
-  --umber-mid: #c17f42;
-  --sky:       #4c6d85;
+  --umber-mid: #8d5c2e;
+  --sky:       #4a6a82;
   --sky-bg:    #e5edf1;
-  --sky-mid:   #62889f;
+  --sky-mid:   #4d6c7e;
   --rust:      #9c3f2e;
   --rust-bg:   #f5e1da;
-  --rust-mid:  #bf5a41;
+  --rust-mid:  #a54d38;
   --moss:      #5c6b34;
   --moss-bg:   #ecefdc;
+  --on-accent: #ffffff;   /* texto sobre fondos sage/umber/rust */
   /* acentos "neón" reservados para gráficos/datos (líneas, donuts,
      barras, anillos) — el resto de la UI se queda en la paleta natural */
   --chart-1:   #2f9150;
@@ -77,8 +78,8 @@
   /* sidebar */
   --side-bg:   #d4c496;
   --side-on:   #4c6636;
-  --side-txt:  #82784f;
-  --side-act:  #3e5a2c;
+  --side-txt:  #595236;
+  --side-act:  #3d582b;
   /* fonts */
   --serif:     'DM Serif Display', Georgia, serif;
   --sans:      'DM Sans', system-ui, sans-serif;
@@ -94,20 +95,20 @@
   :root {
     /* mismo espíritu natural, pero "tierra/corteza" en vez de negro puro */
     --cream:#1c170e; --paper:#332a18; --paper2:#3c311c; --paper3:#473a20;
-    --ink:#f1e9d7; --ink2:#c6b899; --ink3:#9c8f70;
+    --ink:#f1e9d7; --ink2:#c6b899; --ink3:#b0a58d;
     --rule:#4a3c22; --rule2:#5f4e2b;
     --sage:#93b06b; --sage-bg:#2a3520; --sage-mid:#a7c37e; --sage-lt:#212a18;
     --umber:#dc9c55; --umber-bg:#3b2b18; --umber-mid:#e5ac6c;
     --sky:#82a4bc; --sky-bg:#202e37; --sky-mid:#9cbcd1;
     --rust:#db7a63; --rust-bg:#3b251e; --rust-mid:#e18d76;
-    --moss:#a0b96d; --moss-bg:#283017;
+    --moss:#a0b96d; --moss-bg:#283017; --on-accent:#1c170e;
     /* acentos neón para gráficos — brillan sobre el fondo oscuro */
     --chart-1:   #4fe07a;
     --chart-2:   #37d3e8;
     --chart-3:   #ffbf3f;
     --chart-4:   #ff6e58;
     --chart-5:   #b98bff;
-    --side-bg:#26210f; --side-on:#a7c37e; --side-txt:#6b6142; --side-act:#bbdb94;
+    --side-bg:#26210f; --side-on:#a7c37e; --side-txt:#96885c; --side-act:#bbdb94;
   }
 }
 
@@ -385,7 +386,7 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
 .fhint { font-size: 12px; color: var(--ink3); margin-top: 4px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 600px) { .form-row { grid-template-columns: 1fr; } }
-.btn-g { width: 100%; padding: 13px; border-radius: var(--r); font-size: 14px; font-weight: 700; cursor: pointer; border: none; background: var(--sage); color: #fff; margin-bottom: 8px; font-family: var(--sans); transition: background .15s, transform .1s; }
+.btn-g { width: 100%; padding: 13px; border-radius: var(--r); font-size: 14px; font-weight: 700; cursor: pointer; border: none; background: var(--sage); color: var(--on-accent); margin-bottom: 8px; font-family: var(--sans); transition: background .15s, transform .1s; }
 .btn-g:hover { background: var(--sage-mid); } .btn-g:active { transform: scale(.98); }
 .btn-o { width: 100%; padding: 11px; border-radius: var(--r); font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid var(--rule2); background: var(--paper2); color: var(--ink); font-family: var(--sans); }
 .add-btn { width: 100%; padding: 15px; background: var(--paper); border-radius: var(--rl); border: 1.5px dashed var(--rule2); cursor: pointer; font-size: 13px; font-weight: 600; color: var(--ink2); display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 10px; font-family: var(--sans); transition: border-color .15s, color .15s; }
@@ -410,11 +411,16 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
 .mt-tbl tr:last-child td { border-bottom: none; }
 
 /* toast */
-.toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(0); background: var(--sage); color: #fff; padding: 10px 22px; border-radius: 30px; font-size: 13px; font-weight: 600; z-index: 200; white-space: nowrap; transition: opacity .25s, transform .25s; pointer-events: none; box-shadow: 0 4px 20px rgba(0,0,0,.25); }
-.estado-red { position: fixed; top: 0; left: 0; right: 0; z-index: 150; padding: calc(6px + env(safe-area-inset-top)) 14px 6px; background: var(--umber); color: #fff; font-size: 12.5px; font-weight: 600; text-align: center; }
+.toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(0); background: var(--sage); color: var(--on-accent); padding: 10px 22px; border-radius: 30px; font-size: 13px; font-weight: 600; z-index: 200; width: max-content; max-width: calc(100vw - 32px); text-align: center; transition: opacity .25s, transform .25s; pointer-events: none; box-shadow: 0 4px 20px rgba(0,0,0,.25); }
+.estado-red { position: fixed; top: 0; left: 0; right: 0; z-index: 150; padding: calc(6px + env(safe-area-inset-top)) 14px 6px; background: var(--umber); color: var(--on-accent); font-size: 12.5px; font-weight: 600; text-align: center; }
 .estado-red.hide { display: none; }
+.sync-ult { font-size: 11px; color: var(--ink2); line-height: 1.3; }
+.sync-ult.viejo { color: var(--umber); font-weight: 600; }
+.sb-foot .sync-ult { padding: 2px 4px 6px; }
+.toast-act { margin-left: 14px; padding: 2px 4px; border: none; background: none; color: var(--on-accent); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; pointer-events: auto; }
 .sysc:focus-visible, .tk-btn:focus-visible, .del-btn:focus-visible, .fab:focus-visible, .mob-sync:focus-visible, .sync-side:focus-visible, .sn:focus-visible, .bt:focus-visible, .chip:focus-visible { outline: 2px solid var(--sage-mid); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
+@media (max-width: 767px) { .toast { bottom: calc(80px + env(safe-area-inset-bottom)); } }
 .toast.h { opacity: 0; transform: translateX(-50%) translateY(8px); }
 /* desplegable propio (reemplaza al <select> nativo) */
 .cs { position: relative; }
@@ -435,8 +441,8 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
 .dlg p { font-size: 14px; line-height: 1.45; color: var(--ink2); margin-bottom: 18px; white-space: pre-line; }
 .dlg-btns { display: flex; gap: 8px; }
 .dlg-btns button { flex: 1; min-height: 44px; border-radius: var(--r); font-size: 14px; font-weight: 700; cursor: pointer; font-family: var(--sans); border: 1px solid var(--rule2); background: var(--paper2); color: var(--ink); }
-.dlg-btns button.ok { background: var(--sage); border-color: var(--sage); color: #fff; }
-.dlg-btns button.danger { background: var(--rust-mid); border-color: var(--rust-mid); color: #fff; }
+.dlg-btns button.ok { background: var(--sage); border-color: var(--sage); color: var(--on-accent); }
+.dlg-btns button.danger { background: var(--rust-mid); border-color: var(--rust-mid); color: var(--on-accent); }
 @keyframes dlgIn { from { opacity: 0; } to { opacity: 1; } }
 .btn-del { width: 100%; padding: 11px; border-radius: var(--r); font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid var(--rust-mid); background: transparent; color: var(--rust); font-family: var(--sans); }
 .btn-del:hover { background: var(--rust-bg); }
@@ -457,7 +463,7 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
 .reg-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 .reg-item { min-height: 72px; border: 1px solid var(--rule2); background: var(--paper); border-radius: var(--rl); font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--ink); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
 .reg-item span { font-size: 24px; }
-.fab { position: fixed; right: 18px; bottom: 24px; width: 56px; height: 56px; border-radius: 50%; border: none; background: var(--sage); color: #fff; font-size: 26px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.3); z-index: 41; }
+.fab { position: fixed; right: 18px; bottom: 24px; width: 56px; height: 56px; border-radius: 50%; border: none; background: var(--sage); color: var(--on-accent); font-size: 26px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.3); z-index: 41; }
 .fab:active { transform: scale(.94); }
 @media (max-width: 767px) { .fab { bottom: calc(56px + env(safe-area-inset-bottom) + 16px); } }
 /* HOY */
@@ -472,7 +478,7 @@ table.ctbl tr.hoy td:first-child { font-weight: 800; color: var(--sage); }
 .tk-body { flex: 1; min-width: 0; }
 .tk-t { font-size: 14px; font-weight: 600; color: var(--ink); }
 .tk-d { font-size: 12px; color: var(--ink3); margin-top: 2px; }
-.tk-btn { flex: 0 0 auto; min-width: 48px; min-height: 48px; border: none; border-radius: var(--r); background: var(--sage); color: #fff; font-size: 20px; font-weight: 700; font-family: var(--sans); cursor: pointer; }
+.tk-btn { flex: 0 0 auto; min-width: 48px; min-height: 48px; border: none; border-radius: var(--r); background: var(--sage); color: var(--on-accent); font-size: 20px; font-weight: 700; font-family: var(--sans); cursor: pointer; }
 .tk-undo { background: var(--paper2); color: var(--ink); font-size: 13px; padding: 0 14px; }
 .tk-done { opacity: .75; border-left-color: var(--sage-mid); }
 .tk-done .tk-t { text-decoration: line-through; }
@@ -548,6 +554,7 @@ body.sin-sesion > *:not(#acceso):not(script):not(.toast) { display: none !import
     <button class="sync-side" onclick="doSync()">
       <i class="ti ti-refresh" id="sync-i-side"></i> Sincronizar
     </button>
+    <div class="sync-ult" id="sync-ult-side"></div>
   </div>
 </aside>
 
@@ -560,7 +567,7 @@ body.sin-sesion > *:not(#acceso):not(script):not(.toast) { display: none !import
   <div class="mob-hdr">
     <div class="mob-brand">
       <img class="mob-icon" src="icons/logo.svg" alt="">
-      <div class="mob-title">Brote</div>
+      <div><div class="mob-title">Brote</div><div class="sync-ult" id="sync-ult-mob"></div></div>
     </div>
     <button class="mob-sync" onclick="abrirHistorial()" aria-label="Historial"><i class="ti ti-history"></i></button>
     <button class="mob-sync" onclick="salir()" aria-label="Salir"><i class="ti ti-logout"></i></button>
@@ -1012,8 +1019,30 @@ const fbLoad = async () => {
     const krd = await getDocs(query(collection(db,'registroPecera'),orderBy('fecha','desc')));
     if (krd.docs.length) S.registroPecera = conservarLocales(S.registroPecera, krd.docs.map(d=>({...d.data(),id:d.id})), ID_LOCAL_PEC, r => r.fecha+'|'+r.tipo);
     sv();
-  } catch(e) { toast('No se pudo sincronizar con la nube: mostrando lo guardado en este dispositivo'); }
+    marcarSync();
+  } catch(e) { toast('Sin conexión con la nube: se muestra lo guardado en este dispositivo'); }
 };
+
+// ════ ÚLTIMA SINCRONIZACIÓN ════
+// Se anota cada vez que fbLoad() trae los datos de Firestore sin errores; si falla, la hora
+// queda vieja y el texto se pone en naranja a partir de la hora.
+const CLAVE_SYNC = 'brote_ultimo_sync';
+const leerSync = () => { try { return +localStorage.getItem(CLAVE_SYNC) || null; } catch(e) { return null; } };
+const textoSync = (ts, ahora = Date.now()) => {
+  if (!ts) return 'Sin sincronizar todavía';
+  const min = Math.max(0, Math.floor((ahora - ts) / 60000));
+  if (min < 1) return 'Sincronizado ahora';
+  if (min < 60) return 'Sincronizado hace ' + min + ' min';
+  const h = Math.floor(min / 60);
+  return h < 24 ? 'Sincronizado hace ' + h + ' h' : 'Sincronizado hace ' + Math.floor(h / 24) + ' d';
+};
+const pintarSync = () => {
+  const ts = leerSync(), txt = textoSync(ts), viejo = !ts || Date.now() - ts >= 3600000;
+  ['sync-ult-side', 'sync-ult-mob'].forEach(id => { const el = document.getElementById(id); if (el) { el.textContent = txt; el.classList.toggle('viejo', viejo); } });
+};
+const marcarSync = () => { try { localStorage.setItem(CLAVE_SYNC, String(Date.now())); } catch(e) {} pintarSync(); };
+setInterval(pintarSync, 60000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pintarSync(); });
 
 // ════ SYNC A GOOGLE SHEET (Apps Script Web App) ════
 // fetch en modo no-cors: no podemos leer la respuesta, pero evita el preflight CORS
@@ -1069,6 +1098,7 @@ const mostrarEstadoRed = () => {
 window.addEventListener('online', () => { mostrarEstadoRed(); vaciarColaSheet().then(mostrarEstadoRed); });
 window.addEventListener('offline', mostrarEstadoRed);
 mostrarEstadoRed();
+pintarSync();
 
 // Las tarjetas son <div role="button">: Enter o Espacio las abren como un clic.
 document.addEventListener('keydown', e => {
@@ -1255,7 +1285,7 @@ const prevHTML = () => {
         const e = est.find(x => x.g === g && x.tr.id === fila.trat.id);
         return `<div style="padding:8px 0;border-top:1px solid var(--paper3)">
           <div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b style="font-size:13px">${fila.trat.nombre}</b>${chip(e)}</div>
-          <div style="display:flex;gap:2px;margin:6px 0">${fila.meses.map((on, i) => `<span style="flex:1;text-align:center;font-size:9px;padding:2px 0;border-radius:3px;${on ? 'background:var(--chart-1);color:#fff;' : 'background:var(--paper3);color:var(--ink3);'}${i + 1 === mesAct ? 'outline:2px solid var(--ink);' : ''}">${MESES_ABR[i]}</span>`).join('')}</div>
+          <div style="display:flex;gap:2px;margin:6px 0">${fila.meses.map((on, i) => `<span style="flex:1;text-align:center;font-size:10px;padding:2px 0;border-radius:3px;${on ? 'background:var(--sage);color:var(--on-accent);' : 'background:var(--paper3);color:var(--ink3);'}${i + 1 === mesAct ? 'outline:2px solid var(--ink);' : ''}">${MESES_ABR[i]}</span>`).join('')}</div>
           <div style="font-size:12px;color:var(--ink3)"><b>${fila.trat.producto}</b> — ${fila.trat.dosis}${fila.trat.nota ? `<br><i>${fila.trat.nota}</i>` : ''}</div>
           ${e.ultima ? `<div style="font-size:11px;color:var(--ink3);margin-top:3px">Última: ${fmt(fISO(e.ultima))}</div>` : ''}
         </div>`;
@@ -2013,13 +2043,22 @@ const registrarEventoPlanta = (planta, fecha, tipo, detalle = '', producto = '',
   registrarLocal(S.registroPlantas, 'registroPlantas', 'plantaEvento', { id:'ev'+Date.now()+(++seqEv), planta, fecha, tipo, detalle, producto, resultado });
 const registrarEventoPecera = (fecha, tipo, detalle = '', resultado = '') =>
   registrarLocal(S.registroPecera, 'registroPecera', 'peceraEvento', { id:'kv'+Date.now(), fecha, tipo, detalle, resultado });
+// Deshace un registro recién guardado: lo saca de la lista local y de Firestore. La planilla
+// no recibe borrados (igual que al eliminar a mano), así que la fila queda ahí.
+const deshacerRegistro = async (lista, col, rec, ids = ID_LOCAL_REV) => {
+  const i = lista.indexOf(rec); if (i >= 0) lista.splice(i, 1);
+  sv();
+  if (rec.id && !ids(String(rec.id))) await fbDel(col, rec.id);
+  refresh();
+  toast('Registro deshecho');
+};
 window.saveRev = async () => {
   const f=document.getElementById('rf').value, si=+document.getElementById('rs').value;
   if(!f){ toast('Completá la fecha'); return; }
-  await registrarRevolcada(si, f, document.getElementById('ro').value);
+  const rec = await registrarRevolcada(si, f, document.getElementById('ro').value);
   document.getElementById('ro').value = '';
   closeRegistro();
-  toast(`✅ Revolcada guardada — Sistema ${si}`);
+  toast(`✅ Revolcada guardada — Sistema ${si}`, { fn: () => deshacerRegistro(S.revolcadas, 'revolcadas', rec, ID_LOCAL_REV) });
   refresh();
 };
 
@@ -2073,10 +2112,10 @@ window.delPlanta = async id => {
 window.saveEventoPlanta = async () => {
   const pid=+document.getElementById('pv').value, f=document.getElementById('pf').value;
   if(!f){ toast('Completá la fecha'); return; }
-  await registrarEventoPlanta(pid, f, document.getElementById('pt').value, document.getElementById('pd').value, document.getElementById('pp').value, document.getElementById('pr').value);
+  const rec = await registrarEventoPlanta(pid, f, document.getElementById('pt').value, document.getElementById('pd').value, document.getElementById('pp').value, document.getElementById('pr').value);
   ['pd','pp','pr'].forEach(x=>document.getElementById(x).value='');
   closeRegistro();
-  toast(`✅ Evento guardado — ${pLbl(S.plantas.find(p=>p.id===pid))}`);
+  toast(`✅ Evento guardado — ${pLbl(S.plantas.find(p=>p.id===pid))}`, { fn: () => deshacerRegistro(S.registroPlantas, 'registroPlantas', rec, ID_LOCAL_PLA) });
   refresh();
 };
 
@@ -2100,10 +2139,10 @@ window.saveEventoPecera = async () => {
   const f = document.getElementById('kf').value;
   if(!f){ toast('Completá la fecha'); return; }
   const tipo = document.getElementById('kt').value;
-  await registrarEventoPecera(f, tipo, document.getElementById('kd').value, document.getElementById('kr').value);
+  const rec = await registrarEventoPecera(f, tipo, document.getElementById('kd').value, document.getElementById('kr').value);
   ['kd','kr'].forEach(x=>document.getElementById(x).value='');
   closeRegistro();
-  toast(`✅ Evento de pecera guardado — ${tipo}`);
+  toast(`✅ Evento de pecera guardado — ${tipo}`, { fn: () => deshacerRegistro(S.registroPecera, 'registroPecera', rec, ID_LOCAL_PEC) });
   refresh();
 };
 window.delEventoPecera = async (id, e) => {
@@ -2358,10 +2397,18 @@ document.querySelectorAll('.f select').forEach(csEnhance);
 
 // ════ TOAST ════
 let tt;
-const toast = msg => {
+// op = { label, fn }: agrega un botón (ej. "Deshacer") y deja el aviso más tiempo en pantalla.
+const toast = (msg, op) => {
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.remove('h');
-  clearTimeout(tt); tt = setTimeout(()=>t.classList.add('h'), 2800);
+  t.style.pointerEvents = op ? 'auto' : '';
+  if (op) {
+    const b = document.createElement('button');
+    b.className = 'toast-act'; b.textContent = op.label || 'Deshacer';
+    b.onclick = () => { clearTimeout(tt); t.classList.add('h'); t.style.pointerEvents = ''; op.fn(); };
+    t.appendChild(b);
+  }
+  clearTimeout(tt); tt = setTimeout(() => { t.classList.add('h'); t.style.pointerEvents = ''; }, op ? 6500 : 2800);
 };
 window.showToast = toast;
 
