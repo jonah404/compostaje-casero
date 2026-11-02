@@ -18,7 +18,7 @@ const APP_SHELL = [
   '/icons/icon-192.png',
   '/icons/icon-512.png',
 ];
-// Fuentes de Google e se sirven de la caché y se refrescan en segundo plano.
+// Las fuentes de Google se sirven de la caché y se refrescan en segundo plano.
 const EXTERNAL_CACHE = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 
 self.addEventListener('install', event => {
