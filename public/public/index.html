@@ -1066,6 +1066,8 @@ const proxRev = s => {
   const base = r.length ? pISO(r[0].fecha) : pISO(s.inicioC);
   const p = new Date(base); p.setDate(p.getDate()+7); return p;
 };
+// Todo texto cargado por el usuario (nombres, notas, observaciones) se escapa antes de meterlo en innerHTML.
+const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const sLbl = s => s.nombre ? `#${s.id} — ${s.nombre}` : `Sistema ${s.id}`;
 
 // ════ PLANTAS — cálculos ════
@@ -1319,7 +1321,7 @@ const prevHTML = () => {
   const grupos = [...new Set(est.map(e => e.g))];
   return `<details class="fold" open><summary>🛡️ Calendario preventivo · ${est.filter(e => e.estado === 'hoy').length} para hoy</summary>
     ${grupos.map(g => `
-      <div style="font-weight:600;margin:12px 0 4px">${GRUPOS[g].icono} ${GRUPOS[g].nombre} <span style="font-weight:400;font-size:12px;color:var(--ink3)">· ${est.find(e => e.g === g).plantas.map(pLbl).join(', ')}</span></div>
+      <div style="font-weight:600;margin:12px 0 4px">${GRUPOS[g].icono} ${GRUPOS[g].nombre} <span style="font-weight:400;font-size:12px;color:var(--ink3)">· ${est.find(e => e.g === g).plantas.map(p => esc(pLbl(p))).join(', ')}</span></div>
       ${calendarioAnual(g).map(fila => {
         const e = est.find(x => x.g === g && x.tr.id === fila.trat.id);
         return `<div style="padding:8px 0;border-top:1px solid var(--paper3)">
@@ -1448,7 +1450,7 @@ const sysHTML = s => {
   const mp = [s.inicioC?'Carga: '+fmt(s.inicioC):'', s.inicioE?'Estanque: '+fmt(s.inicioE):'', rc?rc+' revolcada(s)':''].filter(Boolean);
   return `<div class="sysc" onclick="openSis(${s.id})">
     <div class="sysc-top">
-      <span class="sysc-name">${sLbl(s)}</span>
+      <span class="sysc-name">${esc(sLbl(s))}</span>
       <span style="display:flex;align-items:center;gap:6px">
         <span class="badge ${e.cls}">${e.label}${e.d?' · '+e.d+'d':''}</span>
         <button class="del-btn" onclick="delSis(${s.id},event)" title="Eliminar sistema"><i class="ti ti-trash"></i></button>
@@ -1656,7 +1658,7 @@ const urgentesHoy = () => {
 };
 
 const filaTarea = (t, enEspera = false) => `<div class="tk ${enEspera ? 'tk-done' : (t.atraso > 0 ? 'tk-late' : '')}">
-  <div class="tk-body"><div class="tk-t">${t.titulo}</div><div class="tk-d">${enEspera ? 'Registrado — se guarda en unos segundos' : t.detalle}</div></div>
+  <div class="tk-body"><div class="tk-t">${esc(t.titulo)}</div><div class="tk-d">${enEspera ? 'Registrado — se guarda en unos segundos' : esc(t.detalle)}</div></div>
   ${enEspera
     ? `<button class="tk-btn tk-undo" onclick="deshacerTarea('${t.id}')">Deshacer</button>`
     : `<button class="tk-btn" aria-label="${t.modo === 'uno' ? 'Marcar hecha' : 'Registrar'}" onclick="tareaTap('${t.id}')">${t.modo === 'uno' ? '✓' : '›'}</button>`}
@@ -1681,13 +1683,13 @@ const renderHoy = () => {
       <button class="chip" onclick="go('comp')">🌱 Compost · ${nC}</button>
       <button class="chip" onclick="go('pla')">🪴 Plantas · ${nP}</button>
     </div>
-    ${urg.map(a => `<div class="al ${a.c}"><div class="al-t">${a.t}</div>${a.b ? `<div class="al-b">${a.b}</div>` : ''}</div>`).join('')}
+    ${urg.map(a => `<div class="al ${a.c}"><div class="al-t">${esc(a.t)}</div>${a.b ? `<div class="al-b">${esc(a.b)}</div>` : ''}</div>`).join('')}
     <div class="sh">Tareas de hoy para ${duenoDelDia(TODAY)} <span class="sh-sub">${pend.length}</span></div>
     ${hoy.length
       ? AREAS_HOY.map(seccion).join('')
-      : `<div class="card tk-empty">Todo al día 🌿${prox[0] ? `<div class="tk-d">Próximo: ${prox[0].titulo} — ${prox[0].detalle}</div>` : ''}</div>`}
-    ${hechas.length ? `<details class="fold"><summary>Hechas hoy · ${hechas.length}</summary>${hechas.map(h => `<div class="tk tk-done"><div class="tk-body"><div class="tk-t">${h.titulo}</div></div></div>`).join('')}</details>` : ''}
-    ${prox.length ? `<details class="fold"><summary>Próximos · ${prox.length}</summary>${prox.map(t => `<div class="tk"><div class="tk-body"><div class="tk-t">${t.titulo}</div><div class="tk-d">${t.detalle}</div></div></div>`).join('')}</details>` : ''}`;
+      : `<div class="card tk-empty">Todo al día 🌿${prox[0] ? `<div class="tk-d">Próximo: ${esc(prox[0].titulo)} — ${esc(prox[0].detalle)}</div>` : ''}</div>`}
+    ${hechas.length ? `<details class="fold"><summary>Hechas hoy · ${hechas.length}</summary>${hechas.map(h => `<div class="tk tk-done"><div class="tk-body"><div class="tk-t">${esc(h.titulo)}</div></div></div>`).join('')}</details>` : ''}
+    ${prox.length ? `<details class="fold"><summary>Próximos · ${prox.length}</summary>${prox.map(t => `<div class="tk"><div class="tk-body"><div class="tk-t">${esc(t.titulo)}</div><div class="tk-d">${esc(t.detalle)}</div></div></div>`).join('')}</details>` : ''}`;
 };
 window.renderHoy = renderHoy;
 
@@ -1819,7 +1821,7 @@ const plantHTML = p => {
   const meta = [p.variedad||p.especie, p.ubicacion].filter(Boolean).join(' · ');
   return `<div class="sysc" onclick="openPla(${p.id})">
     <div class="sysc-top">
-      <span class="sysc-name">${pLbl(p)}</span>
+      <span class="sysc-name">${esc(pLbl(p))}</span>
       ${p.estado?`<span class="badge bv">${p.estado}</span>`:''}
     </div>
     ${meta?`<div class="sysc-meta">${meta}</div>`:''}
@@ -1882,7 +1884,7 @@ const renderRev = () => {
       <td style="text-align:center">${diasAnt!==null?diasAnt:'—'}</td>
       <td>${ok}</td>
       <td style="font-size:12px;color:var(--ink3)">${c?`${n1(c.temp)}°C · ${n0(c.hum)}% · ${c.lluvia==='si'?'☔ '+n1(c.mm)+'mm':'sin lluvia'} · ${n0(c.viento)} km/h`:'Sin datos de clima'}</td>
-      <td style="font-size:12px;color:var(--ink3);font-style:italic">${r.obs||''}</td>
+      <td style="font-size:12px;color:var(--ink3);font-style:italic">${esc(r.obs)}</td>
       <td><button class="del-btn" onclick="delRev('${r.id}',event)"><i class="ti ti-x"></i></button></td>
     </tr>`;
   }).join('');
@@ -1905,7 +1907,7 @@ const renderPec = () => {
 
   const statsHTML = `
     <div class="g4" style="margin-bottom:16px">
-      <div class="stat"><div class="stat-l">Volumen</div><div class="stat-v">${p.litros||'—'}L</div><div class="stat-s">${e.enCiclado?'🔄 en ciclado':'✅ establecida'}</div></div>
+      <div class="stat"><div class="stat-l">Volumen</div><div class="stat-v">${esc(p.litros)||'—'}L</div><div class="stat-s">${e.enCiclado?'🔄 en ciclado':'✅ establecida'}</div></div>
       <div class="stat"><div class="stat-l">Desde el armado</div><div class="stat-v">${e.diasArmado!=null?e.diasArmado:'—'}</div><div class="stat-s">días</div></div>
       <div class="stat"><div class="stat-l">Último cambio de agua</div><div class="stat-v" style="color:${e.cambioUrg?'var(--rust)':'var(--sage)'}">${e.diasSinCambio!=null?e.diasSinCambio+'d':'—'}</div><div class="stat-s">objetivo cada ${e.limiteCambio}d</div></div>
       <div class="stat"><div class="stat-l">Última limpieza filtro</div><div class="stat-v" style="color:${e.limpiezaUrg?'var(--rust)':'var(--sage)'}">${e.diasSinLimpieza!=null?e.diasSinLimpieza+'d':'—'}</div><div class="stat-s">${e.puedeLimpiar?'objetivo cada '+CFG_PEC.diasLimpiezaFiltro+'d':'esperar al día '+CFG_PEC.diasMinPrimeraLimpieza}</div></div>
@@ -1914,7 +1916,7 @@ const renderPec = () => {
       ${e.cambioUrg?`<span class="badge" style="background:var(--rust-bg);color:var(--rust)">💧 Cambio de agua atrasado</span>`:`<span class="badge bl">💧 Cambio de agua al día</span>`}
       ${e.limpiezaUrg?`<span class="badge" style="background:var(--umber-bg);color:var(--umber)">🧽 Limpiar filtro/esponja</span>`:''}
     </div>
-    ${p.notas?`<div style="font-size:12px;color:var(--ink3);font-style:italic;margin-bottom:16px">${p.notas}</div>`:''}
+    ${p.notas?`<div style="font-size:12px;color:var(--ink3);font-style:italic;margin-bottom:16px">${esc(p.notas)}</div>`:''}
     <div class="fc" style="margin-bottom:16px">
       <h3><i class="ti ti-flask"></i>Guía de dosis</h3>
       <div style="font-size:12px;color:var(--ink3);line-height:1.7">
@@ -1925,9 +1927,9 @@ const renderPec = () => {
 
   const rows = regs.map(r => `<tr>
       <td>${fmt(r.fecha)}</td>
-      <td>${r.tipo}</td>
-      <td style="font-size:12px;color:var(--ink3)">${r.detalle||''}</td>
-      <td style="font-size:12px;color:var(--ink3);font-style:italic">${r.resultado||''}</td>
+      <td>${esc(r.tipo)}</td>
+      <td style="font-size:12px;color:var(--ink3)">${esc(r.detalle)}</td>
+      <td style="font-size:12px;color:var(--ink3);font-style:italic">${esc(r.resultado)}</td>
       <td><button class="del-btn" onclick="delEventoPecera('${r.id}',event)"><i class="ti ti-x"></i></button></td>
     </tr>`).join('');
   const tableHTML = regs.length
@@ -2055,7 +2057,7 @@ const renderCli = () => {
               <td style="text-align:left;font-size:12px;color:var(--ink2)">${c.dir||'—'}</td>
               ${heatCell(c.evapo, 'evapo')}
               ${heatCell(c.sol,   'sol')}
-              <td style="text-align:left;font-size:12px;color:var(--ink3)">${c.notas||''}</td>
+              <td style="text-align:left;font-size:12px;color:var(--ink3)">${esc(c.notas)}</td>
             </tr>`;
           }).join('')}
         </tbody>
@@ -2086,14 +2088,14 @@ window.openSis = id => {
       ${p?`<tr><td>Próx. revolver</td><td style="color:${d<=0?'var(--rust-mid)':d<=2?'var(--umber-mid)':'var(--ink)'};font-weight:700">${d<=0?'HOY ⚠️':fmt(fISO(p))}</td></tr>`:''}
       <tr><td>Revolcadas</td><td>${revs.length}</td></tr>
     </table>
-    ${s.notas?`<div style="font-size:12px;color:var(--ink2);background:var(--paper2);padding:11px;border-radius:var(--r);margin:14px 0">${s.notas}</div>`:''}
+    ${s.notas?`<div style="font-size:12px;color:var(--ink2);background:var(--paper2);padding:11px;border-radius:var(--r);margin:14px 0">${esc(s.notas)}</div>`:''}
     <div style="font-family:var(--serif);font-size:17px;color:var(--ink);margin:18px 0 10px">Revolcadas</div>
     ${revs.length?`<div style="overflow-x:auto"><table class="rtbl" style="width:100%">
       <thead><tr><th>Fecha</th><th>Clima del día</th><th>Observaciones</th></tr></thead>
       <tbody>${revs.map(r=>{const c=cdDia(r.fecha);return`<tr>
         <td><b>${fmt(r.fecha)}</b></td>
         <td style="font-size:12px">${c?`${n1(c.temp)}°C · ${n0(c.hum)}% · ${c.lluvia==='si'?'☔':''}`:'—'}</td>
-        <td style="font-size:12px;color:var(--ink3);font-style:italic">${r.obs||''}</td>
+        <td style="font-size:12px;color:var(--ink3);font-style:italic">${esc(r.obs)}</td>
       </tr>`;}).join('')}</tbody>
     </table></div>`:
     `<div style="font-size:13px;color:var(--ink3)">Sin revolcadas registradas</div>`}
@@ -2110,25 +2112,25 @@ window.openPla = id => {
   document.getElementById('mtitle').textContent = pLbl(p);
   document.getElementById('mbody').innerHTML = `
     <table class="mt-tbl">
-      <tr><td>Variedad / Especie</td><td>${[p.variedad,p.especie].filter(Boolean).join(' / ')||'—'}</td></tr>
+      <tr><td>Variedad / Especie</td><td>${esc([p.variedad,p.especie].filter(Boolean).join(' / '))||'—'}</td></tr>
       <tr><td>Fecha plantación</td><td>${fmt(p.fechaP)}</td></tr>
-      <tr><td>Ubicación</td><td>${p.ubicacion||'—'}</td></tr>
+      <tr><td>Ubicación</td><td>${esc(p.ubicacion)||'—'}</td></tr>
       <tr><td>Estado</td><td>${p.estado||'—'}</td></tr>
       <tr><td>Días sin agua</td><td style="color:${e.riegoUrg?'var(--rust-mid)':e.riegoProx?'var(--umber-mid)':'var(--ink)'}">${e.diasSinAgua!=null?e.diasSinAgua+' días (límite '+e.limite+')':'—'}</td></tr>
       <tr><td>Próxima fertilización</td><td style="color:${e.fertUrg?'var(--umber-mid)':'var(--ink)'}">${e.proximaFert?fmt(fISO(e.proximaFert))+(e.diasParaFert<0?' — atrasada':''):'—'}</td></tr>
       <tr><td>Próxima revisión de plagas</td><td style="color:${e.plagasUrg?'var(--sky-mid)':'var(--ink)'}">${e.proximaPlagas?fmt(fISO(e.proximaPlagas))+(e.diasParaPlagas<0?' — atrasada':''):'—'}</td></tr>
       <tr><td>Próxima poda</td><td>${e.proximaPoda?fmt(fISO(e.proximaPoda)):'—'}</td></tr>
     </table>
-    ${p.notas?`<div style="font-size:12px;color:var(--ink2);background:var(--paper2);padding:11px;border-radius:var(--r);margin:14px 0">${p.notas}</div>`:''}
+    ${p.notas?`<div style="font-size:12px;color:var(--ink2);background:var(--paper2);padding:11px;border-radius:var(--r);margin:14px 0">${esc(p.notas)}</div>`:''}
     ${fitoHTML(p)}
     <div style="font-family:var(--serif);font-size:17px;color:var(--ink);margin:18px 0 10px">Historial</div>
     ${eventos.length?`<div style="overflow-x:auto"><table class="rtbl" style="width:100%">
       <thead><tr><th>Fecha</th><th>Evento</th><th>Detalle</th><th>Resultado</th></tr></thead>
       <tbody>${eventos.map(r=>`<tr>
         <td><b>${fmt(r.fecha)}</b></td>
-        <td>${r.tipo}</td>
-        <td style="font-size:12px;color:var(--ink3)">${r.detalle||''}${r.producto?' — '+r.producto:''}</td>
-        <td style="font-size:12px;color:var(--ink3);font-style:italic">${r.resultado||''}</td>
+        <td>${esc(r.tipo)}</td>
+        <td style="font-size:12px;color:var(--ink3)">${esc(r.detalle)}${r.producto?' — '+esc(r.producto):''}</td>
+        <td style="font-size:12px;color:var(--ink3);font-style:italic">${esc(r.resultado)}</td>
       </tr>`).join('')}</tbody>
     </table></div>`:`<div style="font-size:13px;color:var(--ink3)">Sin eventos registrados</div>`}
     <div style="height:14px"></div>
@@ -2516,10 +2518,10 @@ window.showToast = toast;
 
 // ════ INIT ════
 const poblarSels = () => {
-  const opts = S.sistemas.map(s=>`<option value="${s.id}">${sLbl(s)}</option>`).join('');
+  const opts = S.sistemas.map(s=>`<option value="${s.id}">${esc(sLbl(s))}</option>`).join('');
   ['rs','es'].forEach(id=>{const el=document.getElementById(id);const c=el.value;el.innerHTML=opts;if(c)el.value=c;});
   document.getElementById('hf').innerHTML = '<option value="todos">Todos los sistemas</option>'+opts;
-  const poptsPla = S.plantas.map(p=>`<option value="${p.id}">${pLbl(p)}</option>`).join('');
+  const poptsPla = S.plantas.map(p=>`<option value="${p.id}">${esc(pLbl(p))}</option>`).join('');
   ['pv','epv'].forEach(id=>{const el=document.getElementById(id);const c=el.value;el.innerHTML=poptsPla;if(c)el.value=c;});
   actualizarProblemaSel();
 };
