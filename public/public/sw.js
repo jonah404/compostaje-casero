@@ -3,7 +3,7 @@
 // si cambian, hay que subir esta versión.
 // Hosting sirve html/js con "Cache-Control: no-cache" (firebase.json) y acá se piden con
 // cache:'no-cache'/'reload' para que la caché HTTP del navegador no deje versiones mezcladas.
-const CACHE = 'brote-v15';
+const CACHE = 'brote-v16';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -18,8 +18,8 @@ const APP_SHELL = [
   '/icons/icon-192.png',
   '/icons/icon-512.png',
 ];
-// Fuentes de Google e íconos Tabler: se sirven de la caché y se refrescan en segundo plano.
-const EXTERNAL_CACHE = ['fonts.googleapis.com', 'fonts.gstatic.com', 'cdn.jsdelivr.net'];
+// Fuentes de Google e se sirven de la caché y se refrescan en segundo plano.
+const EXTERNAL_CACHE = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 
 self.addEventListener('install', event => {
   event.waitUntil(
