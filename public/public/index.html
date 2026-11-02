@@ -988,7 +988,7 @@ const fbLoad = async () => {
     const krd = await getDocs(query(collection(db,'registroPecera'),orderBy('fecha','desc')));
     if (krd.docs.length) S.registroPecera = conservarLocales(S.registroPecera, krd.docs.map(d=>({...d.data(),id:d.id})), ID_LOCAL_PEC, r => r.fecha+'|'+r.tipo);
     sv();
-  } catch(e) {}
+  } catch(e) { toast('No se pudo sincronizar con la nube: mostrando lo guardado en este dispositivo'); }
 };
 
 // ════ SYNC A GOOGLE SHEET (Apps Script Web App) ════
@@ -996,18 +996,43 @@ const fbLoad = async () => {
 // que el Web App de Apps Script no maneja. Es "fire and forget".
 // Manda el ID token de Firebase: el Apps Script lo valida y solo acepta las cuentas
 // autorizadas (el correo que figura en la Sheet sale del token, no de lo que diga el cliente).
+// Si el envío falla de entrada (sin conexión, sin token) queda en una cola local y se
+// reintenta al volver la conexión o al abrir la app. Lo que Apps Script rechace después
+// de recibirlo no se puede ver desde acá (no-cors): eso lo cubre el sync diario Sheet → Firestore.
+const COLA_SHEET = 'brote_cola_sheet';
+const leerCola = () => { try { return JSON.parse(localStorage.getItem(COLA_SHEET) || '[]'); } catch(e) { return []; } };
+const guardarCola = c => { try { localStorage.setItem(COLA_SHEET, JSON.stringify(c)); } catch(e) {} };
+const enviarSheet = async (tipo, data) => {
+  const idToken = auth && auth.currentUser ? await auth.currentUser.getIdToken() : '';
+  if (!idToken) throw new Error('sin sesión');
+  await fetch(SHEET_SYNC_URL, {
+    method: 'POST', mode: 'no-cors', keepalive: true,
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ tipo, data, idToken })
+  });
+};
 const sheetSync = async (tipo, data) => {
   if (!SHEET_SYNC_URL) return;
   if (DRY) { console.info('[dry] sheetSync', tipo, data); return; }
-  try {
-    const idToken = auth && auth.currentUser ? await auth.currentUser.getIdToken() : '';
-    await fetch(SHEET_SYNC_URL, {
-      method: 'POST', mode: 'no-cors', keepalive: true,
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ tipo, data, idToken })
-    });
-  } catch(e) {}
+  try { await enviarSheet(tipo, data); }
+  catch(e) {
+    guardarCola([...leerCola(), { tipo, data }]);
+    toast('Sin conexión con la planilla: se reintenta solo al volver');
+  }
 };
+let vaciandoCola = false;
+const vaciarColaSheet = async () => {
+  if (vaciandoCola || DRY || !SHEET_SYNC_URL) return;
+  vaciandoCola = true;
+  try {
+    let cola = leerCola();
+    while (cola.length) {
+      try { await enviarSheet(cola[0].tipo, cola[0].data); } catch(e) { break; }
+      cola = cola.slice(1); guardarCola(cola);   // se guarda de a uno: si se corta, no se reenvía lo ya enviado
+    }
+  } finally { vaciandoCola = false; }
+};
+window.addEventListener('online', vaciarColaSheet);
 
 // ════ UTILS ════
 // A medianoche local: si quedara con la hora real, los "días sin agua/cambio/
@@ -2541,7 +2566,7 @@ const init = async () => {
       if(ok){ refresh(); }
     });
   }
-  fbLoad().then(async ()=>{ poblarSels(); refresh(); await cargarPreviasPrev(); });
+  fbLoad().then(async ()=>{ poblarSels(); refresh(); await cargarPreviasPrev(); vaciarColaSheet(); });
 };
 
 // ════ ACCESO (login con Google) ════

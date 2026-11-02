@@ -127,60 +127,11 @@ console.log('agregarEspeciesFaltantes');
   });
 }
 
-console.log('altaPlantasInterior2');
-{
-  const esp = hoja(espBase(), 13), pla = hoja(plaBase()), reg = hoja(regBase());
-  const llamadas = [];
-  const g = cargar({ Especies: esp, Plantas: pla, 'Registro Plantas': reg }, llamadas);
-  g.altaPlantasInterior2();
-  const nuevas = pla.rows.filter(r => Number(r[0]) >= 20);
-  t('crea 8 fichas con IDs 20-27 (sin reusar 13-19)', () => {
-    assert.deepEqual(nuevas.map(r => r[0]), [20, 21, 22, 23, 24, 25, 26, 27]);
-    assert.deepEqual(nuevas.map(r => r[1]), ['Helecho de cinta', 'Helecho Hawaii', 'Helecho Davana', 'Helecho estrella azul', 'Dracena marginata tricolor', 'Philodendron imperial red', 'Falsa aralia', 'Helecho espárrago']);
-  });
-  t('el helecho espárrago queda en la galería; el resto en interior', () => {
-    assert.equal(nuevas[7][5], 'Galería (exterior)');
-    nuevas.slice(0, 7).forEach(r => assert.equal(r[5], 'Interior'));
-  });
-  t('cada una tiene último riego y un evento en Registro Plantas', () => {
-    nuevas.forEach(r => { assert.equal(Object.prototype.toString.call(r[16]), '[object Date]'); assert.ok(reg.rows.some(x => x[0] === r[0] && x[3].indexOf('Riego') >= 0), 'riego ' + r[1]); });
-  });
-  t('la ficha se recalcula con el perfil (próxima fertilización cargada)', () => {
-    nuevas.forEach(r => { [11, 13, 15].forEach(c => assert.equal(Object.prototype.toString.call(r[c]), '[object Date]', 'col ' + (c + 1) + ' de ' + r[1])); });
-  });
-  t('sincroniza a Firestore (una llamada por planta de la hoja)', () => {
-    const ids = llamadas.map(l => l.url.match(/plantas\/(\d+)\?/)[1]);
-    [20, 27].forEach(i => assert.ok(ids.includes(String(i))));
-  });
-  t('repetirla no duplica plantas ni riegos', () => {
-    const p = pla.rows.length, r = reg.rows.length;
-    g.altaPlantasInterior2();
-    assert.equal(pla.rows.length, p); assert.equal(reg.rows.length, r);
-  });
-}
-
-console.log('quitarHuertaSheet');
-{
-  const pla = hoja(plaBase()), reg = hoja(regBase());
-  const g = cargar({ Especies: hoja(espBase(), 13), Plantas: pla, 'Registro Plantas': reg });
-  g.quitarHuertaSheet();
-  t('borra solo las filas de huerta (14, 15, 19)', () => {
-    assert.deepEqual(pla.rows.slice(1).map(r => r[0]), [7, 12]);
-  });
-  t('borra sus eventos y conserva los de las otras plantas', () => {
-    assert.deepEqual(reg.rows.slice(1).map(r => r[0]), [7, 12]);
-  });
-  t('vacía las columnas U:AF', () => {
-    pla.rows.forEach(r => { for (let c = 20; c < 32; c++) assert.ok(r[c] === '' || r[c] === undefined, 'col ' + (c + 1)); });
-  });
-  t('repetirla no rompe nada', () => { g.quitarHuertaSheet(); assert.equal(pla.rows.length, 3); });
-}
-
 console.log('autenticación de Firestore');
 {
   const llamadas = [];
   const g = cargar({ Especies: hoja(espBase(), 13), Plantas: hoja(plaBase()), 'Registro Plantas': hoja(regBase()) }, llamadas);
-  g.altaPlantasInterior2();
+  g.sincronizarPlantasAFirestore();
   t('las llamadas a Firestore llevan el token OAuth del script', () => {
     const fs_ = llamadas.filter(l => l.url.includes('firestore.googleapis.com'));
     assert.ok(fs_.length > 0);
