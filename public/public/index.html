@@ -794,6 +794,7 @@ import { esAutorizado, nombreCorto, agruparEntradas, filtrarEntradas, htmlGrupo,
 import { crearEscritor } from './escritor.js';
 import { duenoDelDia } from './turnos.js';
 import { estadoPlanta, esInterior } from './plantas.js';
+import { faseSistema, proxRevolcada, revolcadasEnTiempo } from './compost.js';
 import { ETQ, CFG_PEC, estadoPecera, armarTareas, armarUrgentes } from './tareas.js';
 import { PLANES, GRUPOS, grupoDePlanta, estadoTratamiento, calendarioAnual } from './preventivo.js';
 import {
@@ -1066,24 +1067,8 @@ const n1    = v => (v!=null&&v!==''&&!isNaN(+v)) ? (+v).toFixed(1) : '—';
 const n0    = v => (v!=null&&v!==''&&!isNaN(+v)) ? Math.round(+v)  : '—';
 const cdDia = f => S.clima.find(c => c.fecha === f) || null;
 
-const est = s => {
-  if (!s.inicioC) return {label:'Sin datos',cls:'bv',fase:'v'};
-  if (s.inicioE) {
-    const d = dd(pISO(s.inicioE), TODAY);
-    if (d>=180) return {label:'✅ Listo',cls:'bl',fase:'l',d};
-    if (d>=120) return {label:'Casi listo',cls:'bq',fase:'q',d};
-    return {label:'En estanque',cls:'bs',fase:'s',d};
-  }
-  return {label:'En carga',cls:'bc',fase:'c'};
-};
-// Igual que verificarYCrearEventos() del calendario: se revuelve cada 7 días también
-// con el sistema ya en estanque (no se corta al cargar inicioE).
-const proxRev = s => {
-  if (!s.inicioC) return null;
-  const r = S.revolcadas.filter(x=>x.sistema===s.id).sort((a,b)=>a.fecha>b.fecha?-1:1);
-  const base = r.length ? pISO(r[0].fecha) : pISO(s.inicioC);
-  const p = new Date(base); p.setDate(p.getDate()+7); return p;
-};
+const est = s => faseSistema(s, TODAY);
+const proxRev = s => proxRevolcada(s, S.revolcadas);
 // Todo texto cargado por el usuario (nombres, notas, observaciones) se escapa antes de meterlo en innerHTML.
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const sLbl = s => s.nombre ? `#${s.id} — ${s.nombre}` : `Sistema ${s.id}`;
@@ -1368,18 +1353,7 @@ const sysHTML = s => {
 
 // ════ ANÁLISIS EXTRA — con los datos que se van acumulando ════
 const analisisExtra = () => {
-  const bySis = {};
-  [...S.revolcadas].sort((a,b)=>a.fecha>b.fecha?1:-1).forEach(r=>{
-    (bySis[r.sistema] ??= []).push(r.fecha);
-  });
-  let enTiempo=0, totalPares=0;
-  Object.values(bySis).forEach(arr=>{
-    for(let i=1;i<arr.length;i++){
-      totalPares++;
-      if (dd(pISO(arr[i-1]), pISO(arr[i])) <= 7) enTiempo++;
-    }
-  });
-  const pctRevolcadas = totalPares ? Math.round(enTiempo/totalPares*100) : null;
+  const { totalPares, pct: pctRevolcadas } = revolcadasEnTiempo(S.revolcadas);
 
   const totalPlantas = S.plantas.length;
   let plantasOk = 0;
