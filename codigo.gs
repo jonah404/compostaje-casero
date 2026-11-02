@@ -2056,7 +2056,10 @@ function actualizarFichaPlantas() {
     }
 
     var aguaEfectiva = calcularUltimaAguaEfectiva(ultimoRiego, especie);
-    if (aguaEfectiva.fecha) {
+    // Las plantas de interior ya no se riegan desde acá: sin contador ni alertas de riego.
+    if (perfil && perfil.tipo === 'Interior') {
+      shP.getRange(fila, 18).setValue('').setBackground(null).setFontColor(null);
+    } else if (aguaEfectiva.fecha) {
       var fechaAgua = new Date(aguaEfectiva.fecha); fechaAgua.setHours(0, 0, 0, 0);
       var diasSinAgua = Math.floor((hoy - fechaAgua) / 86400000);
       var limiteRiego = perfil
@@ -2151,7 +2154,7 @@ function verificarEventosPlantas(cal, manana) {
     var ultimoRiego = p[16] ? new Date(p[16]) : null;
     var aguaEfectiva = calcularUltimaAguaEfectiva(ultimoRiego, especie);
 
-    if (aguaEfectiva.fecha) {
+    if (aguaEfectiva.fecha && !esInterior) {
       var fechaAgua = new Date(aguaEfectiva.fecha); fechaAgua.setHours(0, 0, 0, 0);
       var diasSinAgua = Math.floor((hoy - fechaAgua) / 86400000);
       var limiteRiego = perfil

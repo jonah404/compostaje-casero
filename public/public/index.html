@@ -1214,7 +1214,9 @@ const estPlanta = p => {
   const esVerano = CFG_PLA.mesesVerano.includes(mes);
   const perfil = perfilEspecie(p.especie || p.nombre);
   const limite = perfil ? (esVerano ? perfil.riegoVerano : perfil.riegoInvierno) : (esVerano ? CFG_PLA.diasSinRiegoVerano : CFG_PLA.diasSinRiegoInvierno);
-  const agua = aguaEfectiva(p);
+  // Las plantas de interior ya no se riegan desde la app: sin conteo ni alertas de riego.
+  const interior = !!(perfil && perfil.tipo === 'Interior');
+  const agua = interior ? null : aguaEfectiva(p);
   const diasSinAgua = agua ? dd(agua.fecha, hoy) : null;
   const fueraDeTemporadaFert = perfil && !mesEnTemporada(mes, perfil.fertMesIni, perfil.fertMesFin);
   const fert   = proxCalc(p, 'Fertiliz', 'ultimaFert',   'proximaFert',   perfil ? perfil.diasFert : CFG_PLA.diasFert);
@@ -1222,7 +1224,7 @@ const estPlanta = p => {
   const plagas = proxCalc(p, 'plagas', 'ultimaPlagas', 'proximaPlagas', fichaFitoP ? diasVigilancia(fichaFitoP, mes) : CFG_PLA.diasPlagas);
   const poda   = proxCalc(p, 'Poda',     'ultimaPoda',   'proximaPoda',   (perfil && perfil.podaDias) ? perfil.podaDias : CFG_PLA.diasPoda);
   return {
-    diasSinAgua, limite, agua,
+    diasSinAgua, limite, agua, interior,
     riegoUrg: diasSinAgua!=null && diasSinAgua>=limite,
     riegoProx: diasSinAgua!=null && diasSinAgua>=limite*0.7 && diasSinAgua<limite,
     proximaFert: fert.proxima, diasParaFert: fert.dias, fertEnTemporada: !fueraDeTemporadaFert, fertUrg: !fueraDeTemporadaFert && fert.dias!=null && fert.dias<=0,
@@ -1802,15 +1804,16 @@ const renderPla = () => {
 const renderPlaResumen = () => {
   const ax = analisisExtra();
   const ests = S.plantas.map(estPlanta);
-  const nUrg = ests.filter(e => e.riegoUrg).length;
-  const nProx = ests.filter(e => e.riegoProx).length;
-  const nOk = ests.length - nUrg - nProx;
+  const estsRiego = ests.filter(e => !e.interior);
+  const nUrg = estsRiego.filter(e => e.riegoUrg).length;
+  const nProx = estsRiego.filter(e => e.riegoProx).length;
+  const nOk = estsRiego.length - nUrg - nProx;
   const donut = donutSVG([
     {value:nOk, color:'var(--chart-1)'}, {value:nProx, color:'var(--chart-3)'}, {value:nUrg, color:'var(--chart-4)'},
   ], 112, 15, 'plantas');
   const legend = [ {n:'Al día', v:nOk, c:'var(--chart-1)'}, {n:'Riego pronto', v:nProx, c:'var(--chart-3)'}, {n:'Regar ahora', v:nUrg, c:'var(--chart-4)'} ];
   document.getElementById('pla-resumen').innerHTML = S.plantas.length ? `
-    <div class="card">
+    ${estsRiego.length ? `<div class="card">
       <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:10px">Riego de plantas</div>
       <div class="donut-wrap">
         ${donut}
@@ -1818,7 +1821,7 @@ const renderPlaResumen = () => {
           ${legend.map(l => `<div class="donut-legend-item"><span style="display:flex;align-items:center;gap:7px"><span class="donut-dot" style="background:${l.c}"></span>${l.n}</span><b>${l.v}</b></div>`).join('')}
         </div>
       </div>
-    </div>
+    </div>` : ''}
     <div class="ring-row">
       <div class="ring-tile">
         ${ringSVG(ax.pctPlantas, ax.pctPlantas == null ? 'var(--ink3)' : ax.pctPlantas >= 80 ? 'var(--chart-1)' : ax.pctPlantas >= 50 ? 'var(--chart-3)' : 'var(--chart-4)')}
