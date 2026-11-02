@@ -1,8 +1,9 @@
 {
   "private": true,
   "type": "module",
-  "description": "Solo pruebas de las reglas de Firestore (la app no tiene build)",
+  "description": "La app no tiene build; acá solo viven las pruebas",
   "scripts": {
+    "test:rapido": "node scripts/check-sintaxis.mjs && node scripts/test-preventivo.mjs && node scripts/test-turnos.mjs && node scripts/test-escritor.mjs && node scripts/test-historial.mjs && node scripts/test-altas-gs.mjs",
     "test:reglas": "firebase emulators:exec --config public/firebase.json --only firestore --project compostaje-casero \"node scripts/test-reglas.mjs\""
   },
   "devDependencies": {

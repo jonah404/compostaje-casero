@@ -1,0 +1,17 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Estas pruebas no necesitan dependencias; las reglas de Firestore (test:reglas)
+      # requieren el emulador y se corren a mano antes de tocar firestore.rules.
+      - run: npm run test:rapido
