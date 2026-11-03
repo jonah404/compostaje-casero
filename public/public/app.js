@@ -15,7 +15,7 @@ import { PAL, interp, luma, palGradient, GRAD, heatCell } from './heatmap.js';
 import { analisisClima } from './analisis.js';
 import { PERIODOS, rangoPeriodo, serieDiaria, resumenPeriodo, indiceDesdeX, graficoSVG, acumulado, tooltipHTML, detalleDiaHTML, GRAFICOS, seriesDe, fmtFechaCorta, fmtFechaLarga } from './clima-graficos.js';
 import { armarRespaldo, nombreRespaldo, registrosParaExcel } from './respaldo.js';
-import { climaSparkSVG, donutSVG, hbarSVG, ringSVG } from './graficos.js';
+import { donutSVG, hbarSVG, ringSVG } from './graficos.js';
 import { ETQ, CFG_PEC, estadoPecera, armarTareas, armarUrgentes } from './tareas.js';
 import { PLANES, GRUPOS, grupoDePlanta, estadoTratamiento, calendarioAnual } from './preventivo.js';
 import {
@@ -746,13 +746,10 @@ const fitoHTML = p => {
   </details>`;
 };
 
-// ════ CABECERA DE CLIMA (antes en Inicio): gráfico de 21 días + clima reciente ════
+// ════ CABECERA DE CLIMA (antes en Inicio): clima reciente ════
 const climaHeadHTML = () => {
   const ch = cdDia(fISO(TODAY)) || [...S.clima].sort((a,b) => a.fecha > b.fecha ? -1 : 1)[0];
   return `<div class="card">
-    <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:8px">Temperatura y lluvia — últimos 21 días</div>
-    ${climaSparkSVG(S.clima, TODAY, 21)}
-    <div class="sep"></div>
     <div style="font-size:12px;color:var(--ink3);font-weight:600;margin-bottom:10px">Clima reciente <span class="sh-sub">${ch ? fmt(ch.fecha) : ''}</span></div>
     ${ch ? `<div>
       <div class="clh-row">
