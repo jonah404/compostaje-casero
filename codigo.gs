@@ -38,9 +38,45 @@ var CFG = {
   tempFria:           5,
   diasFrioConsec:     2,
   tempCalor:          38,
-  diasEstanqueMin:    120,  // 4 meses → aviso
-  diasEstanqueOk:     180,  // 6 meses → listo
+  diasPlenosMin:      60,   // días de actividad plena → aviso (≈4 meses con frío)
+  diasPlenosOk:       90,   // días de actividad plena → listo (90 d en verano, hasta 180 d en invierno)
 };
+
+// La actividad microbiana se duplica cada ~10 °C (Q10≈2) entre 10 y 20 °C. Se cuentan días de
+// actividad plena: 1 por día cálido, hasta 0.5 por día frío, con la temperatura media REAL de
+// cada día de la hoja de clima. Los días sin dato (hoy, futuros) usan la temperatura media de
+// los últimos 14 días con dato. Igual que compost.js.
+function factorActividad(temp) {
+  return Math.min(1, Math.max(0.5, Math.pow(2, (temp - 20) / 10)));
+}
+function fechaClave(d) { return Utilities.formatDate(new Date(d), CFG.tz, "yyyy-MM-dd"); }
+function factorPorDia(climaDatos, hoy) {
+  var mapa = {};
+  climaDatos.forEach(function(r) {
+    if (r[0] && r[1] !== "" && !isNaN(Number(r[1]))) mapa[fechaClave(r[0])] = Number(r[1]);
+  });
+  var rec = [], f = new Date(hoy.getTime());
+  for (var i = 0; i < 60 && rec.length < 14; i++) {
+    f.setDate(f.getDate() - 1);
+    var t = mapa[fechaClave(f)];
+    if (t !== undefined) rec.push(t);
+  }
+  var fProy = rec.length ? factorActividad(rec.reduce(function(a, b) { return a + b; }, 0) / rec.length) : 0.75;
+  return function(d) {
+    if (d < hoy) { var t = mapa[fechaClave(d)]; if (t !== undefined) return factorActividad(t); }
+    return fProy;
+  };
+}
+function diasPlenos(desde, hoy, fd) {
+  var ac = 0, f = new Date(desde.getTime());
+  while (f < hoy) { ac += fd(f); f.setDate(f.getDate() + 1); }
+  return ac;
+}
+function diasHastaPlenos(desde, plenos, fd) {
+  var ac = 0, n = 0, f = new Date(desde.getTime());
+  while (ac < plenos && n < 1000) { ac += fd(f); f.setDate(f.getDate() + 1); n++; }
+  return n;
+}
 
 // ====================================================================
 //  TRIGGERS SEPARADOS — configurar con configurarTriggerDiario()
@@ -329,6 +365,7 @@ function actualizarAnalisis() {
 
   var hoy        = new Date();
   var climaDatos = shClima.getDataRange().getValues().slice(2);
+  var fdClima    = factorPorDia(climaDatos, hoy);
   var sisDatos   = shSis.getDataRange().getValues().slice(2);
 
   function ultimosDias(n) {
@@ -435,11 +472,12 @@ function actualizarAnalisis() {
     var tProm  = avgCol(climaPer, 1);
     var lluPer = sumCol(climaPer, 8);
     var diasEstanq = fechaEstanq ? Math.floor((hoy-fechaEstanq)/86400000) : null;
+    var plenosEstanq = fechaEstanq ? diasPlenos(fechaEstanq, hoy, fdClima) : null;
 
     var estado = !fechaInicio ? "Sin datos" :
       !fechaEstanq ? "En carga 🔄" :
-      diasEstanq>=CFG.diasEstanqueOk  ? "LISTO 🎉" :
-      diasEstanq>=CFG.diasEstanqueMin ? "CASI LISTO ⏳" : "En estanque 🏺";
+      plenosEstanq>=CFG.diasPlenosOk  ? "LISTO 🎉" :
+      plenosEstanq>=CFG.diasPlenosMin ? "CASI LISTO ⏳" : "En estanque 🏺";
 
     // Próximo revolver: calculado desde ULTIMA revolcada registrada para este sistema
     var proxRev = "—";
@@ -459,8 +497,8 @@ function actualizarAnalisis() {
       var dias   = Math.floor((hoy - base) / 86400000);
       if (dias >= CFG.diasSinRevolver) alerta = "🔄 REVOLVER";
     }
-    if (diasEstanq !== null && diasEstanq >= CFG.diasEstanqueOk)  alerta = "🎉 COSECHAR";
-    else if (diasEstanq !== null && diasEstanq >= CFG.diasEstanqueMin && alerta === "—") alerta = "👀 REVISAR";
+    if (plenosEstanq !== null && plenosEstanq >= CFG.diasPlenosOk)  alerta = "🎉 COSECHAR";
+    else if (plenosEstanq !== null && plenosEstanq >= CFG.diasPlenosMin && alerta === "—") alerta = "👀 REVISAR";
 
     var bgEst = estado.indexOf("LISTO")>=0?"#B7E4C7":estado.indexOf("CASI")>=0?"#FFF3B0":"#F9F9F9";
     var bgAl  = alerta.indexOf("REVOLVER")>=0?"#FFD166":
@@ -879,6 +917,7 @@ function verificarYCrearEventos() {
   var sisDatos   = shSis.getDataRange().getValues().slice(2);
   var climaDatos = shClima.getDataRange().getValues().slice(2);
   var climaAyer  = climaDatos.length ? climaDatos[climaDatos.length-1] : null;
+  var fdClima    = factorPorDia(climaDatos, hoy);
 
   var tempMin   = climaAyer ? Number(climaAyer[3])  : null;
   var tempMax   = climaAyer ? Number(climaAyer[2])  : null;
@@ -978,12 +1017,13 @@ function verificarYCrearEventos() {
 
     if (fechaEstanq) {
       var diasEstanq = Math.floor((hoy - fechaEstanq) / 86400000);
-      if (diasEstanq >= CFG.diasEstanqueOk) {
+      var plenosEstanq = diasPlenos(fechaEstanq, hoy, fdClima);
+      if (plenosEstanq >= CFG.diasPlenosOk) {
         gruposCompost.listoCosechar.push({ numSis: numSis, diasEstanq: diasEstanq });
-      } else if (diasEstanq >= CFG.diasEstanqueMin) {
+      } else if (plenosEstanq >= CFG.diasPlenosMin) {
         gruposCompost.revisarMaduracion.push({
           numSis: numSis, diasEstanq: diasEstanq,
-          fechaEstimada: new Date(fechaEstanq.getTime() + CFG.diasEstanqueOk*86400000)
+          fechaEstimada: new Date(fechaEstanq.getFullYear(), fechaEstanq.getMonth(), fechaEstanq.getDate() + diasHastaPlenos(fechaEstanq, CFG.diasPlenosOk, fdClima))
         });
       }
     }
@@ -1019,7 +1059,7 @@ function verificarYCrearEventos() {
       desc: gruposCompost.listoCosechar.map(function(x) {
         return "• Sistema " + x.numSis + " — " + x.diasEstanq + " días en estanque";
       }).join("\n") + "\n\n" +
-        "Ya cumplieron 6 meses. Aspecto esperado: tierra oscura, olor a tierra húmeda.\n" +
+        "Ya cumplieron su tiempo de maduración (90 días en verano, hasta 180 en invierno). Aspecto esperado: tierra oscura, olor a tierra húmeda.\n" +
         "Acción: cosechar y preparar para el próximo ciclo.",
       color: CalendarApp.EventColor.GREEN,
       urgente: true
@@ -1030,8 +1070,7 @@ function verificarYCrearEventos() {
     eventos.push({
       titulo: "⏳ COMPOST: Revisar maduración — " + gruposCompost.revisarMaduracion.length + " sistema(s)",
       desc: gruposCompost.revisarMaduracion.map(function(x) {
-        return "• Sistema " + x.numSis + " — " + x.diasEstanq + " días en estanque (mín: " +
-          CFG.diasEstanqueMin + "), cosecha estimada " +
+        return "• Sistema " + x.numSis + " — " + x.diasEstanq + " días en estanque, cosecha estimada " +
           Utilities.formatDate(x.fechaEstimada, CFG.tz, "dd/MM/yyyy");
       }).join("\n") + "\n\nAcción: revisá visualmente color, textura y olor.",
       color: CalendarApp.EventColor.TEAL

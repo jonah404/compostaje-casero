@@ -7,7 +7,7 @@ import { esAutorizado, nombreCorto, agruparEntradas, filtrarEntradas, htmlGrupo,
 import { crearEscritor } from './escritor.js';
 import { duenoDelDia } from './turnos.js';
 import { estadoPlanta, esInterior } from './plantas.js';
-import { faseSistema, proxRevolcada, revolcadasEnTiempo } from './compost.js';
+import { faseSistema, huecosClima, proxRevolcada, revolcadasEnTiempo } from './compost.js';
 import { fISO, pISO, fmt, dd, n1, n0, esc } from './util.js';
 import { SEED_SIS, SEED_REV, SEED_CLI, SEED_PLA, SEED_REGPLA, SEED_PEC, SEED_REGPEC } from './semillas.js';
 import { NIVEL_DIAS, NIVEL_LABEL, PROBLEMAS_CITRICOS_COMUN, FITOSANITARIO, fichaFito, nivelVigilancia, diasVigilancia } from './fitosanitario.js';
@@ -109,6 +109,24 @@ async function autoFetch(force = false) {
   const datos = await fetchClima(subDays(hoy, 35), subDays(hoy, 1));
   if (!datos.length) return false;
   upsertCli(datos); S.climaLastFetch = hoy; sv();
+  if (useFirebase) datos.forEach(c => fbSave('clima', c.id, c, { sinHistorial:true }).catch(()=>{}));
+  return true;
+}
+
+// Los estanques se miden con la temperatura real de cada día: si falta alguna del historial
+// (sistema cargado hace más de 35 días, o sin conexión esos días) se pide a Open-Meteo.
+async function completarClimaEstanques() {
+  const hoy = todayISO();
+  if (S.climaHuecosChequeo === hoy) return false;
+  const inicios = S.sistemas.filter(x => x.inicioC && x.inicioE).map(x => x.inicioE).sort();
+  if (!inicios.length) return false;
+  const faltan = huecosClima(pISO(inicios[0]), TODAY, S.clima);
+  S.climaHuecosChequeo = hoy;
+  if (!faltan.length) { sv(); return false; }
+  const datos = (await fetchClima(faltan[0], faltan[faltan.length - 1])).filter(c => faltan.includes(c.fecha));
+  sv();
+  if (!datos.length) return false;
+  upsertCli(datos); sv();
   if (useFirebase) datos.forEach(c => fbSave('clima', c.id, c, { sinHistorial:true }).catch(()=>{}));
   return true;
 }
@@ -257,7 +275,7 @@ document.addEventListener('keydown', e => {
 const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0);
 const cdDia = f => S.clima.find(c => c.fecha === f) || null;
 
-const est = s => faseSistema(s, TODAY);
+const est = s => faseSistema(s, TODAY, S.clima);
 const proxRev = s => proxRevolcada(s, S.revolcadas);
 const sLbl = s => s.nombre ? `#${s.id} — ${s.nombre}` : `Sistema ${s.id}`;
 
@@ -350,8 +368,8 @@ const sysHTML = s => {
   const e=est(s), p=proxRev(s), d=p?dd(TODAY,p):null;
   const rc = S.revolcadas.filter(r=>r.sistema===s.id).length;
   let pp=0, pc='';
-  if(e.fase==='s'){pp=Math.min(100,Math.round(e.d/180*100));pc='pfb';}
-  if(e.fase==='q'){pp=Math.min(100,Math.round(e.d/180*100));pc='pfa';}
+  if(e.fase==='s'){pp=e.pct;pc='pfb';}
+  if(e.fase==='q'){pp=e.pct;pc='pfa';}
   if(e.fase==='l'){pp=100;pc='pfg';}
   const mp = [s.inicioC?'Carga: '+fmt(s.inicioC):'', s.inicioE?'Estanque: '+fmt(s.inicioE):'', rc?rc+' revolcada(s)':''].filter(Boolean);
   return `<div class="sysc" role="button" tabindex="0" onclick="openSis(${s.id})">
@@ -363,7 +381,7 @@ const sysHTML = s => {
       </span>
     </div>
     ${mp.length?`<div class="sysc-meta">${mp.join('&nbsp;&nbsp;·&nbsp;&nbsp;')}</div>`:''}
-    ${pp?`<div class="prog"><div class="pf ${pc}" style="width:${pp}%"></div></div><div class="prog-lb"><span>${e.d} días</span><span>meta 180 días</span></div>`:''}
+    ${pp?`<div class="prog"><div class="pf ${pc}" style="width:${pp}%"></div></div><div class="prog-lb"><span>${e.d} días</span><span>meta ~${e.meta} días</span></div>`:''}
     ${p?`<div class="rev-pill ${d<0?'rph':d<=2?'rpp':'rpo'}"><i class="ti ti-refresh" style="font-size:12px"></i>${d<0?'Atrasado '+(-d)+'d':d===0?'HOY':'En '+d+'d'}</div>`:''}
   </div>`;
 };
@@ -843,7 +861,7 @@ window.openSis = id => {
   document.getElementById('mtitle').textContent = sLbl(s);
   document.getElementById('mbody').innerHTML = `
     <div style="margin-bottom:14px"><span class="badge ${e.cls}" style="font-size:12px;padding:5px 12px">${e.label}${e.d?' · '+e.d+' días':''}</span></div>
-    ${(e.fase==='s'||e.fase==='q'||e.fase==='l')?`<div class="prog" style="height:6px;margin-bottom:4px"><div class="pf ${e.fase==='l'?'pfg':e.fase==='q'?'pfa':'pfb'}" style="width:${Math.min(100,Math.round(e.d/180*100))}%"></div></div><div class="prog-lb" style="margin-bottom:14px"><span>${e.d} días</span><span>meta 180 días</span></div>`:``}
+    ${(e.fase==='s'||e.fase==='q'||e.fase==='l')?`<div class="prog" style="height:6px;margin-bottom:4px"><div class="pf ${e.fase==='l'?'pfg':e.fase==='q'?'pfa':'pfb'}" style="width:${e.pct}%"></div></div><div class="prog-lb" style="margin-bottom:14px"><span>${e.d} días</span><span>meta ~${e.meta} días · listo ~${e.fechaListo.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'})}</span></div>`:``}
     <table class="mt-tbl">
       <tr><td>Inicio carga</td><td>${fmt(s.inicioC)}</td></tr>
       <tr><td>Fin carga</td><td>${fmt(s.finC)}</td></tr>
@@ -1383,7 +1401,12 @@ const init = async () => {
       if(ok){ refresh(); }
     });
   }
-  fbLoad().then(async ()=>{ poblarSels(); refresh(); await cargarPreviasPrev(); vaciarColaSheet(); });
+  fbLoad().then(async ()=>{ poblarSels(); refresh(); await cargarPreviasPrev(); vaciarColaSheet(); if (await completarClimaEstanques()) refresh(); });
+  // Si la app queda abierta de un día para otro, al volver se baja el clima nuevo y se recalcula
+  document.addEventListener('visibilitychange', async () => {
+    if (document.hidden || S.climaLastFetch === todayISO()) return;
+    if (await autoFetch(false)) refresh();
+  });
 };
 
 // ════ ACCESO (login con Google) ════

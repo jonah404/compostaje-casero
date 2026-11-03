@@ -94,6 +94,6 @@ export const armarUrgentes = ctx => {
     if (frias.length) out.push({ c:'al-w', t:'🥶 Frío — alejar de la ventana', b: frias.map(ctx.pLbl).join(', ') });
   }
   if (ult && ult.tmax != null && ult.tmax !== '' && +ult.tmax >= TEMP_CALOR) out.push({ c:'al-r', t:'🔥 Calor extremo — revisar humedad del compost', b:`Máxima registrada: ${n1(ult.tmax)}°C` });
-  ctx.sistemas.filter(s => ctx.faseSistema(s) === 'l').forEach(s => out.push({ c:'al-ok', t:`🎉 ${ctx.sLbl(s)} — listo para cosechar`, b:'Más de 180 días en estanque' }));
+  ctx.sistemas.filter(s => ctx.faseSistema(s) === 'l').forEach(s => out.push({ c:'al-ok', t:`🎉 ${ctx.sLbl(s)} — listo para cosechar`, b:'Cumplió su tiempo de maduración en estanque' }));
   return out;
 };
