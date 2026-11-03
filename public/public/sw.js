@@ -3,13 +3,14 @@
 // si cambian, hay que subir esta versión.
 // Hosting sirve html/js con "Cache-Control: no-cache" (firebase.json) y acá se piden con
 // cache:'no-cache'/'reload' para que la caché HTTP del navegador no deje versiones mezcladas.
-const CACHE = 'brote-v22';
+const CACHE = 'brote-v23';
 const APP_SHELL = [
   '/',
   '/index.html',
   '/styles.css',
   '/app.js',
   '/util.js',
+  '/respaldo.js',
   '/semillas.js',
   '/fitosanitario.js',
   '/heatmap.js',

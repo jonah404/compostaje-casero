@@ -122,6 +122,14 @@
 
     <!-- HISTORIAL -->
     <div class="pg" id="pg-his">
+      <div class="card respaldo">
+        <div class="respaldo-t">Respaldo de tus datos</div>
+        <div class="respaldo-s" id="respaldo-ult"></div>
+        <div class="respaldo-btns">
+          <button class="btn-o" onclick="descargarRespaldo()"><i class="ti ti-download"></i> Respaldo completo (JSON)</button>
+          <button class="btn-o" onclick="exportarExcel()"><i class="ti ti-download"></i> Registros para Excel (CSV)</button>
+        </div>
+      </div>
       <div class="his-filtros">
         <div class="f"><label>Persona</label><select id="his-p" onchange="renderHistorial()"><option value="">Todas</option></select></div>
         <div class="f"><label>Acción</label><select id="his-a" onchange="renderHistorial()">

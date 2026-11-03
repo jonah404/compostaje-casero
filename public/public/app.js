@@ -13,6 +13,7 @@ import { SEED_SIS, SEED_REV, SEED_CLI, SEED_PLA, SEED_REGPLA, SEED_PEC, SEED_REG
 import { NIVEL_DIAS, NIVEL_LABEL, PROBLEMAS_CITRICOS_COMUN, FITOSANITARIO, fichaFito, nivelVigilancia, diasVigilancia } from './fitosanitario.js';
 import { PAL, interp, luma, palGradient, GRAD, heatCell } from './heatmap.js';
 import { analisisClima } from './analisis.js';
+import { armarRespaldo, nombreRespaldo, registrosParaExcel } from './respaldo.js';
 import { climaSparkSVG, donutSVG, hbarSVG, ringSVG } from './graficos.js';
 import { ETQ, CFG_PEC, estadoPecera, armarTareas, armarUrgentes } from './tareas.js';
 import { PLANES, GRUPOS, grupoDePlanta, estadoTratamiento, calendarioAnual } from './preventivo.js';
@@ -1093,7 +1094,7 @@ const renderTab = t => {
   if (t==='comp') { renderCompostResumen(); renderSist(); renderRev(); }
   if (t==='pla')  { renderPlaResumen(); renderPla(); renderPec(); }
   if (t==='cli')  renderCli();
-  if (t==='his')  renderHistorial();
+  if (t==='his')  { renderHistorial(); pintarRespaldo(); }
 };
 window.refresh = () => renderTab(cur);
 window.setSeg = (tab, s) => {
@@ -1153,6 +1154,41 @@ const cargarHistorial = async (mas = false) => {
     renderHistorial();
   } catch (e) { toast('No se pudo cargar el historial'); }
 };
+// ════ RESPALDO ════
+// Baja una copia de lo que la app guarda (JSON completo) o los registros en CSV para Excel.
+// En el celular se usa la hoja de compartir (Drive, WhatsApp, correo…); en la PC, una descarga normal.
+const CLAVE_RESPALDO = 'brote_ultimo_respaldo';
+const descargar = async (nombre, texto, tipo) => {
+  const blob = new Blob([texto], { type: tipo });
+  const archivo = new File([blob], nombre, { type: tipo });
+  if (navigator.canShare && navigator.canShare({ files: [archivo] }) && /iPhone|iPad|Android/i.test(navigator.userAgent)) {
+    try { await navigator.share({ files: [archivo], title: nombre }); return true; }
+    catch (e) { if (e.name === 'AbortError') return false; }
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = nombre;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  return true;
+};
+const pintarRespaldo = () => {
+  const el = document.getElementById('respaldo-ult'); if (!el) return;
+  let ts = null; try { ts = +localStorage.getItem(CLAVE_RESPALDO) || null; } catch(e) {}
+  el.textContent = ts ? 'Último respaldo descargado: ' + new Date(ts).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : 'Todavía no descargaste ninguno';
+};
+const respaldoHecho = () => { try { localStorage.setItem(CLAVE_RESPALDO, String(Date.now())); } catch(e) {} pintarRespaldo(); };
+window.descargarRespaldo = async () => {
+  toast('Preparando el respaldo…');
+  if (useFirebase) await fbLoad();   // trae lo último de Firestore antes de armarlo
+  const r = armarRespaldo(S, (window.usuarioActual() || {}).email || '');
+  if (await descargar(nombreRespaldo(), JSON.stringify(r, null, 2), 'application/json')) { respaldoHecho(); toast('✅ Respaldo listo'); }
+};
+window.exportarExcel = async () => {
+  toast('Preparando el archivo…');
+  if (useFirebase) await fbLoad();
+  if (await descargar(nombreRespaldo(new Date(), 'csv', 'brote-registros'), registrosParaExcel(S), 'text/csv;charset=utf-8')) toast('✅ Archivo listo');
+};
+
 window.abrirHistorial = () => { go('his'); cargarHistorial(false); };
 window.cargarMasHistorial = () => cargarHistorial(true);
 window.clickHistorial = async ev => {
