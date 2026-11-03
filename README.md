@@ -23,6 +23,12 @@ public/public/index.html  ───────► colecciones (fuente  ◄─�
 - **Apps Script (`codigo.gs`)**: se pega a mano en el editor de Apps Script. Corre los triggers diarios (clima, eventos de calendario, fichas de plantas, sincronización a Firestore) y expone el `doPost`.
 - **Clima**: Open-Meteo (archive API), sin clave.
 
+## Respaldos
+
+- **Automático**: `respaldarFirestoreEnDrive()` (Apps Script) guarda cada noche, ~03:15, un JSON con todas las colecciones de Firestore en la carpeta "Brote respaldos" de Drive, y conserva los últimos 30. Hay que darle el permiso `https://www.googleapis.com/auth/drive` en `appsscript.json` y correr `agregarTriggerRespaldo()` una vez (los pasos están en el encabezado de la función).
+- **Manual**: en la app, Historial → "Respaldo completo (JSON)" o "Registros para Excel (CSV)".
+- **Restaurar**: no hay botón. Los JSON se pueden volver a cargar en Firestore a mano; el historial de la app permite deshacer cambios puntuales.
+
 ## Seguridad
 
 - Login con Google. Solo entran `jonahlalvarez@gmail.com` y `mavidiaz092@gmail.com`.

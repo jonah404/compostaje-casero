@@ -2749,3 +2749,117 @@ function diagnosticarPecera() {
     Logger.log('10) Eventos que YA existen hoy en el calendario: ' + JSON.stringify(existentes));
   }
 }
+
+// ====================================================================
+//  RESPALDO AUTOMÁTICO de Firestore en Google Drive
+//
+//  Cada noche guarda una copia de todas las colecciones en la carpeta
+//  "Brote respaldos" de tu Drive (un archivo brote-respaldo-AAAA-MM-DD.json
+//  por día) y conserva los últimos 30. Es la copia cruda de Firestore: cada
+//  documento con su _docId y sus campos internos (_by, etc.).
+//
+//  CÓMO INSTALARLO (una sola vez):
+//  1. Pegar este archivo completo en el proyecto de Apps Script.
+//  2. Configuración del proyecto → "Mostrar el archivo de manifiesto
+//     appsscript.json" y sumar este permiso a "oauthScopes" (conservando
+//     los que ya están):
+//       "https://www.googleapis.com/auth/drive"
+//  3. Ejecutar respaldarFirestoreEnDrive() a mano y aceptar el permiso
+//     nuevo: comprobá que aparece la carpeta y el archivo en Drive.
+//  4. Ejecutar agregarTriggerRespaldo() para que corra todas las noches.
+// ====================================================================
+var CFG_RESPALDO = {
+  carpeta: 'Brote respaldos',
+  conservar: 30,
+  colecciones: ['sistemas', 'revolcadas', 'plantas', 'registroPlantas', 'pecera', 'registroPecera', 'clima', 'historial']
+};
+
+// Firestore devuelve cada valor envuelto ({ stringValue: ... }); esto lo vuelve un valor común.
+function fsValor_(v) {
+  if (v === null || v === undefined) return null;
+  if ('stringValue' in v) return v.stringValue;
+  if ('integerValue' in v) return Number(v.integerValue);
+  if ('doubleValue' in v) return v.doubleValue;
+  if ('booleanValue' in v) return v.booleanValue;
+  if ('timestampValue' in v) return v.timestampValue;
+  if ('nullValue' in v) return null;
+  if ('mapValue' in v) return fsCampos_(v.mapValue.fields);
+  if ('arrayValue' in v) return (v.arrayValue.values || []).map(fsValor_);
+  if ('geoPointValue' in v) return v.geoPointValue;
+  if ('referenceValue' in v) return v.referenceValue;
+  return null;
+}
+
+function fsCampos_(campos) {
+  var o = {};
+  Object.keys(campos || {}).forEach(function (k) { o[k] = fsValor_(campos[k]); });
+  return o;
+}
+
+function fsDocAObjeto_(doc) {
+  var o = fsCampos_(doc.fields);
+  o._docId = String(doc.name).split('/').pop();
+  return o;
+}
+
+function listarColeccion_(coleccion) {
+  var docs = [], token = '';
+  do {
+    var url = 'https://firestore.googleapis.com/v1/projects/' + FIRESTORE_PROJECT_ID +
+      '/databases/(default)/documents/' + coleccion + '?pageSize=300' +
+      (token ? '&pageToken=' + encodeURIComponent(token) : '');
+    var resp = fsFetch_(url, { muteHttpExceptions: true });
+    if (resp.getResponseCode() >= 300) {
+      throw new Error('Firestore ' + coleccion + ': ' + resp.getResponseCode() + ' ' + resp.getContentText());
+    }
+    var cuerpo = JSON.parse(resp.getContentText());
+    (cuerpo.documents || []).forEach(function (d) { docs.push(fsDocAObjeto_(d)); });
+    token = cuerpo.nextPageToken || '';
+  } while (token);
+  return docs;
+}
+
+function armarRespaldoFirestore_() {
+  var datos = {};
+  CFG_RESPALDO.colecciones.forEach(function (c) { datos[c] = listarColeccion_(c); });
+  return { app: 'Brote', origen: 'firestore', version: 1, creado: new Date().toISOString(), datos: datos };
+}
+
+function carpetaRespaldos_() {
+  var it = DriveApp.getFoldersByName(CFG_RESPALDO.carpeta);
+  return it.hasNext() ? it.next() : DriveApp.createFolder(CFG_RESPALDO.carpeta);
+}
+
+// Borra (a la papelera) los respaldos más viejos y deja los últimos CFG_RESPALDO.conservar.
+function depurarRespaldos_(carpeta) {
+  var archivos = [], it = carpeta.getFiles();
+  while (it.hasNext()) {
+    var f = it.next();
+    if (/^brote-respaldo-\d{4}-\d{2}-\d{2}\.json$/.test(f.getName())) archivos.push(f);
+  }
+  archivos.sort(function (a, b) { return a.getName() < b.getName() ? 1 : -1; });   // más nuevos primero
+  archivos.slice(CFG_RESPALDO.conservar).forEach(function (f) { f.setTrashed(true); });
+  return Math.max(0, archivos.length - CFG_RESPALDO.conservar);
+}
+
+function respaldarFirestoreEnDrive() {
+  var respaldo = armarRespaldoFirestore_();
+  var carpeta = carpetaRespaldos_();
+  var nombre = 'brote-respaldo-' + Utilities.formatDate(new Date(), CFG.tz, 'yyyy-MM-dd') + '.json';
+  var repetidos = carpeta.getFilesByName(nombre);   // si ya corrió hoy, se reemplaza
+  while (repetidos.hasNext()) repetidos.next().setTrashed(true);
+  carpeta.createFile(nombre, JSON.stringify(respaldo), 'application/json');
+  var borrados = depurarRespaldos_(carpeta);
+  var resumen = CFG_RESPALDO.colecciones.map(function (c) { return c + ': ' + respaldo.datos[c].length; }).join(' | ');
+  Logger.log('[OK] Respaldo ' + nombre + ' guardado en "' + CFG_RESPALDO.carpeta + '" (' + resumen + '). Respaldos viejos borrados: ' + borrados);
+}
+
+// Agrega el trigger nocturno sin tocar los demás (y sin duplicarlo si ya existe).
+function agregarTriggerRespaldo() {
+  var existe = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'respaldarFirestoreEnDrive'; });
+  if (existe) { Logger.log('[INFO] El trigger de respaldo ya existe — no se agregó otro'); return; }
+  ScriptApp.newTrigger('respaldarFirestoreEnDrive')
+    .timeBased().atHour(3).nearMinute(15).everyDays(1)
+    .inTimezone(CFG.tz).create();
+  Logger.log('[OK] Trigger creado: respaldarFirestoreEnDrive todas las noches ~03:15');
+}

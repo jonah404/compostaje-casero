@@ -48,6 +48,23 @@ const TOKENS = {
   'tok-sin-verificar': { email: OK, emailVerified: false },
   'tok-ajeno': { email: 'otro@x.com', emailVerified: true },
 };
+// Firestore de prueba: documentos por colección (en páginas) y un Drive con carpeta y archivos.
+let FS_PAGINAS = {}, FS_ERROR = null, TRIGGERS = [];
+const campo = x => typeof x === 'string' ? { stringValue: x } : Number.isInteger(x) ? { integerValue: String(x) } : typeof x === 'number' ? { doubleValue: x }
+  : typeof x === 'boolean' ? { booleanValue: x } : x === null ? { nullValue: null } : Array.isArray(x) ? { arrayValue: { values: x.map(campo) } }
+  : { mapValue: { fields: Object.fromEntries(Object.entries(x).map(([k, v]) => [k, campo(v)])) } };
+const doc = (col, id, o) => ({ name: 'projects/p/databases/(default)/documents/' + col + '/' + id, fields: Object.fromEntries(Object.entries(o).map(([k, v]) => [k, campo(v)])) });
+const nuevoDrive = (archivosIniciales = []) => {
+  const carpetas = {};
+  const crearArchivo = (nombre, contenido) => { const f = { nombre, contenido, papelera: false, getName: () => nombre, setTrashed(v) { f.papelera = v; } }; return f; };
+  const carpeta = { archivos: archivosIniciales.map(n => crearArchivo(n, '{}')),
+    getFiles() { const a = carpeta.archivos.filter(f => !f.papelera); let i = 0; return { hasNext: () => i < a.length, next: () => a[i++] }; },
+    getFilesByName(n) { const a = carpeta.archivos.filter(f => !f.papelera && f.nombre === n); let i = 0; return { hasNext: () => i < a.length, next: () => a[i++] }; },
+    createFile(n, c, tipo) { const f = crearArchivo(n, c); f.tipo = tipo; carpeta.archivos.push(f); return f; } };
+  return { carpeta, creadas: [], getFoldersByName: n => { const hay = carpetas[n]; return { hasNext: () => !!hay, next: () => hay }; },
+    createFolder(n) { carpetas[n] = carpeta; this.creadas.push(n); return carpeta; } };
+};
+let DRIVE = nuevoDrive();
 const cargar = (hojas, llamadas = []) => {
   const ctx = {
     Logger: { log() {} },
@@ -58,7 +75,6 @@ const cargar = (hojas, llamadas = []) => {
     },
     CalendarApp: { EventColor: new Proxy({}, { get: (_, k) => String(k) }) },
     SpreadsheetApp: { getActiveSpreadsheet: () => ({ getSheetByName: n => hojas[n] || null }) },
-    ScriptApp: { getOAuthToken: () => 'TOKEN-STUB' },
     CacheService: { getScriptCache: () => { const m = {}; return { get: k => m[k] || null, put: (k, v) => { m[k] = v; } }; } },
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
     ContentService: { MimeType: { JSON: 'json' }, createTextOutput: txt => ({ txt, setMimeType() { return this; } }) },
@@ -69,8 +85,19 @@ const cargar = (hojas, llamadas = []) => {
         return u ? { getResponseCode: () => 200, getContentText: () => JSON.stringify({ users: [u] }) }
                  : { getResponseCode: () => 400, getContentText: () => '{}' };
       }
+      const lista = url.match(/documents\/([A-Za-z]+)\?pageSize/);
+      if (lista) {
+        const paginas = FS_PAGINAS[lista[1]] || [[]];
+        const token = (url.match(/pageToken=([0-9]+)/) || [])[1];
+        const i = token ? +token : 0;
+        return { getResponseCode: () => FS_ERROR === lista[1] ? 500 : 200,
+          getContentText: () => JSON.stringify({ documents: paginas[i], nextPageToken: i + 1 < paginas.length ? String(i + 1) : undefined }) };
+      }
       return { getResponseCode: () => 200, getContentText: () => '' };
     } },
+    DriveApp: DRIVE,
+    ScriptApp: { getOAuthToken: () => 'TOKEN-STUB', getProjectTriggers: () => TRIGGERS, newTrigger: fn => { const t = { fn, getHandlerFunction: () => fn };
+      const b = { timeBased: () => b, atHour: () => b, nearMinute: () => b, everyDays: () => b, inTimezone: () => b, create: () => { TRIGGERS.push(t); return t; } }; return b; } },
   };
   vm.createContext(ctx);
   vm.runInContext(src, ctx);
@@ -124,6 +151,72 @@ console.log('agregarEspeciesFaltantes');
   });
   t('repetirla no duplica filas', () => {
     const antes = esp.rows.length; g.agregarEspeciesFaltantes(); assert.equal(esp.rows.length, antes);
+  });
+}
+
+console.log('respaldo en Drive');
+{
+  const lista = ['sistemas', 'revolcadas', 'plantas', 'registroPlantas', 'pecera', 'registroPecera', 'clima', 'historial'];
+  const preparar = (archivos = []) => {
+    DRIVE = nuevoDrive(archivos); TRIGGERS = []; FS_ERROR = null;
+    FS_PAGINAS = { plantas: [[doc('plantas', '1', { id: 1, nombre: 'Limonero', _by: { uid: 'u1', email: 'a@b.c' }, dias: [1, 2.5], ok: true, nada: null })], [doc('plantas', '2', { id: 2, nombre: 'Durazno' })]],
+      pecera: [[doc('pecera', 'main', { litros: 42 })]] };
+    return cargar({});
+  };
+  t('lee todas las colecciones, incluidas las páginas siguientes', () => {
+    const g = preparar(); g.respaldarFirestoreEnDrive();
+    const f = DRIVE.carpeta.archivos[0], r = JSON.parse(f.contenido);
+    assert.deepEqual(Object.keys(r.datos), lista);
+    assert.deepEqual(r.datos.plantas.map(p => p._docId), ['1', '2']);
+    assert.equal(r.datos.pecera[0].litros, 42);
+    assert.deepEqual(r.datos.sistemas, []);
+    assert.equal(r.origen, 'firestore');
+  });
+  t('convierte los valores de Firestore (números, listas, mapas, nulos)', () => {
+    const g = preparar(); g.respaldarFirestoreEnDrive();
+    const p = JSON.parse(DRIVE.carpeta.archivos[0].contenido).datos.plantas[0];
+    assert.equal(p.id, 1); assert.deepEqual(p.dias, [1, 2.5]); assert.equal(p.ok, true); assert.equal(p.nada, null);
+    assert.deepEqual(p._by, { uid: 'u1', email: 'a@b.c' });
+  });
+  t('crea la carpeta una vez y guarda un archivo por día con la fecha en el nombre', () => {
+    const g = preparar(); g.respaldarFirestoreEnDrive(); g.respaldarFirestoreEnDrive();
+    assert.deepEqual(DRIVE.creadas, ['Brote respaldos']);
+    const vivos = DRIVE.carpeta.archivos.filter(f => !f.papelera);
+    assert.equal(vivos.length, 1);
+    assert.match(vivos[0].nombre, /^brote-respaldo-\d{4}-\d{2}-\d{2}\.json$/);
+    assert.equal(vivos[0].tipo, 'application/json');
+  });
+  t('conserva solo los últimos 30 y manda los más viejos a la papelera', () => {
+    const viejos = Array.from({ length: 35 }, (_, i) => 'brote-respaldo-2026-09-' + String(i + 1).padStart(2, '0') + '.json').map(n => n.replace('-09-3', '-10-0').replace('-09-4', '-10-1'));
+    const g = preparar([...new Set(viejos)]);
+    g.respaldarFirestoreEnDrive();
+    const vivos = DRIVE.carpeta.archivos.filter(f => !f.papelera);
+    assert.equal(vivos.length, 30);
+    assert.ok(vivos.some(f => f.nombre.startsWith('brote-respaldo-2026-11') || f.nombre.indexOf(new Date().getFullYear()) > 0), 'el de hoy se conserva');
+    const papelera = DRIVE.carpeta.archivos.filter(f => f.papelera).map(f => f.nombre).sort();
+    assert.ok(papelera.length >= 5);
+    assert.ok(papelera.every(n => vivos.every(v => v.nombre > n)), 'se borran los más viejos');
+  });
+  t('no toca otros archivos de la carpeta', () => {
+    const g = preparar(['notas.txt']); g.respaldarFirestoreEnDrive();
+    assert.equal(DRIVE.carpeta.archivos.find(f => f.nombre === 'notas.txt').papelera, false);
+  });
+  t('si Firestore falla corta con un error y no guarda un respaldo a medias', () => {
+    const g = preparar(); FS_ERROR = 'revolcadas';
+    assert.throws(() => g.respaldarFirestoreEnDrive(), /revolcadas: 500/);
+    assert.equal(DRIVE.carpeta.archivos.length, 0);
+  });
+  t('las lecturas llevan el token OAuth del script', () => {
+    const llamadas = []; DRIVE = nuevoDrive(); TRIGGERS = []; FS_ERROR = null; FS_PAGINAS = {};
+    cargar({}, llamadas).respaldarFirestoreEnDrive();
+    const fsl = llamadas.filter(l => l.url.includes('firestore.googleapis.com'));
+    assert.equal(fsl.length, lista.length);
+    fsl.forEach(l => assert.equal(l.o.headers.Authorization, 'Bearer TOKEN-STUB'));
+  });
+  t('el trigger nocturno se agrega una sola vez', () => {
+    const g = preparar(); g.agregarTriggerRespaldo(); g.agregarTriggerRespaldo();
+    assert.equal(TRIGGERS.length, 1);
+    assert.equal(TRIGGERS[0].fn, 'respaldarFirestoreEnDrive');
   });
 }
 
