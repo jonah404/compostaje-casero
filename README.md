@@ -16,7 +16,7 @@ public/public/index.html  ───────► colecciones (fuente  ◄─�
 
 - **App (`public/public/`)**: sin build, solo archivos estáticos.
   - `index.html` es solo el HTML (marcado y pantallas), `styles.css` los estilos y `app.js` la interfaz y el estado (`S`, que se guarda en el navegador y se sincroniza).
-  - La lógica va en módulos sin acceso a la app, todos con tests: `plantas.js` (riego, fertilización, plagas y poda), `tareas.js` (tareas de hoy, urgencias y pecera), `compost.js`, `preventivo.js` (calendario de fumigación), `turnos.js`, `fitosanitario.js` (fichas de plagas), `analisis.js` (clima), `heatmap.js`, `graficos.js`, `util.js` y `semillas.js` (datos iniciales).
+  - La lógica va en módulos sin acceso a la app, todos con tests: `plantas.js` (riego, fertilización, plagas y poda), `tareas.js` (tareas de hoy, urgencias y pecera), `compost.js`, `preventivo.js` (calendario de fumigación), `turnos.js`, `fitosanitario.js` (fichas de plagas), `analisis.js` (clima), `clima-graficos.js` (períodos, resumen y gráficos del clima), `heatmap.js`, `graficos.js`, `util.js` y `semillas.js` (datos iniciales).
   - `escritor.js` e `historial.js` guardan el autor de cada cambio, el historial y "restaurar". `sw.js` es el service worker (sin conexión).
 - **Datos**: Firestore guarda sistemas, revolcadas, plantas, registro de plantas, pecera, registro de pecera, clima e historial. La app también guarda una copia en el navegador (`localStorage`, clave `compost_v7`) para funcionar sin conexión.
 - **Google Sheet**: es el respaldo y donde se ven las fichas. La app le escribe vía el Web App de Apps Script (`doPost`); si el envío falla por falta de conexión queda en una cola local y se reintenta.

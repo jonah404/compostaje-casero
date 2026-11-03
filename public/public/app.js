@@ -13,6 +13,7 @@ import { SEED_SIS, SEED_REV, SEED_CLI, SEED_PLA, SEED_REGPLA, SEED_PEC, SEED_REG
 import { NIVEL_DIAS, NIVEL_LABEL, PROBLEMAS_CITRICOS_COMUN, FITOSANITARIO, fichaFito, nivelVigilancia, diasVigilancia } from './fitosanitario.js';
 import { PAL, interp, luma, palGradient, GRAD, heatCell } from './heatmap.js';
 import { analisisClima } from './analisis.js';
+import { PERIODOS, rangoPeriodo, serieDiaria, resumenPeriodo, indiceDesdeX, graficoSVG, acumulado, tooltipHTML, detalleDiaHTML, GRAFICOS, seriesDe, fmtFechaCorta, fmtFechaLarga } from './clima-graficos.js';
 import { armarRespaldo, nombreRespaldo, registrosParaExcel } from './respaldo.js';
 import { climaSparkSVG, donutSVG, hbarSVG, ringSVG } from './graficos.js';
 import { ETQ, CFG_PEC, estadoPecera, armarTareas, armarUrgentes } from './tareas.js';
@@ -771,40 +772,189 @@ const climaHeadHTML = () => {
 // ════ RENDER CLIMA ════
 let climaVerTodo = false;
 // Muestra todo lo que hay en el dispositivo y, si Firestore tiene días anteriores, trae otro bloque.
-window.climaMas = async () => {
-  climaVerTodo = true;
+// Trae de Firestore un bloque más viejo de clima. Devuelve true si llegaron días nuevos.
+const traerClimaAnterior = async () => {
   // Cursor: el día más viejo que trajo Firestore (no el local, que en un
   // dispositivo nuevo es el seed y dejaría un hueco sin traer).
   const cursor = climaCursor || [...S.clima].sort((a,b) => a.fecha < b.fecha ? -1 : 1)[0]?.fecha;
-  if (useFirebase && cursor) {
-    try {
-      const cd = await getDocs(query(collection(db,'clima'),orderBy('fecha','desc'),startAfter(cursor),limit(CLIMA_DIAS_FIRESTORE)));
-      if (cd.docs.length) { upsertCli(cd.docs.map(d => ({id:d.id,...d.data()}))); climaCursor = cd.docs[cd.docs.length-1].data().fecha; sv(); }
-    } catch(e) {}
-  }
+  if (!useFirebase || !cursor) return false;
+  try {
+    const cd = await getDocs(query(collection(db,'clima'),orderBy('fecha','desc'),startAfter(cursor),limit(CLIMA_DIAS_FIRESTORE)));
+    if (!cd.docs.length) return false;
+    upsertCli(cd.docs.map(d => ({id:d.id,...d.data()}))); climaCursor = cd.docs[cd.docs.length-1].data().fecha; sv();
+    return true;
+  } catch(e) { return false; }
+};
+// Muestra todo lo que hay en el dispositivo y, si Firestore tiene días anteriores, trae otro bloque.
+window.climaMas = async () => {
+  climaVerTodo = true;
+  await traerClimaAnterior();
   renderCli();
 };
+
+// ════ ANÁLISIS GRÁFICO DEL CLIMA ════
+// Período, KPIs y gráficos salen de los mismos registros diarios (S.clima). Cada gráfico tiene su propia
+// escala y unidad; un día sin dato queda como hueco, nunca como cero.
+const CLAVE_PER = 'brote_clima_periodo';
+const climaPer = (() => { try { const g = JSON.parse(localStorage.getItem(CLAVE_PER) || 'null'); if (g && g.clave) return g; } catch(e) {} return { clave:'30', desde:'', hasta:'' }; })();
+const climaOcultas = new Set();   // 'grafico:serie' de las series que se apagaron
+let cgCargando = false;
+
+const cgRango = () => rangoPeriodo(climaPer.clave, TODAY, climaPer.desde, climaPer.hasta);
+const cgDatos = () => { const rg = cgRango(); const { fechas, registros } = serieDiaria(S.clima, rg.desde, rg.hasta); return { rg, fechas, registros }; };
+
+// Si el período pide días más viejos que los que hay en el dispositivo, se traen de Firestore.
+const asegurarClimaDesde = async desde => {
+  if (!useFirebase || cgCargando) return;
+  cgCargando = true; let cambio = false;
+  try {
+    for (let k = 0; k < 8; k++) {
+      const min = S.clima.map(c => c.fecha).sort()[0];
+      if (!min || min <= desde) break;
+      if (!(await traerClimaAnterior())) break;
+      cambio = true;
+    }
+  } finally { cgCargando = false; }
+  if (cambio && document.getElementById('cg-root')) renderAnalisisClima(true);
+};
+
+const kpiClima = (rotulo, valor, sub, color) => `<div class="stat"><div class="stat-l">${rotulo}</div><div class="stat-v"${color ? ` style="color:${color}"` : ''}>${valor}</div><div class="stat-s">${sub}</div></div>`;
+
+const renderAnalisisClima = (sinTraer) => {
+  const root = document.getElementById('cg-root'); if (!root) return;
+  const { rg, fechas, registros } = cgDatos();
+  const res = resumenPeriodo(registros, rg.dias);
+  const an = analisisClima(S.clima, TODAY);   // la racha sin lluvia es la de hoy hacia atrás, no depende del período
+  const cond = res.condicion;
+  const titulo = rg.clave === 'custom' ? 'Período personalizado' : 'Últimos ' + rg.dias + ' días';
+  const hoyIso = fISO(TODAY);
+  root.innerHTML = `
+    <div class="sh">Análisis <span class="sh-sub">${titulo} · ${fmtFechaCorta(rg.desde)} al ${fmtFechaCorta(rg.hasta)}</span></div>
+    <div class="cg-pers" role="group" aria-label="Período">
+      ${PERIODOS.map(p => `<button class="cg-pill${rg.clave === p.clave ? ' on' : ''}" data-per="${p.clave}" aria-pressed="${rg.clave === p.clave}">${p.etiqueta}</button>`).join('')}
+      <button class="cg-pill${rg.clave === 'custom' ? ' on' : ''}" data-per="custom" aria-pressed="${rg.clave === 'custom'}">Personalizado</button>
+    </div>
+    ${rg.clave === 'custom' ? `<div class="cg-custom">
+      <label>Desde <input type="date" id="cg-desde" value="${rg.desde}" max="${hoyIso}"></label>
+      <label>Hasta <input type="date" id="cg-hasta" value="${rg.hasta}" max="${hoyIso}"></label>
+    </div>` : ''}
+    <div class="cg-cob">${res.diasConDato} de ${rg.dias} días con registro${cgCargando ? ' · cargando historial…' : ''}</div>
+    <div class="g4" style="margin-bottom:10px">
+      ${kpiClima('Temp promedio', res.tempProm == null ? '—' : n1(res.tempProm) + '°', res.tmin == null ? 'sin datos' : 'mín ' + n1(res.tmin) + '° · máx ' + n1(res.tmax) + '°')}
+      ${kpiClima('Humedad', res.humProm == null ? '—' : n0(res.humProm) + '%', 'promedio')}
+      ${kpiClima('Lluvia', res.lluviaTotal == null ? '—' : n1(res.lluviaTotal), 'mm acumulados · ' + res.diasLluvia + ' día(s) con lluvia')}
+      ${kpiClima('Evaporación', res.evapoTotal == null ? '—' : n1(res.evapoTotal), 'mm en el período')}
+    </div>
+    <div class="g4" style="margin-bottom:16px">
+      ${kpiClima('Viento', res.vientoProm == null ? '—' : n1(res.vientoProm), res.rafagaMax == null ? 'km/h promedio' : 'km/h prom. · ráfaga ' + n1(res.rafagaMax))}
+      ${kpiClima('Sol', res.solProm == null ? '—' : n1(res.solProm), 'horas por día')}
+      ${kpiClima('Sin lluvia', an.sl, 'días consecutivos hasta hoy')}
+      ${kpiClima('Condición', cond ? cond.idx : '—', cond ? '/100 — ' + cond.il2.split(' ').slice(-1)[0] : 'sin datos', cond && cond.ic)}
+    </div>
+    <div class="cg-grid">${GRAFICOS.filter(g => !g.compacto).map(cgCardHTML).join('')}</div>
+    <div class="cg-grid cg-mini">${GRAFICOS.filter(g => g.compacto).map(cgCardHTML).join('')}</div>`;
+  pintarGraficosClima();
+  if (!sinTraer) asegurarClimaDesde(rg.desde);
+};
+
+const cgCardHTML = g => {
+  const { registros, rg } = cgDatos();
+  const vals = registros.map(r => r && r[g.series[0].campo] != null && r[g.series[0].campo] !== '' ? +r[g.series[0].campo] : null);
+  const total = vals.filter(v => v != null).reduce((a, b) => a + b, 0);
+  const sub = g.id === 'lluvia' ? `<div class="cg-sub">Acumulado del período: <b>${n1(total)} mm</b> · ${vals.filter(v => v > 0).length} día(s) con lluvia</div>` : '';
+  const leyenda = g.series.length > 1 ? `<div class="cg-leg">${g.series.map(s => { const on = !climaOcultas.has(g.id + ':' + s.id);
+    return `<button class="cg-lg${on ? '' : ' off'}" data-g="${g.id}" data-s="${s.id}" aria-pressed="${on}"><span class="cg-dot" style="background:${s.color}"></span>${s.nombre}</button>`; }).join('')}</div>` : '';
+  return `<div class="card cg-card"><div class="cg-head"><div class="cg-t">${g.titulo} <span>${g.unidad}</span></div>${leyenda}</div>${sub}<div class="cg-wrap" data-g="${g.id}" tabindex="0" role="group" aria-label="${g.titulo}: pasá el cursor o tocá un día para ver el valor"></div></div>`;
+};
+
+const pintarGraficosClima = () => {
+  const { fechas, registros } = cgDatos();
+  document.querySelectorAll('#cg-root .cg-wrap').forEach(w => {
+    const g = GRAFICOS.find(x => x.id === w.dataset.g); if (!g) return;
+    const series = seriesDe(g, registros, climaOcultas);
+    const ancho = Math.max(240, Math.floor(w.clientWidth || 320));
+    w._cg = { g, series, fechas, registros };
+    w.innerHTML = graficoSVG({ tipo: g.tipo, fechas, series, ancho, alto: g.compacto ? 150 : 190, dec: g.dec, fijo: g.fijo || null, etiqueta: g.titulo + ' (' + g.unidad + ')' }) + '<div class="cg-tt" hidden></div>';
+  });
+};
+
+const cgXde = (svg, i) => { const n = +svg.dataset.n, pl = +svg.dataset.pl, pw = +svg.dataset.pw;
+  return svg.dataset.barras === '1' ? pl + (i + .5) * pw / n : (n === 1 ? pl + pw / 2 : pl + i * pw / (n - 1)); };
+const cgOcultarTodo = () => document.querySelectorAll('#cg-root .cg-tt').forEach(t => { t.hidden = true; t.style.pointerEvents = ''; document.querySelectorAll('#cg-root .cg-cursor').forEach(c => c.style.display = 'none'); });
+const cgMostrar = (wrap, i, tactil) => {
+  const svg = wrap.querySelector('svg.cg-svg'), tt = wrap.querySelector('.cg-tt'), c = wrap._cg; if (!svg || !tt || !c) return;
+  cgOcultarTodo();
+  wrap._i = i;
+  const x = cgXde(svg, i), cur = svg.querySelector('.cg-cursor');
+  cur.setAttribute('x1', x); cur.setAttribute('x2', x); cur.style.display = '';
+  const extras = c.g.id === 'lluvia' ? [{ nombre: 'Acumulado', texto: n1(acumulado(c.series[0].valores)[i]) + ' mm' }] : [];
+  tt.innerHTML = tooltipHTML(i, c.fechas, c.series, { dec: c.g.dec, unidad: c.g.unidad, extras })
+    + (tactil && c.registros[i] ? `<button class="cg-tt-btn" data-dia="${c.fechas[i]}">Ver día completo ›</button>` : '');
+  tt.style.pointerEvents = tactil ? 'auto' : 'none';
+  tt.hidden = false;
+  const ancho = wrap.clientWidth, w = tt.offsetWidth;
+  tt.style.left = (x > ancho * 0.55 ? Math.max(4, x - w - 10) : Math.min(ancho - w - 4, x + 10)) + 'px';
+  tt.style.top = '4px';
+};
+const cgIndice = (wrap, e) => { const svg = wrap.querySelector('svg.cg-svg'); if (!svg) return null;
+  const r = svg.getBoundingClientRect(), x = (e.clientX - r.left) * (svg.viewBox.baseVal.width / r.width);
+  return indiceDesdeX(x, { n: +svg.dataset.n, padL: +svg.dataset.pl, plotW: +svg.dataset.pw, barras: svg.dataset.barras === '1' }); };
+
+window.abrirDiaClima = fecha => {
+  const c = S.clima.find(x => x.fecha === fecha);
+  document.getElementById('mtitle').textContent = fmtFechaLarga(fecha);
+  document.getElementById('mbody').innerHTML = detalleDiaHTML(c || null);
+  document.getElementById('mwrap').classList.add('on');
+};
+
+const guardarPeriodo = () => { try { localStorage.setItem(CLAVE_PER, JSON.stringify(climaPer)); } catch(e) {} };
+const cgIniciarEventos = () => {
+  const host = document.getElementById('cli-c'); if (!host || host._cgListo) return; host._cgListo = true;
+  host.addEventListener('click', e => {
+    const per = e.target.closest('.cg-pill');
+    if (per) {
+      climaPer.clave = per.dataset.per;
+      if (climaPer.clave === 'custom' && !climaPer.desde) { const r = rangoPeriodo('30', TODAY); climaPer.desde = r.desde; climaPer.hasta = r.hasta; }
+      guardarPeriodo(); renderAnalisisClima(); return;
+    }
+    const lg = e.target.closest('.cg-lg');
+    if (lg) { const k = lg.dataset.g + ':' + lg.dataset.s; climaOcultas.has(k) ? climaOcultas.delete(k) : climaOcultas.add(k); renderAnalisisClima(true); return; }
+    const btn = e.target.closest('.cg-tt-btn');
+    if (btn) { abrirDiaClima(btn.dataset.dia); return; }
+    const w = e.target.closest('.cg-wrap');
+    if (!w) { cgOcultarTodo(); return; }
+    const i = cgIndice(w, e); if (i == null) return;
+    if (e.pointerType === 'mouse' || e.detail > 0 && !('ontouchstart' in window)) {
+      if (w._cg.registros[i]) abrirDiaClima(w._cg.fechas[i]); else showToast('No hay registro de ese día');
+    } else cgMostrar(w, i, true);
+  });
+  host.addEventListener('pointermove', e => { if (e.pointerType !== 'mouse') return; const w = e.target.closest('.cg-wrap'); if (!w) return; const i = cgIndice(w, e); if (i != null) cgMostrar(w, i, false); });
+  // pointerleave no burbujea: en captura llega por cada hijo, así que solo vale el del propio gráfico
+  host.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse' && e.target.classList && e.target.classList.contains('cg-wrap')) cgOcultarTodo(); }, true);
+  host.addEventListener('keydown', e => {
+    const w = e.target.closest('.cg-wrap'); if (!w || !w._cg) return;
+    const n = w._cg.fechas.length; let i = w._i == null ? n - 1 : w._i;
+    if (e.key === 'ArrowLeft') i = Math.max(0, i - 1); else if (e.key === 'ArrowRight') i = Math.min(n - 1, i + 1);
+    else if (e.key === 'Enter' && w._i != null && w._cg.registros[w._i]) { abrirDiaClima(w._cg.fechas[w._i]); return; } else return;
+    e.preventDefault(); cgMostrar(w, i, false);
+  });
+  host.addEventListener('change', e => {
+    if (e.target.id !== 'cg-desde' && e.target.id !== 'cg-hasta') return;
+    const d = document.getElementById('cg-desde').value, h = document.getElementById('cg-hasta').value;
+    if (!d || !h) return;
+    climaPer.clave = 'custom'; climaPer.desde = d; climaPer.hasta = h; guardarPeriodo(); renderAnalisisClima();
+  });
+  // un toque fuera de los gráficos cierra el tooltip fijado (táctil)
+  document.addEventListener('click', e => { if (!e.target.closest('.cg-wrap')) cgOcultarTodo(); });
+  let t = null;
+  window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(() => { if (document.getElementById('cg-root')) pintarGraficosClima(); }, 150); });
+};
+
 const renderCli = () => {
-  const an = analisisClima(S.clima, TODAY);
   const sorted = [...S.clima].sort((a,b)=>a.fecha>b.fecha?-1:1);
   const shown = climaVerTodo ? sorted : sorted.slice(0, CLIMA_DIAS_INICIAL);
   const hoy = fISO(TODAY);
   document.getElementById('fetch-bar').classList.add('hide');
-
-  // Summary stats
-  const statsHTML = `
-    <div class="g4" style="margin-bottom:10px">
-      <div class="stat"><div class="stat-l">Temp prom 7d</div><div class="stat-v">${n1(an.tp7)}°</div><div class="stat-s">°C promedio</div></div>
-      <div class="stat"><div class="stat-l">Humedad 7d</div><div class="stat-v">${n0(an.hp7)}%</div><div class="stat-s">promedio</div></div>
-      <div class="stat"><div class="stat-l">Lluvia 7d</div><div class="stat-v">${n1(an.ll7)}</div><div class="stat-s">mm acumulados</div></div>
-      <div class="stat"><div class="stat-l">Lluvia 30d</div><div class="stat-v">${n1(an.ll30)}</div><div class="stat-s">mm acumulados</div></div>
-    </div>
-    <div class="g4" style="margin-bottom:20px">
-      <div class="stat"><div class="stat-l">Sin lluvia</div><div class="stat-v">${an.sl}</div><div class="stat-s">días consecutivos</div></div>
-      <div class="stat"><div class="stat-l">Evapo 7d</div><div class="stat-v">${n1(an.ev7)}</div><div class="stat-s">mm total</div></div>
-      <div class="stat"><div class="stat-l">Viento 7d</div><div class="stat-v">${n1(an.vp7)}</div><div class="stat-s">km/h promedio</div></div>
-      <div class="stat"><div class="stat-l">Condición</div><div class="stat-v" style="color:${an.ic}">${an.idx}</div><div class="stat-s">/100 — ${an.il2.split(' ').slice(-1)[0]}</div></div>
-    </div>`;
 
   // Tabla heatmap (sin columna UV)
   const tableHTML = shown.length ? `
@@ -847,10 +997,12 @@ const renderCli = () => {
 
   document.getElementById('cli-c').innerHTML =
     climaHeadHTML() +
-    `<div class="sh">Resumen <span class="sh-sub">análisis climatico</span></div>${statsHTML}` +
+    `<div id="cg-root"></div>` +
     `<div class="sh">Historial <span class="sh-sub">${shown.length} de ${sorted.length} días — colores por valor</span></div>` +
     tableHTML +
     (!climaVerTodo ? `<button class="btn-o" style="margin-top:6px" onclick="climaMas()">Ver más días</button>` : '');
+  cgIniciarEventos();
+  renderAnalisisClima();
 };
 
 // ════ MODAL SISTEMA ════
