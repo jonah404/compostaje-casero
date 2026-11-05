@@ -1,6 +1,6 @@
 // Tareas de hoy, urgencias y estado de la pecera. Sin acceso a la app: todo entra por parámetro
 // para poder probarlo. Mismos criterios que el evento "Tareas de hoy" del calendario (codigo.gs).
-import { esInterior, perfilEspecie } from './plantas.js';
+import { esInterior } from './plantas.js';
 
 export const ETQ = { riego:'regar', fert:'fertilizar', plagas:'revisar plagas', poda:'poda', revolcada:'revolver' };
 export const TEMP_CALOR = 38, TEMP_HELADA = 2, TEMP_HELADA_SEVERA = -2;
@@ -79,7 +79,7 @@ export const armarTareas = ctx => {
 };
 
 // ════ URGENTES ════
-// Helada, frío en interior, calor extremo, compost listo (mismos umbrales que codigo.gs).
+// Helada (solo plantas de exterior), calor extremo, compost listo (mismos umbrales que codigo.gs).
 // ctx: { clima, plantas, sistemas, faseSistema(s)→'l'|…, sLbl, pLbl }
 export const armarUrgentes = ctx => {
   const out = [];
@@ -90,8 +90,6 @@ export const armarUrgentes = ctx => {
       const sev = tmin <= TEMP_HELADA_SEVERA;
       out.push({ c: sev ? 'al-r' : 'al-w', t: (sev ? '🧊 Helada severa' : '❄️ Helada') + ' — proteger plantas de exterior', b:`Mínima registrada: ${n1(tmin)}°C` });
     }
-    const frias = ctx.plantas.filter(p => { const pf = esInterior(p) && perfilEspecie(p.especie || p.nombre); return pf && pf.tempMin != null && tmin <= pf.tempMin + 2; });
-    if (frias.length) out.push({ c:'al-w', t:'🥶 Frío — alejar de la ventana', b: frias.map(ctx.pLbl).join(', ') });
   }
   if (ult && ult.tmax != null && ult.tmax !== '' && +ult.tmax >= TEMP_CALOR) out.push({ c:'al-r', t:'🔥 Calor extremo — revisar humedad del compost', b:`Máxima registrada: ${n1(ult.tmax)}°C` });
   ctx.sistemas.filter(s => ctx.faseSistema(s) === 'l').forEach(s => out.push({ c:'al-ok', t:`🎉 ${ctx.sLbl(s)} — listo para cosechar`, b:'Cumplió su tiempo de maduración en estanque' }));

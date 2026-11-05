@@ -130,12 +130,12 @@ t('helada: avisa si hay plantas de exterior y la mínima es 2 °C o menos', () =
 t('sin plantas de exterior no hay aviso de helada', () => {
   assert.equal(u([{ fecha: '2026-11-01', tmin: -3 }], { plantas: [monstera] }).filter(x => /Helada/.test(x.t)).length, 0);
 });
-t('frío: avisa de las de interior cuando la mínima llega a su tolerancia + 2', () => {
-  const r = u([{ fecha: '2026-11-01', tmin: 14 }], { plantas: [monstera, limonero] });
+t('las plantas de interior ya no generan aviso de frío, aunque la mínima sea muy baja', () => {
+  assert.deepEqual(u([{ fecha: '2026-11-01', tmin: 1 }], { plantas: [monstera] }), []);
+  const r = u([{ fecha: '2026-11-01', tmin: 1 }], { plantas: [monstera, limonero] });
   assert.equal(r.length, 1);
-  assert.match(r[0].t, /Frío/);
-  assert.equal(r[0].b, 'Monstera');
-  assert.equal(u([{ fecha: '2026-11-01', tmin: 15 }], { plantas: [monstera] }).length, 0);
+  assert.match(r[0].t, /Helada/);   // solo por el limonero (exterior)
+  assert.ok(!r.some(x => /Frío/.test(x.t)));
 });
 t('calor extremo desde 38 °C y se usa el día más reciente', () => {
   const r = u([{ fecha: '2026-10-01', tmax: 20 }, { fecha: '2026-11-01', tmax: 38 }]);

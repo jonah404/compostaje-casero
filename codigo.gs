@@ -1109,7 +1109,7 @@ function verificarYCrearEventos() {
 //  EVENTO ÚNICO DIARIO
 //  Todas las tareas del día (compost, plantas, pecera) van en UN solo
 //  evento "Tareas de hoy · N" con una sección por área. Sólo las
-//  urgencias (helada, calor extremo, frío en interior, compost listo)
+//  urgencias (helada, calor extremo, compost listo)
 //  quedan como evento aparte, con hora y recordatorio emergente, para que
 //  no se pierdan dentro de una descripción larga.
 // ====================================================================
@@ -2164,7 +2164,6 @@ function verificarEventosPlantas(cal, manana) {
   // plantas, un evento por planta hacía el calendario ilegible. Cada categoría
   // se junta en UN solo evento con la lista de plantas en la descripción.
   var grupos = {
-    frioInterior:  [], // { nombre, tempTolerado }
     heladaExterior: { severa: false, plantas: [] },
     riegoUrgente:  [], // { nombre, diasSinAgua, limiteRiego, contexto }
     riegoProximo:  [], // { nombre, diasRestantes }
@@ -2184,11 +2183,8 @@ function verificarEventosPlantas(cal, manana) {
 
     // ── HELADA / FRÍO ──────────────────────────────────────────────
     if (tempMin !== null) {
-      if (esInterior && perfil.tempMin !== null) {
-        if (tempMin <= perfil.tempMin + 2) {
-          grupos.frioInterior.push({ nombre: nombre, tempTolerado: perfil.tempMin });
-        }
-      } else if (!esInterior && tempMin <= CFG_PLANTAS.tempHeladaUmbral) {
+      // Las plantas de interior ya no generan aviso de frío; solo la helada de las de exterior.
+      if (!esInterior && tempMin <= CFG_PLANTAS.tempHeladaUmbral) {
         grupos.heladaExterior.severa = tempMin <= CFG_PLANTAS.tempHeladaSevera;
         grupos.heladaExterior.plantas.push(nombre);
       }
@@ -2263,19 +2259,6 @@ function verificarEventosPlantas(cal, manana) {
 
   // ── Armar UN evento por categoría con todas las plantas ──────────
   var eventos = [];
-
-  if (grupos.frioInterior.length) {
-    eventos.push({
-      titulo: '🥶 FRÍO: alejar de la ventana (' + grupos.frioInterior.length + ')',
-      desc: 'Temperatura mínima pronosticada: ' + tempMin + '°C.\n\n' +
-        grupos.frioInterior.map(function (x) {
-          return '• ' + x.nombre + ' (tolera hasta ~' + x.tempTolerado + '°C)';
-        }).join('\n') +
-        '\n\nAcción: alejarlas de ventanas/corrientes de aire esta noche.',
-      color: CalendarApp.EventColor.CYAN,
-      urgente: true
-    });
-  }
 
   if (grupos.heladaExterior.plantas.length) {
     var severa = grupos.heladaExterior.severa;
