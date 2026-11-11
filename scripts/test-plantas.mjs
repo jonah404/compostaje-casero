@@ -25,6 +25,14 @@ t('interior = tiene perfil de interior; los frutales no', () => {
   assert.equal(esInterior(monstera), true);
   assert.equal(esInterior(limonero), false);
 });
+t('si la especie escrita a mano no matchea, se reconoce por el nombre (potus)', () => {
+  const potus = { id: 12, nombre: 'Potus', especie: 'Epipremnum aureum', fechaP: '2026-01-10' };
+  assert.equal(esInterior(potus), true);
+  const e = estadoPlanta(potus, ctx(dia(2026, 11, 11)));
+  assert.equal(e.interior, true);
+  assert.equal(e.riegoUrg, false);
+  assert.equal(e.riegoProx, false);
+});
 t('temporada de fertilización que cruza fin de año (sep a abr)', () => {
   assert.equal(mesEnTemporada(11, 9, 4), true);
   assert.equal(mesEnTemporada(2, 9, 4), true);

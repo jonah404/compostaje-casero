@@ -42,7 +42,10 @@ export const mesEnTemporada = (mes, ini, fin) => !ini || !fin ? true : (ini<=fin
 const pISO = s => s ? new Date(s + 'T00:00:00') : null;
 const dd = (a, b) => Math.round((b - a) / (1000 * 60 * 60 * 24));
 
-export const esInterior = p => { const pf = perfilEspecie(p.especie || p.nombre); return !!(pf && pf.tipo === 'Interior'); };
+// La especie cargada a mano puede no coincidir con ningún perfil ("Pothos", "Epipremnum"...): si no
+// matchea se prueba con el nombre y la variedad, para no tratar una planta de interior como de exterior.
+export const perfilDePlanta = p => perfilEspecie(p.especie) || perfilEspecie(p.nombre) || perfilEspecie(p.variedad);
+export const esInterior = p => { const pf = perfilDePlanta(p); return !!(pf && pf.tipo === 'Interior'); };
 
 // ctx: { hoy: Date a medianoche, clima: [{fecha, mm}], registro: [eventos de plantas],
 //        diasPlagas: (nombre, mes) => intervalo de revisión, o null para el genérico }
@@ -92,7 +95,7 @@ const proxCalc = (p, ctx, tipoEvento, ultimaKey, proximaKey, intervaloDias) => {
 export const estadoPlanta = (p, ctx) => {
   const hoy = ctx.hoy, mes = hoy.getMonth() + 1;
   const esVerano = CFG_PLA.mesesVerano.includes(mes);
-  const perfil = perfilEspecie(p.especie || p.nombre);
+  const perfil = perfilDePlanta(p);
   const limite = perfil ? (esVerano ? perfil.riegoVerano : perfil.riegoInvierno) : (esVerano ? CFG_PLA.diasSinRiegoVerano : CFG_PLA.diasSinRiegoInvierno);
   // Las plantas de interior ya no se riegan desde la app: sin conteo ni alertas de riego.
   const interior = !!(perfil && perfil.tipo === 'Interior');

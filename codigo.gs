@@ -2090,7 +2090,8 @@ function actualizarFichaPlantas() {
     if (!datos[i][0]) continue;
     var idPlanta = datos[i][0];
     var especie = datos[i][3] || datos[i][1] || '';
-    var perfil = perfilEspecie(especie);
+    var perfil = perfilEspecie(especie) || perfilEspecie(datos[i][1]);
+    if (perfil) especie = perfil.especie;
 
     var ultimoRiego = datos[i][16] ? new Date(datos[i][16]) : null;
     var riegoEvento = obtenerUltimoEventoPlanta_(idPlanta, 'Riego');
@@ -2178,7 +2179,8 @@ function verificarEventosPlantas(cal, manana) {
     if (!p[0] || !p[1]) return;
     var nombre = p[1];
     var especie = p[3] || nombre;
-    var perfil = perfilEspecie(especie);
+    var perfil = perfilEspecie(especie) || perfilEspecie(nombre);
+    if (perfil) especie = perfil.especie;
     var esInterior = perfil && perfil.tipo === 'Interior';
 
     // ── HELADA / FRÍO ──────────────────────────────────────────────
