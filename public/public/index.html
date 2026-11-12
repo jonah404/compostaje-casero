@@ -302,7 +302,7 @@
   <button class="bt"    data-tab="pla"  onclick="go('pla')"><i class="ti ti-leaf"></i>Plantas</button>
   <button class="bt"    data-tab="cli"  onclick="go('cli')"><i class="ti ti-cloud"></i>Clima</button>
 </div></nav>
-<div class="estado-red hide" id="estado-red" role="status" aria-live="polite"></div>
+<button type="button" class="estado-red hide" id="estado-red" onclick="reintentarCola()" aria-live="polite"></button>
 <div class="toast h" id="toast" role="status" aria-live="polite"></div>
 
 <script type="module" src="app.js"></script>

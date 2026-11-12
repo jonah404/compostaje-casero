@@ -237,14 +237,15 @@ const sheetSync = async (tipo, data) => {
     toast('Sin conexión con la planilla: se reintenta solo al volver');
   }
 };
-let vaciandoCola = false;
+let vaciandoCola = false, ultimoErrorCola = '';
 const vaciarColaSheet = async () => {
   if (vaciandoCola || DRY || !SHEET_SYNC_URL) return;
   vaciandoCola = true;
+  ultimoErrorCola = '';
   try {
     let cola = leerCola();
     while (cola.length) {
-      try { await enviarSheet(cola[0].tipo, cola[0].data); } catch(e) { break; }
+      try { await enviarSheet(cola[0].tipo, cola[0].data); } catch(e) { ultimoErrorCola = e && e.message || 'error'; break; }
       cola = cola.slice(1); guardarCola(cola);   // se guarda de a uno: si se corta, no se reenvía lo ya enviado
     }
   } finally { vaciandoCola = false; mostrarEstadoRed(); }
@@ -255,9 +256,20 @@ const mostrarEstadoRed = () => {
   const pend = leerCola().length;
   el.textContent = sinRed
     ? 'Sin conexión: lo que cargues se guarda y se envía al volver' + (pend ? ' · ' + pend + ' pendiente' + (pend > 1 ? 's' : '') : '')
-    : pend ? pend + ' cambio' + (pend > 1 ? 's' : '') + ' pendiente' + (pend > 1 ? 's' : '') + ' de enviar a la planilla' : '';
+    : pend ? pend + ' cambio' + (pend > 1 ? 's' : '') + ' pendiente' + (pend > 1 ? 's' : '') + ' de enviar a la planilla · tocá para enviar' : '';
   el.classList.toggle('hide', !sinRed && !pend);
 };
+// Tocar el aviso reintenta el envío ahora y dice qué pasó.
+window.reintentarCola = async () => {
+  if (vaciandoCola) return;
+  toast('Enviando a la planilla…');
+  await vaciarColaSheet();
+  const quedan = leerCola().length;
+  toast(!quedan ? 'Listo: todo enviado a la planilla'
+    : ultimoErrorCola === 'sin sesión' ? 'Falta iniciar sesión: salí y volvé a entrar para enviar'
+    : 'No se pudo enviar (' + quedan + ' pendiente' + (quedan > 1 ? 's' : '') + '): revisá la conexión');
+};
+setInterval(() => { if (leerCola().length && navigator.onLine !== false) vaciarColaSheet(); }, 120000);
 window.addEventListener('online', () => { mostrarEstadoRed(); vaciarColaSheet().then(mostrarEstadoRed); });
 window.addEventListener('offline', mostrarEstadoRed);
 mostrarEstadoRed();
