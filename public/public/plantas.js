@@ -101,10 +101,12 @@ export const estadoPlanta = (p, ctx) => {
   const interior = !!(perfil && perfil.tipo === 'Interior');
   const agua = interior ? null : aguaEfectiva(p, ctx);
   const diasSinAgua = agua ? dd(agua.fecha, hoy) : null;
-  const fueraDeTemporadaFert = perfil && !mesEnTemporada(mes, perfil.fertMesIni, perfil.fertMesFin);
-  const fert = proxCalc(p, ctx, 'Fertiliz', 'ultimaFert', 'proximaFert', perfil ? perfil.diasFert : CFG_PLA.diasFert);
+  // Las de interior tampoco llevan aviso de fertilización ni de plagas: solo poda/limpieza.
+  const fueraDeTemporadaFert = interior || (perfil && !mesEnTemporada(mes, perfil.fertMesIni, perfil.fertMesFin));
+  const sinCalculo = { proxima: null, dias: null };
+  const fert = interior ? sinCalculo : proxCalc(p, ctx, 'Fertiliz', 'ultimaFert', 'proximaFert', perfil ? perfil.diasFert : CFG_PLA.diasFert);
   const intervaloPlagas = ctx.diasPlagas(p.nombre, mes);
-  const plagas = proxCalc(p, ctx, 'plagas', 'ultimaPlagas', 'proximaPlagas', intervaloPlagas != null ? intervaloPlagas : CFG_PLA.diasPlagas);
+  const plagas = interior ? sinCalculo : proxCalc(p, ctx, 'plagas', 'ultimaPlagas', 'proximaPlagas', intervaloPlagas != null ? intervaloPlagas : CFG_PLA.diasPlagas);
   const poda = proxCalc(p, ctx, 'Poda', 'ultimaPoda', 'proximaPoda', (perfil && perfil.podaDias) ? perfil.podaDias : CFG_PLA.diasPoda);
   return {
     diasSinAgua, limite, agua, interior,

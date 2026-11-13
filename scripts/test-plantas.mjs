@@ -32,6 +32,17 @@ t('si la especie escrita a mano no matchea, se reconoce por el nombre (potus)', 
   assert.equal(e.interior, true);
   assert.equal(e.riegoUrg, false);
   assert.equal(e.riegoProx, false);
+  assert.equal(e.fertUrg, false);
+  assert.equal(e.plagasUrg, false);
+  assert.equal(e.diasParaFert, null);
+  assert.equal(e.diasParaPlagas, null);
+});
+t('interior: sin fertilizar ni plagas aunque estén vencidos; exterior sí', () => {
+  const vencido = { ultimaFert: '2026-01-01', proximaFert: '2026-02-01', ultimaPlagas: '2026-01-01', proximaPlagas: '2026-02-01' };
+  const m = estadoPlanta({ ...monstera, ...vencido }, ctx(dia(2026, 11, 11)));
+  assert.equal(m.fertUrg, false); assert.equal(m.plagasUrg, false);
+  const l = estadoPlanta({ ...limonero, ...vencido }, ctx(dia(2026, 11, 11)));
+  assert.equal(l.fertUrg, true); assert.equal(l.plagasUrg, true);
 });
 t('temporada de fertilización que cruza fin de año (sep a abr)', () => {
   assert.equal(mesEnTemporada(11, 9, 4), true);
@@ -113,11 +124,11 @@ t('interior fuera de temporada de fertilización no es urgente', () => {
   assert.equal(e.fertEnTemporada, false);
   assert.equal(e.fertUrg, false);
 });
-t('interior en temporada fertiliza según su perfil (Monstera cada 30 días)', () => {
+t('interior no fertiliza aunque haya un registro viejo (Monstera)', () => {
   const reg = [{ planta: 9, fecha: '2026-10-01', tipo: '🌿 Fertilización' }];
   const e = estadoPlanta(monstera, ctx(dia(2026, 11, 2), { registro: reg }));
-  assert.equal(e.diasParaFert, -2);
-  assert.equal(e.fertUrg, true);
+  assert.equal(e.diasParaFert, null);
+  assert.equal(e.fertUrg, false);
 });
 t('el intervalo de plagas viene de la ficha fitosanitaria si existe', () => {
   const reg = [{ planta: 2, fecha: '2026-10-30', tipo: '🐛 Revisión plagas' }];

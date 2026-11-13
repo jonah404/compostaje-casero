@@ -2222,7 +2222,7 @@ function verificarEventosPlantas(cal, manana) {
     // ── FERTILIZACIÓN ──────────────────────────────────────────────
     var proxFert = p[11] ? new Date(p[11]) : null;
     var fueraDeTemporada = perfil && !mesEnTemporada_(mes, perfil.fertMesIni, perfil.fertMesFin);
-    if (proxFert && !fueraDeTemporada) {
+    if (proxFert && !fueraDeTemporada && !esInterior) {  // interior: sin aviso de fertilización
       proxFert.setHours(0, 0, 0, 0);
       var diasParaFert = Math.floor((proxFert - hoy) / 86400000);
       var detalleFert = perfil && perfil.productoFert
@@ -2241,7 +2241,7 @@ function verificarEventosPlantas(cal, manana) {
 
     // ── REVISIÓN DE PLAGAS ─────────────────────────────────────────
     var proxPlagas = p[15] ? new Date(p[15]) : null;
-    if (proxPlagas) {
+    if (proxPlagas && !esInterior) {  // interior: sin revisión de plagas
       proxPlagas.setHours(0, 0, 0, 0);
       var diasParaPlagas = Math.floor((proxPlagas - hoy) / 86400000);
       if (diasParaPlagas <= 0) grupos.plagas.push({ nombre: nombre, ficha: fichaFito(nombre) });
